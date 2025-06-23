@@ -9,6 +9,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 INSTALLED_APPS = [
     # ...existing apps...
     'rest_framework.authtoken',  # Add this line
+    'corsheaders',
+]
+
+MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
+    # ...existing middleware...
 ]
 
 MEDIA_URL = '/media/'
@@ -29,8 +35,26 @@ REST_FRAMEWORK = {
     ],
 }
 
+# CORS configuration
+CORS_ALLOW_ALL_ORIGINS = True  # For development only. In production, specify allowed origins
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = True  # For development only
+
+# Or, if you want to specify allowed origins:
+# CORS_ALLOWED_ORIGINS = [
+#     'http://localhost:5173',
+#     'http://localhost:5174',
+# ]
+
+# Enable CORS headers for all HTTP methods
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',

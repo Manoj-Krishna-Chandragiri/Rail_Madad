@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings
 from django.utils import timezone
 import os
 
@@ -32,9 +32,23 @@ class Complaint(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Open')
     staff = models.CharField(max_length=255, blank=True, null=True)
     photos = models.CharField(max_length=255, blank=True, null=True)  # Increased max_length
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    # Add fields for admin interaction
+    resolution_notes = models.TextField(blank=True, null=True)
+    resolved_by = models.CharField(max_length=255, blank=True, null=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
  
     def save(self, *args, **kwargs):
+        # If status is changing to closed, record resolution time
+        if self.pk:
+            old_instance = Complaint.objects.get(pk=self.pk)
+            if old_instance.status != 'closed' and self.status == 'closed':
+                from django.utils import timezone
+                self.resolved_at = timezone.now()
+        
         # Don't modify the photos path as it's now handled in the view
         super().save(*args, **kwargs)
  

@@ -10,6 +10,7 @@
   },
   "proxy": "http://192.168.22.212:8082",
   "dependencies": {
+    "apexcharts": "^4.7.0",
     "@types/node": "^20.11.24",
     "axios": "^1.7.9",
     "cloudinary": "^2.5.1",
@@ -18,7 +19,10 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.2",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "chart.js": "^4.4.0",
+    "react-chartjs-2": "^5.2.0",
+    "react-apexcharts": "^1.7.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.56",

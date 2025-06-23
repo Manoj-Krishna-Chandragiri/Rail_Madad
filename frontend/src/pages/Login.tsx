@@ -8,6 +8,7 @@ import { getFirestore, setDoc, doc, getDoc } from "firebase/firestore";
 import { handleMFAChallenge } from '../utils/mfa';
 import { sendSMS, validatePhoneNumber, formatPhoneNumber } from '../utils/smsGateway';
 import { handleEmailSignIn, handlePhoneSignIn, validatePhoneVerification, handleMockVerification } from '../utils/authHandlers';
+import axios from 'axios';
 
 const MALE_DEFAULT_AVATAR = 'https://uxwing.com/wp-content/themes/uxwing/download/peoples-avatars/default-profile-picture-male-icon.png';
 const FEMALE_DEFAULT_AVATAR = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRHEJ-8GyKlZr5ZmEfRMmt5nR4tH_aP-crbgg&s';
@@ -21,6 +22,7 @@ interface SignUpData {
   gender: 'male' | 'female' | '';
   address: string;
   profileImage: string;
+  userType: 'passenger' | 'admin';
 }
 
 interface PasswordInputProps {
@@ -117,7 +119,8 @@ const Login: React.FC = () => {
     phoneNumber: '',
     gender: '',
     address: '',
-    profileImage: ''
+    profileImage: '',
+    userType: 'passenger'
   });
   const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('error');
   const navigate = useNavigate();
@@ -179,17 +182,90 @@ const Login: React.FC = () => {
     }
   }, [showPhoneRecovery]); // Add showPhoneRecovery as dependency
 
-  const handleEmailPasswordSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const result = await handleEmailSignIn(email, password);
-      setMessageType(showMessage('Login successful!', setError, 'success'));
-      navigate(result.redirect);
-    } catch (error: any) {
-      console.error('Email sign-in error:', error);
-      setMessageType(showMessage(error.message || 'Login failed', setError, 'error'));
+ const handleEmailPasswordSignIn = async (e: React.FormEvent) => {
+  e.preventDefault();
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    const user = result.user;
+
+    // Get token for backend authentication
+    const token = await user.getIdToken();
+    localStorage.setItem('authToken', token);
+    localStorage.setItem('userEmail', user.email || '');
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+    // Special handling for admin account
+    const adminEmails = ['adm.railmadad@gmail.com', 'admin@railmadad.in'];
+    if (adminEmails.includes(email)) {
+      localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('userRole', 'admin');
+      localStorage.setItem('adminToken', token);
+      
+      // Dispatch event to notify components of user type change
+      window.dispatchEvent(new Event('userTypeChanged'));
+      
+      setMessageType(showMessage('Admin login successful!', setError, 'success'));
+      navigate('/admin-dashboard');
+      return;
     }
-  };
+
+    if (!user.emailVerified) {
+      setMessageType(showMessage('Please verify your email before signing in. Check your inbox.', setError, 'error'));
+      return;
+    }
+
+    try {
+      const userResponse = await axios.get('/api/accounts/profile/');
+      const userData = userResponse.data;
+      const role = userData.user_type || 'passenger';
+
+      localStorage.setItem('isAuthenticated', 'true');
+      
+      // Check if user is admin based on backend data
+      if (role === 'admin' || userData.is_admin || adminEmails.includes(user.email || '')) {
+        localStorage.setItem('userRole', 'admin');
+        localStorage.setItem('adminToken', token);
+        
+        // Dispatch event to notify components of user type change
+        window.dispatchEvent(new Event('userTypeChanged'));
+        
+        setMessageType(showMessage('Admin login successful!', setError, 'success'));
+        navigate('/admin-dashboard');
+      } else {
+        localStorage.setItem('userRole', role);
+        
+        // Dispatch event to notify components of user type change
+        window.dispatchEvent(new Event('userTypeChanged'));
+        
+        setMessageType(showMessage('Login successful!', setError, 'success'));
+        navigate('/user-dashboard');
+      }
+
+    } catch (backendError: any) {
+      if (axios.isAxiosError(backendError) && backendError.response?.status === 404) {
+        const initialUserData = {
+          email: user.email,
+          name: user.displayName,
+          profileImage: user.photoURL || '',
+        };
+
+        await axios.post('/api/accounts/profile/create/', initialUserData);
+        localStorage.setItem('isAuthenticated', 'true');
+        localStorage.setItem('userRole', 'passenger');
+        navigate('/user-dashboard/profile?newUser=true');
+      } else {
+        console.error('Backend sync failed:', backendError);
+        setMessageType(showMessage('Login succeeded, but syncing profile failed.', setError, 'info'));
+        localStorage.setItem('isAuthenticated', 'true');
+        localStorage.setItem('userRole', 'passenger');
+        navigate('/user-dashboard');
+      }
+    }
+  } catch (error: any) {
+    console.error('Login failed:', error);
+    setMessageType(showMessage('Login failed. Please try again.', setError, 'error'));
+  }
+};
 
   const handlePhoneSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -280,10 +356,17 @@ const Login: React.FC = () => {
       const user = userCredential.user;
 
       // Special handling for admin account
-      if (email === 'adm.railmadad@gmail.com' && password === 'admin@2025') {
+      const adminEmails = ['adm.railmadad@gmail.com', 'admin@railmadad.in'];
+      if (adminEmails.includes(email)) {
         localStorage.setItem('isAuthenticated', 'true');
         localStorage.setItem('userRole', 'admin');
-        navigate('/dashboard');
+        localStorage.setItem('adminToken', await user.getIdToken());
+        
+        // Dispatch event to notify components of user type change
+        window.dispatchEvent(new Event('userTypeChanged'));
+        
+        setMessageType(showMessage('Admin login successful!', setError, 'success'));
+        navigate('/admin-dashboard');
         return;
       }
 
@@ -295,12 +378,31 @@ const Login: React.FC = () => {
 
       // Set up user session
       localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('userRole', 'passenger');
+      localStorage.setItem('userEmail', user.email || '');
       
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (userDoc.exists()) {
-        setMessageType(showMessage('Login successful!', setError, 'success'));
-        navigate('/');
+        const userData = userDoc.data();
+        
+        // Check if user is admin
+        if (userData.userType === 'admin' || userData.is_admin || user.email === 'adm.railmadad@gmail.com') {
+          localStorage.setItem('userRole', 'admin');
+          localStorage.setItem('adminToken', await user.getIdToken());
+          
+          // Dispatch event to notify components of user type change
+          window.dispatchEvent(new Event('userTypeChanged'));
+          
+          setMessageType(showMessage('Admin login successful!', setError, 'success'));
+          navigate('/admin-dashboard');
+        } else {
+          localStorage.setItem('userRole', userData.userType || 'passenger');
+          
+          // Dispatch event to notify components of user type change
+          window.dispatchEvent(new Event('userTypeChanged'));
+          
+          setMessageType(showMessage('Login successful!', setError, 'success'));
+          navigate('/user-dashboard');
+        }
       } else {
         setMessageType(showMessage('User data not found', setError, 'error'));
       }
@@ -332,37 +434,131 @@ const Login: React.FC = () => {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      
-      // Check if user already exists in Firestore
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      
-      localStorage.setItem('isAuthenticated', 'true');
+  // Modified handleGoogleSignIn function in Login.tsx
 
-      if (!userDoc.exists()) {
-        // First time user - create basic profile and redirect to profile page
+const handleGoogleSignIn = async () => {
+  const provider = new GoogleAuthProvider();
+  try {
+    const result = await signInWithPopup(auth, provider);
+    const user = result.user;
+    
+    // Get token for backend authentication
+    const token = await user.getIdToken();
+    localStorage.setItem('authToken', token);
+    localStorage.setItem('userEmail', user.email || '');
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    
+    // Set basic authentication state
+    localStorage.setItem('isAuthenticated', 'true');
+    
+    // Check admin emails
+    const adminEmails = ['adm.railmadad@gmail.com', 'admin@railmadad.in'];
+    const isAdminEmail = adminEmails.includes(user.email || '');
+    
+    // Check if user already exists in Firestore
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    
+    if (!userDoc.exists()) {
+      // First time user - create profile in Firestore
+      const initialUserData = {
+        email: user.email,
+        name: user.displayName,
+        profileImage: user.photoURL || MALE_DEFAULT_AVATAR,
+        userType: isAdminEmail ? 'admin' : 'passenger',
+        createdAt: new Date().toISOString()
+      };
+      
+      await setDoc(doc(db, "users", user.uid), initialUserData);
+    }
+    
+    // Sync with Django backend
+    try {
+      // First try to get existing profile
+      const userResponse = await axios.get('/api/accounts/profile/');
+      const backendUserData = userResponse.data;
+      const role = backendUserData.user_type || 'passenger';
+      
+      // Check if user is admin
+      if (role === 'admin' || backendUserData.is_admin || isAdminEmail) {
+        localStorage.setItem('userRole', 'admin');
+        localStorage.setItem('adminToken', token);
+        
+        // Dispatch event to notify components of user type change
+        window.dispatchEvent(new Event('userTypeChanged'));
+        
+        setMessageType(showMessage('Admin login successful!', setError, 'success'));
+        navigate('/admin-dashboard');
+      } else {
+        localStorage.setItem('userRole', role);
+        
+        // Dispatch event to notify components of user type change
+        window.dispatchEvent(new Event('userTypeChanged'));
+        
+        setMessageType(showMessage('Login successful!', setError, 'success'));
+        navigate('/user-dashboard');
+      }
+    } catch (backendError) {
+      if (axios.isAxiosError(backendError) && backendError.response?.status === 404) {
+        // User doesn't exist in Django backend - create them
+        const userType = isAdminEmail ? 'admin' : 'passenger';
         const initialUserData = {
           email: user.email,
-          name: user.displayName,
-          profileImage: user.photoURL || MALE_DEFAULT_AVATAR,
-          createdAt: new Date().toISOString()
+          name: user.displayName || '',
+          profileImage: user.photoURL || '',
+          user_type: userType
         };
         
-        await setDoc(doc(db, "users", user.uid), initialUserData);
-        navigate('/profile?newUser=true'); // Redirect to profile for setup
+        try {
+          await axios.post('/api/accounts/profile/create/', initialUserData);
+          
+          if (userType === 'admin') {
+            localStorage.setItem('userRole', 'admin');
+            localStorage.setItem('adminToken', token);
+            
+            // Dispatch event to notify components of user type change
+            window.dispatchEvent(new Event('userTypeChanged'));
+            
+            setMessageType(showMessage('Admin account created and logged in!', setError, 'success'));
+            navigate('/admin-dashboard');
+          } else {
+            localStorage.setItem('userRole', 'passenger');
+            
+            // Dispatch event to notify components of user type change
+            window.dispatchEvent(new Event('userTypeChanged'));
+            
+            setMessageType(showMessage('Account created successfully!', setError, 'success'));
+            navigate('/user-dashboard/profile?newUser=true');
+          }
+        } catch (createError) {
+          console.error('Failed to create profile:', createError);
+          localStorage.setItem('userRole', isAdminEmail ? 'admin' : 'passenger');
+          setMessageType(showMessage('Login succeeded, but creating profile failed.', setError, 'info'));
+          
+          if (isAdminEmail) {
+            localStorage.setItem('adminToken', token);
+            navigate('/admin-dashboard');
+          } else {
+            navigate('/user-dashboard/profile?newUser=true');
+          }
+        }
       } else {
-        // Existing user - redirect to home
-        navigate('/');
+        console.error('Backend sync failed:', backendError);
+        localStorage.setItem('userRole', isAdminEmail ? 'admin' : 'passenger');
+        setMessageType(showMessage('Login succeeded, but syncing profile failed.', setError, 'info'));
+        
+        if (isAdminEmail) {
+          localStorage.setItem('adminToken', token);
+          navigate('/admin-dashboard');
+        } else {
+          navigate('/user-dashboard');
+        }
       }
-    } catch (error) {
-      console.error("Error during Google Sign-In", error);
-      showMessage('Google Sign-In failed', setError);
     }
-  };
+  } catch (error) {
+    console.error("Error during Google Sign-In", error);
+    showMessage('Google Sign-In failed', setError);
+  }
+};
 
   const handleForgotPassword = (e: React.FormEvent) => {
     e.preventDefault();
@@ -392,8 +588,8 @@ const Login: React.FC = () => {
       const user = userCredential.user;
 
       // Send email verification
-      // Send email verification
       await sendEmailVerification(user);
+      
       // Save user data to Firestore
       const userData = {
         email: signUpData.email,
@@ -401,11 +597,30 @@ const Login: React.FC = () => {
         phoneNumber: signUpData.phoneNumber,
         gender: signUpData.gender,
         address: signUpData.address,
+        userType: signUpData.userType,
         profileImage: signUpData.gender === 'male' ? MALE_DEFAULT_AVATAR : FEMALE_DEFAULT_AVATAR,
         emailVerified: false
       };
 
       await setDoc(doc(db, "users", user.uid), userData);
+      
+      // Also register in Django backend
+      try {
+        const token = await user.getIdToken();
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        
+        await axios.post('/api/accounts/profile/create/', {
+          name: signUpData.name,
+          phone_number: signUpData.phoneNumber,
+          gender: signUpData.gender,
+          address: signUpData.address,
+          user_type: signUpData.userType
+        });
+      } catch (backendError) {
+        console.error('Backend registration failed:', backendError);
+        // Continue with frontend flow even if backend fails
+      }
+      
       setMessageType(showMessage('Verification email sent! Please check your inbox and verify your email before signing in.', setError, 'success'));
       setShowSignUp(false);
     } catch (error: any) {
@@ -712,6 +927,21 @@ const Login: React.FC = () => {
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 
                         ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
                     />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'} mb-1`}>
+                      User Type *
+                    </label>
+                    <select
+                      value={signUpData.userType}
+                      onChange={(e) => setSignUpData({ ...signUpData, userType: e.target.value as 'passenger' | 'admin' })}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 
+                        ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
+                      required
+                    >
+                      <option value="passenger">Passenger</option>
+                      <option value="admin">Admin</option>
+                    </select>
                   </div>
                   <div>
                     <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'} mb-1`}>

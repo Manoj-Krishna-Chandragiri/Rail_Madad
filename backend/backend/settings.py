@@ -1,8 +1,12 @@
 import os
 from pathlib import Path
-from dotenv import load_dotenv  # Import dotenv to handle environment variables
+from dotenv import load_dotenv
+import firebase_admin
+from firebase_admin import credentials, auth
+from corsheaders.defaults import default_headers
 
-load_dotenv()  # Load environment variables from .env file
+# Load environment variables from .env file
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -13,6 +17,7 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'change_this_in_production')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
 
+# Allowed hosts with comma-separated values from environment
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost').split(',')
 
 # Application definition
@@ -26,16 +31,29 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
+    'accounts',  # From first settings.py
     'complaints',
 ]
 
+# Custom User Model (from first settings.py)
+AUTH_USER_MODEL = 'accounts.FirebaseUser'
+
+# DRF Authentication Configuration
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+    ]
+}
+
+# Middleware Configuration
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # CORS Middleware at the top
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',  # Must come before FirebaseAuthMiddleware
+    'accounts.middleware.FirebaseAuthMiddleware',  # Correct placement
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -60,19 +78,19 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'backend.wsgi.application'
 
-# Database Configuration (Use Environment Variables)
+# Database Configuration
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.getenv('MYSQL_DATABASE', 'rail_madad'),
+        'NAME': os.getenv('MYSQL_DATABASE', 'rail_madadd'),
         'USER': os.getenv('MYSQL_USER', 'root'),
-        'PASSWORD': os.getenv('MYSQL_PASSWORD', 'Lu@B9pk@3k4WP'),
+        'PASSWORD': os.getenv('MYSQL_PASSWORD', 'Akram04@vvit'),
         'HOST': os.getenv('MYSQL_HOST', 'localhost'),
         'PORT': os.getenv('MYSQL_PORT', '3306'),
     }
 }
 
-# Password validation
+# Password Validation
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -94,15 +112,69 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# Static files (CSS, JavaScript, Images)
+# Static and Media Files Configuration
 STATIC_URL = 'static/'
-
-# Media files configuration
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Admin Credentials (from first settings.py)
+ADMIN_EMAIL = 'adm.railmadad@gmail.com'
+ADMIN_PASSWORD = 'admin@2025'
+
 # CORS Configuration
-CORS_ALLOW_ALL_ORIGINS = True  # Change to specific origins in production
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5174",
+]
+
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'X-CSRFToken',
+    'Authorization',
+]
+
+# Optional: Uncomment the line below for allowing all origins (use cautiously)
+# CORS_ALLOW_ALL_ORIGINS = True
+
+# Firebase Configuration
+FIREBASE_CERT = os.path.join(BASE_DIR, 'backend/railmadad-login-firebase-adminsdk-fbsvc-5305d3439b.json')
+
+if not firebase_admin._apps:
+    try:
+        cred = credentials.Certificate(FIREBASE_CERT)
+        firebase_admin.initialize_app(cred)
+        print("Firebase initialized successfully")
+    except Exception as e:
+        print(f"Firebase initialization error: {str(e)}")
+
+# Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'debug.log'),
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'accounts': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+}
