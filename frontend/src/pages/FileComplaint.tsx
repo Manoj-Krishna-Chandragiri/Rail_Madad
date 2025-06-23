@@ -10,6 +10,7 @@ interface ComplaintFormData {
   train_number: string;  // Changed from trainNumber
   pnr_number: string;    // Changed from pnrNumber
   severity: string;
+  priority: string;
   date_of_incident: string;
 }
 
@@ -22,6 +23,7 @@ const FileComplaint = () => {
     train_number: '',  // Changed from trainNumber
     pnr_number: '',    // Changed from pnrNumber
     severity: 'Medium',
+    priority: 'Medium',
     date_of_incident: '' // Add dateOfIncident to formData
   });
 
@@ -45,6 +47,7 @@ const FileComplaint = () => {
     try {
       const formDataToSend = new FormData();
       
+      // Ensure all required fields are included
       Object.entries(formData).forEach(([key, value]) => {
         formDataToSend.append(key, value?.toString() || '');
       });
@@ -57,12 +60,16 @@ const FileComplaint = () => {
         formDataToSend.append('photos', photo, fileName);
       }
 
+      // Get auth token from localStorage or wherever it's stored
+      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+      
       const response = await axios.post(
         `${import.meta.env.VITE_API_BASE_URL}/api/complaints/file/`,
         formDataToSend,
         {
           headers: {
             "Content-Type": "multipart/form-data",
+            ...(token && { "Authorization": `Bearer ${token}` })
           }
         }
       );
@@ -77,12 +84,13 @@ const FileComplaint = () => {
         train_number: '',  // Changed from trainNumber
         pnr_number: '',    // Changed from pnrNumber
         severity: 'Medium',
+        priority: 'Medium',
         date_of_incident: ''
       });
       setPhotos([]);
     } catch (error: any) {
       console.error("Error submitting:", error.response?.data || error);
-      alert("Failed to submit complaint.");
+      alert(`Failed to submit complaint: ${error.response?.data?.error || error.message}`);
     }
   };
   
@@ -185,6 +193,25 @@ const FileComplaint = () => {
               <option value="Low">Low</option>
               <option value="Medium">Medium</option>
               <option value="High">High</option>
+            </select>
+          </div>
+
+          <div>
+            <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'} mb-1`}>
+              Priority Level
+            </label>
+            <select
+              name="priority"
+              value={formData.priority}
+              onChange={handleChange}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 
+                ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
+              required
+            >
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+              <option value="Critical">Critical</option>
             </select>
           </div>
 

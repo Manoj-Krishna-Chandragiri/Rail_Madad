@@ -21,6 +21,13 @@ class Complaint(models.Model):
         ('Medium', 'Medium'),
         ('High', 'High'),
     ]
+
+    PRIORITY_CHOICES = [
+        ('Low', 'Low'),
+        ('Medium', 'Medium'),
+        ('High', 'High'),
+        ('Critical', 'Critical'),
+    ]
  
     type = models.CharField(max_length=100)
     description = models.TextField()
@@ -28,6 +35,7 @@ class Complaint(models.Model):
     train_number = models.CharField(max_length=20, blank=True, null=True)
     pnr_number = models.CharField(max_length=20, blank=True, null=True)
     severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES, default='Medium')
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='Medium')
     date_of_incident = models.DateField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Open')
     staff = models.CharField(max_length=255, blank=True, null=True)

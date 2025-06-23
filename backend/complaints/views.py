@@ -26,6 +26,7 @@ def file_complaint(request):
         photo = request.FILES.get('photos')
         data = request.data.copy()
  
+        # Handle photo upload
         if photo:
             filename = os.path.basename(photo.name)
             save_path = os.path.join('backend', 'media', 'complaints', filename)
@@ -35,22 +36,36 @@ def file_complaint(request):
                 for chunk in photo.chunks():
                     destination.write(chunk)
             data['photos'] = save_path.replace('\\', '/')
- 
-        # Check if user is authenticated and has a user_id
+
+        # Set default priority if not provided
+        if 'priority' not in data or not data['priority']:
+            data['priority'] = 'Medium'
+
+        # Handle user authentication
+        user_id = None
         if hasattr(request, 'is_authenticated') and request.is_authenticated:
-            # First try to get the user ID from the request attribute
             if hasattr(request, 'user_id') and request.user_id is not None:
-                data['user'] = request.user_id
-            # Fall back to request.user if available
+                user_id = request.user_id
             elif hasattr(request, 'user') and request.user and hasattr(request.user, 'id'):
-                data['user'] = request.user.id
-            # If user exists but no ID available, use Firebase authentication to find/create user
+                user_id = request.user.id
             elif hasattr(request, 'firebase_uid') and request.firebase_uid:
-                # Import get_or_create_user to avoid circular imports
                 from accounts.views import get_or_create_user
                 user, created = get_or_create_user(request)
                 if user:
-                    data['user'] = user.id
+                    user_id = user.id
+        
+        # Set user_id in data if available
+        if user_id:
+            data['user'] = user_id
+        
+        # Validate required fields
+        required_fields = ['type', 'description', 'train_number', 'pnr_number', 'location', 'date_of_incident']
+        missing_fields = [field for field in required_fields if not data.get(field)]
+        
+        if missing_fields:
+            return JsonResponse({
+                "error": f"Missing required fields: {', '.join(missing_fields)}"
+            }, status=400)
         
         serializer = ComplaintSerializer(data=data)
         if serializer.is_valid():
@@ -59,10 +74,16 @@ def file_complaint(request):
                 "message": "Complaint filed successfully", 
                 "complaint_id": complaint.id
             }, status=201)
-        return JsonResponse(serializer.errors, status=400)
+        
+        return JsonResponse({
+            "error": "Validation failed",
+            "details": serializer.errors
+        }, status=400)
  
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=400) 
+        return JsonResponse({
+            "error": f"Server error: {str(e)}"
+        }, status=500)
  
 @api_view(['GET'])
 def user_complaints(request):

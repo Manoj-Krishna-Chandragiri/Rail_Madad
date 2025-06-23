@@ -113,6 +113,10 @@ class FirebaseAuthMiddleware:
                         # User doesn't exist in DB, set defaults
                         logger.debug(f"User {request.firebase_email} authenticated via Firebase but not in database")
                         
+                        # For users not in database, we'll create them when needed
+                        # but for now, set basic attributes
+                        request.user_id = None  # Will be created when filing complaint
+                        
                         # Check if this is admin by email
                         admin_emails = ['adm.railmadad@gmail.com', 'admin@railmadad.in']
                         if request.firebase_email in admin_emails:
