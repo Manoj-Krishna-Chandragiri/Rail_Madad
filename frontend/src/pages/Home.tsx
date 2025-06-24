@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Send, 
   Headphones, 
@@ -13,19 +13,118 @@ import {
   Info, 
   ChevronRight, 
   PhoneCall,
-  Clock
+  Clock,
+  Loader2
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import axios from 'axios';
+import { getAuth } from 'firebase/auth';
+
+interface SearchResult {
+  id: string;
+  complaint_id: number;
+  pnr_number: string;
+  train_number: string;
+  type: string;
+  description: string;
+  status: string;
+  severity: string;
+  priority: string;
+  date_of_incident: string;
+  created_at: string;
+  location: string;
+}
 
 const Home = () => {
   const { theme } = useTheme();
+  const navigate = useNavigate();
   const isDark = theme === 'dark';
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
+  const handleSearchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle search logic here
-    console.log('Searching for:', searchQuery);
+    
+    if (!searchQuery.trim()) {
+      setSearchError('Please enter a search term');
+      return;
+    }
+
+    setIsSearching(true);
+    setSearchError(null);
+    setShowResults(false);
+
+    try {
+      const auth = getAuth();
+      const currentUser = auth.currentUser;
+      
+      if (!currentUser) {
+        setSearchError('Please log in to search your complaints');
+        setIsSearching(false);
+        return;
+      }
+      
+      // Get the Firebase ID token
+      const token = await currentUser.getIdToken();
+      
+      // Make API request with authorization header
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_BASE_URL}/api/complaints/search/`,
+        {
+          params: { q: searchQuery.trim() },
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      setSearchResults(response.data.complaints || []);
+      setShowResults(true);
+      
+    } catch (error: any) {
+      console.error('Search error:', error);
+      if (error.response?.status === 401) {
+        setSearchError('Please log in to search your complaints');
+      } else {
+        setSearchError(error.response?.data?.error || 'Failed to search complaints. Please try again.');
+      }
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleComplaintClick = (complaintId: number) => {
+    navigate('/track-status', { state: { searchComplaintId: complaintId } });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'closed':
+      case 'resolved':
+        return 'bg-green-100 text-green-800';
+      case 'in progress':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'open':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getSeverityColor = (severity: string) => {
+    switch (severity.toLowerCase()) {
+      case 'high':
+        return 'bg-red-100 text-red-800';
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'low':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
   // Quick links data for navigation
@@ -479,18 +578,19 @@ const Home = () => {
         </div>
       </div>
 
-      {/* Enhanced Search Section */}
+      {/* Enhanced Search Section with Results */}
       <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6 mb-8`}>
         <div className="flex items-center mb-4">
           <Search className="h-5 w-5 text-indigo-600 mr-2" />
-          <h2 className="text-xl font-semibold">Search Your Complaint or PNR</h2>
+          <h2 className="text-xl font-semibold">Search Your Complaints</h2>
         </div>
-        <form onSubmit={handleSearchSubmit} className="flex flex-col md:flex-row gap-4">
+        
+        <form onSubmit={handleSearchSubmit} className="flex flex-col md:flex-row gap-4 mb-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Enter PNR, complaint ID or train number..."
+              placeholder="Enter PNR, complaint ID, or train number..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className={`w-full pl-10 pr-4 py-3 rounded-lg border ${
@@ -498,16 +598,113 @@ const Home = () => {
                   ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
                   : 'border-gray-200 focus:border-indigo-500'
               } focus:ring-2 focus:ring-indigo-200 transition-colors`}
+              disabled={isSearching}
             />
           </div>
           <button
             type="submit"
-            className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+            disabled={isSearching}
+            className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Search className="h-5 w-5" />
-            <span>Search</span>
+            {isSearching ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Search className="h-5 w-5" />
+            )
+            }
+            <span>{isSearching ? 'Searching...' : 'Search'}</span>
           </button>
         </form>
+
+        {/* Search Error */}
+        {searchError && (
+          <div className="mb-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded-lg">
+            {searchError}
+          </div>
+        )}
+
+        {/* Search Results */}
+        {showResults && (
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium">
+                Search Results ({searchResults.length} found)
+              </h3>
+              <button
+                onClick={() => setShowResults(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ×
+              </button>
+            </div>
+            
+            {searchResults.length > 0 ? (
+              <div className="space-y-4 max-h-96 overflow-y-auto">
+                {searchResults.map((complaint) => (
+                  <div
+                    key={complaint.complaint_id}
+                    onClick={() => handleComplaintClick(complaint.complaint_id)}
+                    className={`p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md ${
+                      isDark 
+                        ? 'bg-gray-700 border-gray-600 hover:bg-gray-650' 
+                        : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h4 className="font-semibold text-lg">Complaint ID: {complaint.id}</h4>
+                        <p className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                          PNR: {complaint.pnr_number} | Train: {complaint.train_number}
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(complaint.status)}`}>
+                          {complaint.status}
+                        </span>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getSeverityColor(complaint.severity)}`}>
+                          {complaint.severity}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <p className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                        <span className="font-medium">Type:</span> {complaint.type}
+                      </p>
+                      <p className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                        <span className="font-medium">Location:</span> {complaint.location}
+                      </p>
+                      <p className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                        <span className="font-medium">Description:</span> {
+                          complaint.description.length > 150 
+                            ? `${complaint.description.substring(0, 150)}...` 
+                            : complaint.description
+                        }
+                      </p>
+                      <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                        <span className="font-medium">Date:</span> {new Date(complaint.date_of_incident).toLocaleDateString()}
+                      </p>
+                    </div>
+                    
+                    <div className="mt-3 flex items-center text-indigo-600 text-sm">
+                      <span>Click to view details</span>
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className={isDark ? 'text-gray-400' : 'text-gray-500'}>
+                  No complaints found matching "{searchQuery}"
+                </p>
+                <p className={`text-sm mt-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                  Try searching with PNR number, complaint ID, or train number
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Features Section with improved styling */}

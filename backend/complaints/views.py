@@ -991,3 +991,89 @@ def update_classification(request, complaint_id):
     except Exception as e:
         logger.error(f"Error in update_classification: {str(e)}")
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+def search_user_complaints(request):
+    """
+    Search complaints for the currently authenticated user.
+    Supports searching by PNR, complaint ID, train number, or description.
+    """
+    try:
+        # Check authentication
+        if not hasattr(request, 'is_authenticated') or not request.is_authenticated:
+            return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Get search query from request
+        search_query = request.GET.get('q', '').strip()
+        
+        if not search_query:
+            return Response({'error': 'Search query is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Determine user ID
+        user_id = None
+        if hasattr(request, 'user_id') and request.user_id is not None:
+            user_id = request.user_id
+        elif hasattr(request, 'user') and request.user and hasattr(request.user, 'id'):
+            user_id = request.user.id
+        
+        if not user_id:
+            return Response({'error': 'User ID not found'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Build search filters
+        complaints = Complaint.objects.filter(user=user_id)
+        
+        # Search across multiple fields
+        search_filters = Q()
+        
+        # Search by PNR number (exact or partial match)
+        if search_query.isdigit() or search_query.isalnum():
+            search_filters |= Q(pnr_number__icontains=search_query)
+        
+        # Search by train number
+        search_filters |= Q(train_number__icontains=search_query)
+        
+        # Search by complaint ID (if it's a number)
+        if search_query.isdigit():
+            search_filters |= Q(id=int(search_query))
+        
+        # Search by description
+        search_filters |= Q(description__icontains=search_query)
+        
+        # Search by complaint type
+        search_filters |= Q(type__icontains=search_query)
+        
+        # Apply search filters
+        complaints = complaints.filter(search_filters).order_by('-created_at')
+        
+        # Limit results to prevent performance issues
+        complaints = complaints[:50]
+        
+        serializer = ComplaintSerializer(complaints, many=True)
+        
+        # Format response data
+        formatted_complaints = []
+        for complaint_data in serializer.data:
+            formatted_complaints.append({
+                'id': f"CMP{complaint_data['id']:03d}",
+                'complaint_id': complaint_data['id'],
+                'pnr_number': complaint_data['pnr_number'] or 'N/A',
+                'train_number': complaint_data['train_number'] or 'N/A',
+                'type': complaint_data['type'],
+                'description': complaint_data['description'],
+                'status': complaint_data['status'],
+                'severity': complaint_data['severity'],
+                'priority': complaint_data['priority'],
+                'date_of_incident': complaint_data['date_of_incident'],
+                'created_at': complaint_data['created_at'],
+                'location': complaint_data['location'] or 'N/A'
+            })
+        
+        return Response({
+            'complaints': formatted_complaints,
+            'total_found': len(formatted_complaints),
+            'search_query': search_query
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in search_user_complaints: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

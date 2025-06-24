@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import { getAuth } from 'firebase/auth';
+import { useLocation } from 'react-router-dom';
 
 interface ComplaintStatus {
   id: string;
@@ -15,6 +16,7 @@ interface ComplaintStatus {
 
 const TrackStatus = () => {
   const { theme } = useTheme();
+  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [complaints, setComplaints] = useState<ComplaintStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +68,13 @@ const TrackStatus = () => {
     };
 
     fetchComplaints();
-  }, []);
+
+    // Check if we came from a search result
+    if (location.state?.searchComplaintId) {
+      const complaintId = location.state.searchComplaintId;
+      setSearchQuery(`CMP${complaintId.toString().padStart(3, '0')}`);
+    }
+  }, [location.state]);
 
   const filteredComplaints = complaints.filter((complaint) =>
     complaint.id.toLowerCase().includes(searchQuery.toLowerCase()) ||

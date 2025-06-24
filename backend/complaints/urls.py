@@ -25,4 +25,7 @@ urlpatterns = [
     path('admin/smart-classification/stats/', views.smart_classification_stats, name='smart-classification-stats'),
     path('admin/smart-classification/complaints/', views.smart_classification_complaints, name='smart-classification-complaints'),
     path('admin/smart-classification/<int:complaint_id>/update/', views.update_classification, name='update-classification'),
+
+    # Search endpoint
+    path('search/', views.search_user_complaints, name='search_user_complaints'),
 ]
