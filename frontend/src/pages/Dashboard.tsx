@@ -54,13 +54,19 @@ const Dashboard = () => {
     pendingEscalations: 0,
     totalComplaints: 0
   });
-  
+
   // Animation states
   const [animateStats, setAnimateStats] = useState(false);
 
   useEffect(() => {
     fetchComplaints();
     fetchAdminStats();
+    
+    // Set up polling for real-time updates every 30 seconds
+    const interval = setInterval(() => {
+      fetchComplaints();
+      fetchAdminStats();
+    }, 30000);
     
     // Trigger animation after data is loaded
     setTimeout(() => {
@@ -75,50 +81,64 @@ const Dashboard = () => {
     
     setTimeout(updateCharts, 1000);
     
-    // Update charts when theme changes
-    window.addEventListener('themeChanged', updateCharts);
-    
     return () => {
-      window.removeEventListener('themeChanged', updateCharts);
+      clearInterval(interval);
     };
   }, [theme]);
 
   const fetchAdminStats = async () => {
     try {
-      // Simulating API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        console.error('No auth token found');
+        return;
+      }
 
-      // Fetch staff count
-      const staffResponse = await axios.get(
-        `${import.meta.env.VITE_API_BASE_URL}/api/complaints/staff/`
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_BASE_URL}/api/complaints/admin/dashboard-stats/`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
       );
 
-      const totalStaff = staffResponse.data.length;
-      const activeAgents = staffResponse.data.filter((s: any) => s.status === 'active').length;
-
-      // Set admin-specific stats
+      const data = response.data;
       setAdminStats({
-        totalStaff,
-        activeAgents,
-        resolvedToday: 12,
-        resolutionRate: 87,
-        averageResolutionTime: '4.5h',
-        pendingEscalations: 5,
-        totalComplaints: Math.floor(Math.random() * 1000) + 500 // Random number for demo
+        totalStaff: data.totalStaff || 0,
+        activeAgents: data.activeStaff || 0,
+        resolvedToday: data.todayResolved || 0,
+        resolutionRate: data.resolutionRate || 0,
+        averageResolutionTime: data.averageResolutionTime || '0h',
+        pendingEscalations: 5, // You can calculate this in backend
+        totalComplaints: data.totalComplaints || 0
       });
     } catch (error) {
       console.error('Error fetching admin stats:', error);
+      // Fallback to dummy data if API fails
+      setAdminStats({
+        totalStaff: 18,
+        activeAgents: 12,
+        resolvedToday: 8,
+        resolutionRate: 87,
+        averageResolutionTime: '4.5h',
+        pendingEscalations: 5,
+        totalComplaints: 150
+      });
     }
   };
 
   const fetchComplaints = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        console.error('No auth token found');
+        return;
+      }
+
       const response = await axios.get(
         `${import.meta.env.VITE_API_BASE_URL}/api/complaints/user/`,
         {
-          headers: { Authorization: `Token ${token}` },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
       
@@ -130,6 +150,11 @@ const Dashboard = () => {
       setComplaints(sortedComplaints);
     } catch (error) {
       console.error('Error fetching complaints', error);
+      // Show user-friendly error message
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        // Redirect to login if unauthorized
+        window.location.href = '/login';
+      }
     } finally {
       setLoading(false);
     }
@@ -423,12 +448,17 @@ const Dashboard = () => {
   const handleStatusChange = async (id: number, newStatus: string) => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        console.error('No auth token found');
+        return;
+      }
+
       await axios.put(
         `${import.meta.env.VITE_API_BASE_URL}/api/complaints/${id}/`,
         { status: newStatus },
         {
-          headers: { Authorization: `Token ${token}` },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
       
@@ -442,6 +472,9 @@ const Dashboard = () => {
       // Close dropdown
       setOpenDropdown(null);
       
+      // Refresh admin stats to reflect changes
+      fetchAdminStats();
+      
       // Update charts after status change
       setTimeout(() => {
         updateStatusDistributionChart();
@@ -450,6 +483,9 @@ const Dashboard = () => {
       
     } catch (error) {
       console.error('Error updating status', error);
+      if (axios.isAxiosError(error) && error.response?.status === 403) {
+        alert('You do not have permission to update complaint status');
+      }
     } finally {
       setLoading(false);
     }
