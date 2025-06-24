@@ -74,18 +74,26 @@ const Dashboard = () => {
       setAnimateStats(true);
     }, 500);
     
-    // Set up charts
-    const updateCharts = () => {
-      updateStatusDistributionChart();
-      updateComplaintTrendsChart();
-    };
-    
-    setTimeout(updateCharts, 1000);
+    // Remove the immediate chart initialization - charts will update when data loads
     
     return () => {
       clearInterval(interval);
     };
   }, [theme]);
+
+  // Add new useEffect to update charts when data changes
+  useEffect(() => {
+    // Update charts only when we have data
+    if (complaints.length > 0) {
+      const updateCharts = () => {
+        updateStatusDistributionChart();
+        updateComplaintTrendsChart();
+      };
+      
+      // Small delay to ensure DOM is ready
+      setTimeout(updateCharts, 100);
+    }
+  }, [complaints, adminStats, theme]); // Update when complaints, adminStats, or theme changes
 
   const fetchAdminStats = async () => {
     try {
@@ -185,9 +193,7 @@ const Dashboard = () => {
     setRefreshing(true);
     try {
       await Promise.all([fetchComplaints(), fetchAdminStats()]);
-      // Update charts
-      updateStatusDistributionChart();
-      updateComplaintTrendsChart();
+      // Charts will automatically update due to the useEffect dependency
     } finally {
       setTimeout(() => {
         setRefreshing(false);
@@ -233,6 +239,11 @@ const Dashboard = () => {
   const updateStatusDistributionChart = () => {
     if (!pieChartRef.current) return;
     
+    // Calculate current complaint counts
+    const currentOpenCount = complaints.filter(c => c.status === 'Open').length;
+    const currentInProgressCount = complaints.filter(c => c.status === 'In Progress').length;
+    const currentClosedCount = complaints.filter(c => c.status === 'Closed').length;
+    
     const options = {
       chart: {
         height: 320,
@@ -242,7 +253,7 @@ const Dashboard = () => {
       },
       colors: ['#ef4444', '#f59e0b', '#10b981'],
       labels: ['Open', 'In Progress', 'Closed'],
-      series: [openCount, inProgressCount, closedCount],
+      series: [currentOpenCount, currentInProgressCount, currentClosedCount],
       legend: {
         position: 'bottom',
         horizontalAlign: 'center',
@@ -279,7 +290,7 @@ const Dashboard = () => {
                 label: 'Total',
                 color: theme === 'dark' ? '#e5e7eb' : '#4b5563',
                 formatter: function () {
-                  return (openCount + inProgressCount + closedCount).toString();
+                  return (currentOpenCount + currentInProgressCount + currentClosedCount).toString();
                 }
               }
             }
@@ -319,26 +330,27 @@ const Dashboard = () => {
   const updateComplaintTrendsChart = () => {
     if (!chartRef.current) return;
 
-    // Use real data from adminStats if available, otherwise generate sample data
+    // Use real data from adminStats if available
     let dates: string[], openData: number[], progressData: number[], closedData: number[];
     
     if (adminStats.complaintTrends && adminStats.complaintTrends.length > 0) {
-      // Use real data
+      // Use real data from API
       dates = adminStats.complaintTrends.map(trend => trend.date);
       openData = adminStats.complaintTrends.map(trend => trend.open);
       progressData = adminStats.complaintTrends.map(trend => trend.in_progress);
       closedData = adminStats.complaintTrends.map(trend => trend.closed);
     } else {
-      // Fallback to sample data for demo purposes
+      // If no API data, create empty data for the last 30 days
       dates = Array.from({ length: 30 }, (_, i) => {
         const date = new Date();
         date.setDate(date.getDate() - (29 - i));
         return date.toISOString().split('T')[0];
       });
       
-      openData = Array.from({ length: 30 }, () => Math.floor(Math.random() * 5) + 1);
-      progressData = Array.from({ length: 30 }, () => Math.floor(Math.random() * 8) + 2);
-      closedData = Array.from({ length: 30 }, () => Math.floor(Math.random() * 10) + 3);
+      // Use zeros instead of random data when no real data is available
+      openData = Array(30).fill(0);
+      progressData = Array(30).fill(0);
+      closedData = Array(30).fill(0);
     }
 
     const options = {
@@ -506,11 +518,7 @@ const Dashboard = () => {
       // Refresh admin stats to reflect changes
       fetchAdminStats();
       
-      // Update charts after status change
-      setTimeout(() => {
-        updateStatusDistributionChart();
-        updateComplaintTrendsChart();
-      }, 500);
+      // Charts will automatically update due to the useEffect dependency on complaints
       
     } catch (error) {
       console.error('Error updating status', error);

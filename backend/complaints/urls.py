@@ -20,4 +20,9 @@ urlpatterns = [
     path('admin/staff/<int:pk>/', views.admin_staff_detail, name='admin-staff-detail'),
     path('admin/dashboard-stats/', views.admin_dashboard_stats, name='admin-dashboard-stats'),
     path('admin/complaint-trends/', views.admin_complaint_trends, name='admin-complaint-trends'),  # Add this new endpoint
+
+    # Smart Classification endpoints
+    path('admin/smart-classification/stats/', views.smart_classification_stats, name='smart-classification-stats'),
+    path('admin/smart-classification/complaints/', views.smart_classification_complaints, name='smart-classification-complaints'),
+    path('admin/smart-classification/<int:complaint_id>/update/', views.update_classification, name='update-classification'),
 ]
