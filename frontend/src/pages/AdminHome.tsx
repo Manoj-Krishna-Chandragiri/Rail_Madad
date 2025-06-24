@@ -17,6 +17,7 @@ import {
   FileText,
   Search
 } from 'lucide-react';
+import axios from 'axios';
 
 interface StatsData {
   openComplaints: number;
@@ -95,11 +96,62 @@ const AdminHome = () => {
   }, [loading, stats]);
 
   useEffect(() => {
-    // Simulate data fetching
+    // Simulate data fetching with real API call
     const fetchData = async () => {
       try {
-        // In a real app, this would be an API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        setLoading(true);
+        
+        // Try to fetch real data from the admin stats endpoint
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          try {
+            const response = await axios.get(
+              `${import.meta.env.VITE_API_BASE_URL}/api/complaints/admin/dashboard-stats/`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+            
+            const data = response.data;
+            setStats({
+              openComplaints: data.openComplaints || 0,
+              closedComplaints: data.closedComplaints || 0,
+              inProgressComplaints: data.inProgressComplaints || 0,
+              staffCount: data.totalStaff || 0,
+              avgResponseTime: '1h 23m',
+              avgResolutionTime: data.averageResolutionTime || '0h',
+              resolutionRate: data.resolutionRate || 0
+            });
+            
+            console.log('AdminHome: Real stats loaded:', data);
+          } catch (apiError) {
+            console.warn('AdminHome: Failed to fetch real stats, using fallback data:', apiError);
+            // Fallback to dummy data
+            setStats({
+              openComplaints: 23,
+              closedComplaints: 45,
+              inProgressComplaints: 12,
+              staffCount: 18,
+              avgResponseTime: '1h 23m',
+              avgResolutionTime: '5h 45m',
+              resolutionRate: 78
+            });
+          }
+        } else {
+          // No token, use dummy data
+          setStats({
+            openComplaints: 23,
+            closedComplaints: 45,
+            inProgressComplaints: 12,
+            staffCount: 18,
+            avgResponseTime: '1h 23m',
+            avgResolutionTime: '5h 45m',
+            resolutionRate: 78
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        // Fallback data
         setStats({
           openComplaints: 23,
           closedComplaints: 45,
@@ -109,8 +161,6 @@ const AdminHome = () => {
           avgResolutionTime: '5h 45m',
           resolutionRate: 78
         });
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
       } finally {
         setLoading(false);
       }

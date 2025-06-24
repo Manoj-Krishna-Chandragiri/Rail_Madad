@@ -391,15 +391,25 @@ def admin_staff_detail(request, pk):
 
 # Admin Dashboard Statistics API View
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
 def admin_dashboard_stats(request):
     """
     Get dashboard statistics for admin
     """
+    # Check authentication using custom middleware attributes
+    if not hasattr(request, 'is_authenticated') or not request.is_authenticated:
+        return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+    
     if not (request.is_admin or request.is_staff):
         return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
     
     try:
+        from django.db.models import Count
+        from datetime import timedelta
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        logger.info(f"Admin dashboard stats requested by user: {request.firebase_email}")
+        
         # Basic complaint counts
         total_complaints = Complaint.objects.count()
         open_complaints = Complaint.objects.filter(status='Open').count()
@@ -414,14 +424,88 @@ def admin_dashboard_stats(request):
             resolved_at__date=today
         ).count()
         
-        # Staff statistics
-        total_staff = Staff.objects.count()
-        active_staff = Staff.objects.filter(status='active').count()
+        # Staff statistics - fetch from Staff model and User model
+        from .models import Staff
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        
+        # Get staff count from Staff model
+        total_staff_from_staff_model = Staff.objects.count()
+        active_staff_from_staff_model = Staff.objects.filter(status='active').count()
+        
+        # Get staff count from User model (users with staff or admin role)
+        total_staff_from_users = User.objects.filter(
+            user_type__in=['admin', 'staff']
+        ).count()
+        active_staff_from_users = User.objects.filter(
+            user_type__in=['admin', 'staff'],
+            is_active=True
+        ).count()
+        
+        # Use the higher count between both models
+        total_staff = max(total_staff_from_staff_model, total_staff_from_users, 1)  # Ensure at least 1
+        active_staff = max(active_staff_from_staff_model, active_staff_from_users, 1)  # Ensure at least 1
         
         # Resolution statistics
         resolution_rate = round((closed_complaints / total_complaints * 100), 2) if total_complaints > 0 else 0
         
-        return Response({
+        # Calculate average resolution time
+        resolved_complaints = Complaint.objects.filter(
+            status='Closed',
+            resolved_at__isnull=False,
+            created_at__isnull=False
+        )
+        
+        if resolved_complaints.exists():
+            total_resolution_time = 0
+            count = 0
+            for complaint in resolved_complaints:
+                if complaint.resolved_at and complaint.created_at:
+                    diff = complaint.resolved_at - complaint.created_at
+                    total_resolution_time += diff.total_seconds()
+                    count += 1
+            
+            if count > 0:
+                avg_seconds = total_resolution_time / count
+                avg_hours = avg_seconds / 3600
+                average_resolution_time = f"{avg_hours:.1f}h"
+            else:
+                average_resolution_time = "0h"
+        else:
+            average_resolution_time = "0h"
+        
+        # Pending escalations (complaints open for more than 48 hours)
+        forty_eight_hours_ago = timezone.now() - timedelta(hours=48)
+        pending_escalations = Complaint.objects.filter(
+            status__in=['Open', 'In Progress'],
+            created_at__lt=forty_eight_hours_ago
+        ).count()
+        
+        # Generate complaint trends data for the last 30 days
+        complaint_trends = []
+        for i in range(30):
+            date = today - timedelta(days=29-i)
+            day_open = Complaint.objects.filter(
+                created_at__date=date,
+                status='Open'
+            ).count()
+            day_progress = Complaint.objects.filter(
+                created_at__date=date,
+                status='In Progress'
+            ).count()
+            day_closed = Complaint.objects.filter(
+                resolved_at__date=date,
+                status='Closed'
+            ).count()
+            
+            complaint_trends.append({
+                'date': date.strftime('%Y-%m-%d'),
+                'open': day_open,
+                'in_progress': day_progress,
+                'closed': day_closed
+            })
+        
+        response_data = {
             'totalComplaints': total_complaints,
             'openComplaints': open_complaints,
             'inProgressComplaints': in_progress_complaints,
@@ -431,10 +515,18 @@ def admin_dashboard_stats(request):
             'totalStaff': total_staff,
             'activeStaff': active_staff,
             'resolutionRate': resolution_rate,
-            'averageResolutionTime': '4.5h'  # You can calculate this properly later
-        })
+            'averageResolutionTime': average_resolution_time,
+            'pendingEscalations': pending_escalations,
+            'complaintTrends': complaint_trends
+        }
+        
+        logger.info(f"Dashboard stats response: {response_data}")
+        return Response(response_data)
         
     except Exception as e:
+        logger.error(f"Error in admin_dashboard_stats: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # Additional admin utility endpoints
@@ -640,3 +732,67 @@ def admin_settings(request):
         # In a real application, you would save these settings to a database
         # For now, just return success
         return Response({'message': 'Settings updated successfully'})
+
+@api_view(['GET'])
+def admin_complaint_trends(request):
+    """
+    Get complaint trends data for charts
+    """
+    # Check authentication using custom middleware attributes
+    if not hasattr(request, 'is_authenticated') or not request.is_authenticated:
+        return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+    
+    if not (request.is_admin or request.is_staff):
+        return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        from datetime import timedelta
+        
+        # Get date range from query params (default to 30 days)
+        days = int(request.GET.get('days', 30))
+        today = timezone.now().date()
+        
+        # Generate trends data
+        trends_data = []
+        for i in range(days):
+            date = today - timedelta(days=days-1-i)
+            
+            # Count complaints created on this date by status
+            day_complaints = Complaint.objects.filter(created_at__date=date)
+            day_resolved = Complaint.objects.filter(resolved_at__date=date, status='Closed')
+            
+            open_count = day_complaints.filter(status='Open').count()
+            progress_count = day_complaints.filter(status='In Progress').count()
+            closed_count = day_resolved.count()
+            
+            trends_data.append({
+                'date': date.strftime('%Y-%m-%d'),
+                'open': open_count,
+                'in_progress': progress_count,
+                'closed': closed_count,
+                'total_created': day_complaints.count()
+            })
+        
+        # Also get complaint type distribution
+        type_distribution = list(
+            Complaint.objects.values('type')
+            .annotate(count=Count('id'))
+            .order_by('-count')[:10]
+        )
+        
+        # Get status distribution over time
+        status_distribution = {
+            'open': Complaint.objects.filter(status='Open').count(),
+            'in_progress': Complaint.objects.filter(status='In Progress').count(),
+            'closed': Complaint.objects.filter(status='Closed').count()
+        }
+        
+        return Response({
+            'trends': trends_data,
+            'type_distribution': type_distribution,
+            'status_distribution': status_distribution,
+            'total_complaints': Complaint.objects.count()
+        })
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

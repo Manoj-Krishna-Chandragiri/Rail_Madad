@@ -19,4 +19,5 @@ urlpatterns = [
     path('admin/staff/', views.admin_staff_list, name='admin-staff-list'),
     path('admin/staff/<int:pk>/', views.admin_staff_detail, name='admin-staff-detail'),
     path('admin/dashboard-stats/', views.admin_dashboard_stats, name='admin-dashboard-stats'),
+    path('admin/complaint-trends/', views.admin_complaint_trends, name='admin-complaint-trends'),  # Add this new endpoint
 ]

@@ -89,12 +89,25 @@ class FirebaseAuthMiddleware:
                         request.user = user
                         
                     except User.DoesNotExist:
-                        # User doesn't exist in DB yet
+                        # User doesn't exist in DB yet - create if admin
                         admin_emails = ['adm.railmadad@gmail.com', 'admin@railmadad.in']
                         if request.firebase_email in admin_emails:
+                            # Create admin user automatically
+                            user = User.objects.create(
+                                firebase_uid=request.firebase_uid,
+                                email=request.firebase_email,
+                                user_type='admin',
+                                is_admin=True,
+                                is_staff=True,
+                                is_active=True,
+                                full_name="Admin User"
+                            )
+                            request.user_id = user.id
                             request.user_type = 'admin'
                             request.is_admin = True
                             request.is_staff = True
+                            request.user = user
+                            logger.info(f"Auto-created admin user: {request.firebase_email}")
                         else:
                             request.user_type = 'passenger'
                             request.is_admin = False

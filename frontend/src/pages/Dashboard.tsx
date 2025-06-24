@@ -52,7 +52,8 @@ const Dashboard = () => {
     resolutionRate: 0,
     averageResolutionTime: '0h',
     pendingEscalations: 0,
-    totalComplaints: 0
+    totalComplaints: 0,
+    complaintTrends: [] as Array<{date: string, open: number, in_progress: number, closed: number}>
   });
 
   // Animation states
@@ -94,12 +95,16 @@ const Dashboard = () => {
         return;
       }
 
+      console.log('Fetching admin stats with token:', token.substring(0, 20) + '...');
+
       const response = await axios.get(
         `${import.meta.env.VITE_API_BASE_URL}/api/complaints/admin/dashboard-stats/`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
+
+      console.log('Admin stats response:', response.data);
 
       const data = response.data;
       setAdminStats({
@@ -108,20 +113,36 @@ const Dashboard = () => {
         resolvedToday: data.todayResolved || 0,
         resolutionRate: data.resolutionRate || 0,
         averageResolutionTime: data.averageResolutionTime || '0h',
-        pendingEscalations: 5, // You can calculate this in backend
-        totalComplaints: data.totalComplaints || 0
+        pendingEscalations: data.pendingEscalations || 0,
+        totalComplaints: data.totalComplaints || 0,
+        complaintTrends: data.complaintTrends || []
       });
+      
+      console.log('Admin stats loaded successfully:', data);
     } catch (error) {
       console.error('Error fetching admin stats:', error);
-      // Fallback to dummy data if API fails
+      
+      // Check if it's an authentication error
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 401) {
+          console.error('Authentication failed - user not logged in or token expired');
+          console.error('Response:', error.response.data);
+        } else if (error.response?.status === 403) {
+          console.error('Access denied - user is not an admin');
+          console.error('Response:', error.response.data);
+        }
+      }
+      
+      // Set default fallback data on error
       setAdminStats({
-        totalStaff: 18,
-        activeAgents: 12,
-        resolvedToday: 8,
-        resolutionRate: 87,
-        averageResolutionTime: '4.5h',
-        pendingEscalations: 5,
-        totalComplaints: 150
+        totalStaff: 0,
+        activeAgents: 0,
+        resolvedToday: 0,
+        resolutionRate: 0,
+        averageResolutionTime: '0h',
+        pendingEscalations: 0,
+        totalComplaints: 0,
+        complaintTrends: []
       });
     }
   };
@@ -298,17 +319,27 @@ const Dashboard = () => {
   const updateComplaintTrendsChart = () => {
     if (!chartRef.current) return;
 
-    // Generate some random data for the last 30 days
-    const dates = Array.from({ length: 30 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (29 - i));
-      return date.toISOString().split('T')[0];
-    });
-
-    // Random data
-    const openData = Array.from({ length: 30 }, () => Math.floor(Math.random() * 15) + 1);
-    const progressData = Array.from({ length: 30 }, () => Math.floor(Math.random() * 18) + 3);
-    const closedData = Array.from({ length: 30 }, () => Math.floor(Math.random() * 20) + 5);
+    // Use real data from adminStats if available, otherwise generate sample data
+    let dates: string[], openData: number[], progressData: number[], closedData: number[];
+    
+    if (adminStats.complaintTrends && adminStats.complaintTrends.length > 0) {
+      // Use real data
+      dates = adminStats.complaintTrends.map(trend => trend.date);
+      openData = adminStats.complaintTrends.map(trend => trend.open);
+      progressData = adminStats.complaintTrends.map(trend => trend.in_progress);
+      closedData = adminStats.complaintTrends.map(trend => trend.closed);
+    } else {
+      // Fallback to sample data for demo purposes
+      dates = Array.from({ length: 30 }, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() - (29 - i));
+        return date.toISOString().split('T')[0];
+      });
+      
+      openData = Array.from({ length: 30 }, () => Math.floor(Math.random() * 5) + 1);
+      progressData = Array.from({ length: 30 }, () => Math.floor(Math.random() * 8) + 2);
+      closedData = Array.from({ length: 30 }, () => Math.floor(Math.random() * 10) + 3);
+    }
 
     const options = {
       chart: {
