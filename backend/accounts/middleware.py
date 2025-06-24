@@ -15,13 +15,6 @@ logger = logging.getLogger('accounts')
 class FirebaseAuthMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
-        # Initialize Firebase Admin SDK if not already initialized
-        try:
-            firebase_admin.get_app()
-        except ValueError:
-            # Use the service account credentials from your Firebase project
-            cred = credentials.Certificate("path/to/serviceAccountKey.json")
-            firebase_admin.initialize_app(cred)
 
     def __call__(self, request):
         # Try to resolve the url and get the url name
@@ -45,22 +38,19 @@ class FirebaseAuthMiddleware:
         request.firebase_user = None
         request.firebase_email = None
         request.firebase_uid = None
-        request.user_type = 'user'  # Default type
+        request.user_type = 'passenger'  # Default type
         request.is_authenticated = False
         request.is_admin = False
         request.is_staff = False
-        request.user = None  # Ensure user is initially None
-        request.user_id = None  # Initialize user_id attribute
+        request.user = None
+        request.user_id = None
 
-        if auth_header:
-            # Properly extract the token - typically in format "Bearer <token>"
-            token = auth_header.split(' ')[1] if ' ' in auth_header else auth_header
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
             
-            logger.debug(f"Processing auth token: {token[:10]}...")
             try:
                 # Verify the token with Firebase
                 decoded_token = auth.verify_id_token(token)
-                logger.debug(f"Token decoded successfully for: {decoded_token.get('email')}")
                 
                 # Store Firebase user info in request
                 request.firebase_user = decoded_token
@@ -68,21 +58,10 @@ class FirebaseAuthMiddleware:
                 request.firebase_uid = decoded_token.get('uid')
                 request.is_authenticated = True
                 
-                # Enhanced user data extraction for Google Auth
-                if 'name' in decoded_token:
-                    request.firebase_name = decoded_token.get('name')
-                elif 'display_name' in decoded_token:
-                    request.firebase_name = decoded_token.get('display_name')
-                
-                # Store provider data
-                request.firebase_provider = decoded_token.get('firebase', {}).get('sign_in_provider', 'unknown') if 'firebase' in decoded_token else 'unknown'
-                
                 # Check if user exists in our database
                 User = get_user_model()
                 try:
-                    # Try to find by firebase_uid first
                     user = User.objects.get(firebase_uid=request.firebase_uid)
-                    logger.debug(f"Found existing user: {user.email}")
                     
                     # Set user ID explicitly
                     request.user_id = user.id
@@ -96,7 +75,7 @@ class FirebaseAuthMiddleware:
                     request.user = user
                     
                 except User.DoesNotExist:
-                    # Try to find by email (for cases where firebase_uid wasn't set initially)
+                    # Try to find by email
                     try:
                         user = User.objects.get(email=request.firebase_email)
                         # Update firebase_uid
@@ -110,14 +89,7 @@ class FirebaseAuthMiddleware:
                         request.user = user
                         
                     except User.DoesNotExist:
-                        # User doesn't exist in DB, set defaults
-                        logger.debug(f"User {request.firebase_email} authenticated via Firebase but not in database")
-                        
-                        # For users not in database, we'll create them when needed
-                        # but for now, set basic attributes
-                        request.user_id = None  # Will be created when filing complaint
-                        
-                        # Check if this is admin by email
+                        # User doesn't exist in DB yet
                         admin_emails = ['adm.railmadad@gmail.com', 'admin@railmadad.in']
                         if request.firebase_email in admin_emails:
                             request.user_type = 'admin'
@@ -128,12 +100,6 @@ class FirebaseAuthMiddleware:
                             request.is_admin = False
                             request.is_staff = False
                 
-            except ValueError as e:
-                logger.error(f"Invalid token format: {str(e)}")
-                return JsonResponse({'error': 'Invalid token format'}, status=401)
-            except auth.InvalidIdTokenError as e:
-                logger.error(f"Invalid Firebase token: {str(e)}")
-                return JsonResponse({'error': 'Invalid or expired Firebase token'}, status=401)
             except Exception as e:
                 logger.error(f"Firebase auth error: {str(e)}")
                 return JsonResponse({'error': f'Authentication error: {str(e)}'}, status=401)

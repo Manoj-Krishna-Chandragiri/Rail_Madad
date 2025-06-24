@@ -18,4 +18,5 @@ urlpatterns = [
     path('admin/complaints/<int:complaint_id>/status/', views.admin_update_complaint_status, name='admin-update-complaint-status'),
     path('admin/staff/', views.admin_staff_list, name='admin-staff-list'),
     path('admin/staff/<int:pk>/', views.admin_staff_detail, name='admin-staff-detail'),
+    path('admin/dashboard-stats/', views.admin_dashboard_stats, name='admin-dashboard-stats'),
 ]

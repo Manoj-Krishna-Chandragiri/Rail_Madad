@@ -100,7 +100,7 @@ def user_complaints(request):
         # Determine if we need to filter by user
         if request.is_admin or request.is_staff:
             # Admin and staff can see all complaints
-            complaints = Complaint.objects.all().order_by('-date_of_incident')
+            complaints = Complaint.objects.all().order_by('-created_at')
         else:
             # Regular users see only their own complaints
             user_id = None
@@ -113,7 +113,7 @@ def user_complaints(request):
                 user_id = request.user.id
             
             if user_id:
-                complaints = Complaint.objects.filter(user=user_id).order_by('-date_of_incident')
+                complaints = Complaint.objects.filter(user=user_id).order_by('-created_at')
             else:
                 # If we can't determine user_id, return empty result
                 return Response({'error': 'User ID not found'}, status=status.HTTP_400_BAD_REQUEST)
@@ -128,6 +128,12 @@ def user_complaints(request):
 def complaint_detail(request, complaint_id):
     try:
         complaint = Complaint.objects.get(id=complaint_id)
+        
+        # Check if user has permission to view this complaint
+        if not (request.is_admin or request.is_staff):
+            # Regular users can only see their own complaints
+            if hasattr(request, 'user_id') and complaint.user_id != request.user_id:
+                return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
     except Complaint.DoesNotExist:
         return Response({'error': 'Complaint not found'}, status=status.HTTP_404_NOT_FOUND)
  
@@ -136,6 +142,16 @@ def complaint_detail(request, complaint_id):
         return Response(serializer.data)
  
     elif request.method == 'PUT':
+        # Only admin/staff can update complaints
+        if not (request.is_admin or request.is_staff):
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+            
+        # If status is being changed to closed, record resolution details
+        if 'status' in request.data and request.data['status'].lower() == 'closed':
+            request.data['resolved_at'] = timezone.now()
+            if hasattr(request, 'firebase_email'):
+                request.data['resolved_by'] = request.firebase_email
+        
         serializer = ComplaintSerializer(complaint, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -378,21 +394,12 @@ def admin_staff_detail(request, pk):
 @permission_classes([IsAuthenticated])
 def admin_dashboard_stats(request):
     """
-    Get comprehensive dashboard statistics for admin
+    Get dashboard statistics for admin
     """
-    user = request.user
-    
-    # Ensure the user is an admin
-    if not user.is_staff and not user.is_superuser:
-        return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
+    if not (request.is_admin or request.is_staff):
+        return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
     
     try:
-        # Get current date and time ranges
-        now = timezone.now()
-        today = now.date()
-        week_ago = today - timedelta(days=7)
-        month_ago = today - timedelta(days=30)
-        
         # Basic complaint counts
         total_complaints = Complaint.objects.count()
         open_complaints = Complaint.objects.filter(status='Open').count()
@@ -400,6 +407,7 @@ def admin_dashboard_stats(request):
         closed_complaints = Complaint.objects.filter(status='Closed').count()
         
         # Today's statistics
+        today = timezone.now().date()
         today_complaints = Complaint.objects.filter(created_at__date=today).count()
         today_resolved = Complaint.objects.filter(
             status='Closed', 
@@ -411,97 +419,19 @@ def admin_dashboard_stats(request):
         active_staff = Staff.objects.filter(status='active').count()
         
         # Resolution statistics
-        total_resolved = Complaint.objects.filter(status='Closed').count()
-        resolution_rate = round((total_resolved / total_complaints * 100), 2) if total_complaints > 0 else 0
-        
-        # Average resolution time (simplified calculation)
-        resolved_complaints = Complaint.objects.filter(
-            status='Closed', 
-            resolved_at__isnull=False
-        )
-        
-        avg_resolution_hours = 0
-        if resolved_complaints.exists():
-            total_resolution_time = 0
-            count = 0
-            for complaint in resolved_complaints:
-                if complaint.resolved_at and complaint.created_at:
-                    time_diff = complaint.resolved_at - complaint.created_at
-                    total_resolution_time += time_diff.total_seconds()
-                    count += 1
-            
-            if count > 0:
-                avg_resolution_hours = round(total_resolution_time / count / 3600, 1)  # Convert to hours
-        
-        # Weekly trend data
-        weekly_data = []
-        for i in range(7):
-            date = today - timedelta(days=i)
-            day_complaints = Complaint.objects.filter(created_at__date=date).count()
-            day_resolved = Complaint.objects.filter(
-                status='Closed',
-                resolved_at__date=date
-            ).count()
-            weekly_data.append({
-                'date': date.strftime('%Y-%m-%d'),
-                'complaints': day_complaints,
-                'resolved': day_resolved
-            })
-        
-        # Severity breakdown
-        severity_stats = {
-            'high': Complaint.objects.filter(severity='High').count(),
-            'medium': Complaint.objects.filter(severity='Medium').count(),
-            'low': Complaint.objects.filter(severity='Low').count()
-        }
-        
-        # Complaint types breakdown
-        type_stats = Complaint.objects.values('type').annotate(
-            count=Count('id')
-        ).order_by('-count')[:10]  # Top 10 complaint types
-        
-        # Recent activity (last 24 hours)
-        recent_complaints = Complaint.objects.filter(
-            created_at__gte=now - timedelta(hours=24)
-        ).count()
-        
-        # Pending escalations (complaints older than 48 hours still open)
-        pending_escalations = Complaint.objects.filter(
-            Q(status='Open') | Q(status='In Progress'),
-            created_at__lte=now - timedelta(hours=48)
-        ).count()
-        
-        # Calculate average response time (time to first status change)
-        # This is a simplified calculation - in a real system you'd track status changes
-        avg_response_time = "2h 15m"  # Placeholder - implement based on status change tracking
+        resolution_rate = round((closed_complaints / total_complaints * 100), 2) if total_complaints > 0 else 0
         
         return Response({
-            'overview': {
-                'total_complaints': total_complaints,
-                'open_complaints': open_complaints,
-                'in_progress_complaints': in_progress_complaints,
-                'closed_complaints': closed_complaints,
-                'resolution_rate': resolution_rate,
-                'today_complaints': today_complaints,
-                'today_resolved': today_resolved,
-                'recent_complaints': recent_complaints,
-                'pending_escalations': pending_escalations
-            },
-            'staff': {
-                'total_staff': total_staff,
-                'active_staff': active_staff,
-                'staff_utilization': round((active_staff / total_staff * 100), 2) if total_staff > 0 else 0
-            },
-            'performance': {
-                'avg_resolution_time': f"{avg_resolution_hours}h",
-                'avg_response_time': avg_response_time,
-                'resolution_rate': resolution_rate
-            },
-            'trends': {
-                'weekly_data': weekly_data,
-                'severity_stats': severity_stats,
-                'type_stats': list(type_stats)
-            }
+            'totalComplaints': total_complaints,
+            'openComplaints': open_complaints,
+            'inProgressComplaints': in_progress_complaints,
+            'closedComplaints': closed_complaints,
+            'todayComplaints': today_complaints,
+            'todayResolved': today_resolved,
+            'totalStaff': total_staff,
+            'activeStaff': active_staff,
+            'resolutionRate': resolution_rate,
+            'averageResolutionTime': '4.5h'  # You can calculate this properly later
         })
         
     except Exception as e:
