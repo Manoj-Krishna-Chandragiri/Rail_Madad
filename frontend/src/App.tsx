@@ -23,7 +23,7 @@ import Help from './pages/Help';
 import FeedbackForm from './pages/FeedbackForm';
 import RealTimeSupport from './pages/RealTimeSupport';
 
-import '../../frontend/src/styles/translate.css';
+import './styles/translate.css';
 import './index.css';
 
 const getUserType = (): 'admin' | 'user' | null => {
