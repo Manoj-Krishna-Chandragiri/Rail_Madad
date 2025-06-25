@@ -1,7 +1,8 @@
-import { FileUp, Camera, Mic, MicOff } from 'lucide-react'; // Remove Paperclip import
+import { FileUp, Camera, Mic, MicOff } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import axios from "axios";
+import { getValidToken } from '../utils/firebase-auth';
 
 interface ComplaintFormData {
   type: string;
@@ -45,6 +46,14 @@ const FileComplaint = () => {
     e.preventDefault();
     
     try {
+      // Get a fresh, valid token
+      const token = await getValidToken();
+      
+      if (!token) {
+        alert("Please sign in again to submit your complaint.");
+        return;
+      }
+      
       const formDataToSend = new FormData();
       
       // Ensure all required fields are included
@@ -60,16 +69,13 @@ const FileComplaint = () => {
         formDataToSend.append('photos', photo, fileName);
       }
 
-      // Get auth token from localStorage or wherever it's stored
-      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
-      
       const response = await axios.post(
         `${import.meta.env.VITE_API_BASE_URL}/api/complaints/file/`,
         formDataToSend,
         {
           headers: {
             "Content-Type": "multipart/form-data",
-            ...(token && { "Authorization": `Bearer ${token}` })
+            "Authorization": `Bearer ${token}`
           }
         }
       );
@@ -90,7 +96,12 @@ const FileComplaint = () => {
       setPhotos([]);
     } catch (error: any) {
       console.error("Error submitting:", error.response?.data || error);
-      alert(`Failed to submit complaint: ${error.response?.data?.error || error.message}`);
+      
+      if (error.response?.status === 401) {
+        alert("Your session has expired. Please sign in again.");
+      } else {
+        alert(`Failed to submit complaint: ${error.response?.data?.error || error.message}`);
+      }
     }
   };
   

@@ -113,9 +113,24 @@ class FirebaseAuthMiddleware:
                             request.is_admin = False
                             request.is_staff = False
                 
+            except auth.ExpiredIdTokenError:
+                logger.error("Firebase token expired")
+                return JsonResponse({
+                    'error': 'Token expired. Please refresh and try again.',
+                    'code': 'TOKEN_EXPIRED'
+                }, status=401)
+            except auth.InvalidIdTokenError:
+                logger.error("Invalid Firebase token")
+                return JsonResponse({
+                    'error': 'Invalid authentication token',
+                    'code': 'INVALID_TOKEN'
+                }, status=401)
             except Exception as e:
                 logger.error(f"Firebase auth error: {str(e)}")
-                return JsonResponse({'error': f'Authentication error: {str(e)}'}, status=401)
+                return JsonResponse({
+                    'error': f'Authentication error: {str(e)}',
+                    'code': 'AUTH_ERROR'
+                }, status=401)
         
         response = self.get_response(request)
         return response

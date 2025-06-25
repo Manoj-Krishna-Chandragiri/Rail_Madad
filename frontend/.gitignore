@@ -7,18 +7,52 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Dependency directories
+node_modules/
+.venv/
+env/
+venv/
+__pycache__/
 
-# Editor directories and files
-.vscode/*
+# Compiled Python files
+*.pyc
+*.pyo
+*.pyd
+
+# Python cache and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.cache/
+
+# Environment files
+.env
+.env.*
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+
+# Media uploads (if not tracking them in Git)
+backend/media/
+frontend/dist/
+frontend/build/
+
+# Editor settings
+.vscode/
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# Misc
+*.bak
+*.tmp
+*.orig
