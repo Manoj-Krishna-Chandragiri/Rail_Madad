@@ -202,7 +202,9 @@ const Login: React.FC = () => {
       localStorage.setItem('adminToken', token);
       
       // Dispatch event to notify components of user type change
-      window.dispatchEvent(new Event('userTypeChanged'));
+      setTimeout(() => {
+        window.dispatchEvent(new Event('userTypeChanged'));
+      }, 100);
       
       setMessageType(showMessage('Admin login successful!', setError, 'success'));
       navigate('/admin-dashboard');
@@ -227,7 +229,9 @@ const Login: React.FC = () => {
         localStorage.setItem('adminToken', token);
         
         // Dispatch event to notify components of user type change
-        window.dispatchEvent(new Event('userTypeChanged'));
+        setTimeout(() => {
+          window.dispatchEvent(new Event('userTypeChanged'));
+        }, 100);
         
         setMessageType(showMessage('Admin login successful!', setError, 'success'));
         navigate('/admin-dashboard');
@@ -235,7 +239,9 @@ const Login: React.FC = () => {
         localStorage.setItem('userRole', role);
         
         // Dispatch event to notify components of user type change
-        window.dispatchEvent(new Event('userTypeChanged'));
+        setTimeout(() => {
+          window.dispatchEvent(new Event('userTypeChanged'));
+        }, 100);
         
         setMessageType(showMessage('Login successful!', setError, 'success'));
         navigate('/user-dashboard');
@@ -484,7 +490,9 @@ const handleGoogleSignIn = async () => {
         localStorage.setItem('adminToken', token);
         
         // Dispatch event to notify components of user type change
-        window.dispatchEvent(new Event('userTypeChanged'));
+        setTimeout(() => {
+          window.dispatchEvent(new Event('userTypeChanged'));
+        }, 100);
         
         setMessageType(showMessage('Admin login successful!', setError, 'success'));
         navigate('/admin-dashboard');
@@ -492,7 +500,9 @@ const handleGoogleSignIn = async () => {
         localStorage.setItem('userRole', role);
         
         // Dispatch event to notify components of user type change
-        window.dispatchEvent(new Event('userTypeChanged'));
+        setTimeout(() => {
+          window.dispatchEvent(new Event('userTypeChanged'));
+        }, 100);
         
         setMessageType(showMessage('Login successful!', setError, 'success'));
         navigate('/user-dashboard');
@@ -516,7 +526,9 @@ const handleGoogleSignIn = async () => {
             localStorage.setItem('adminToken', token);
             
             // Dispatch event to notify components of user type change
-            window.dispatchEvent(new Event('userTypeChanged'));
+            setTimeout(() => {
+              window.dispatchEvent(new Event('userTypeChanged'));
+            }, 100);
             
             setMessageType(showMessage('Admin account created and logged in!', setError, 'success'));
             navigate('/admin-dashboard');
@@ -524,7 +536,9 @@ const handleGoogleSignIn = async () => {
             localStorage.setItem('userRole', 'passenger');
             
             // Dispatch event to notify components of user type change
-            window.dispatchEvent(new Event('userTypeChanged'));
+            setTimeout(() => {
+              window.dispatchEvent(new Event('userTypeChanged'));
+            }, 100);
             
             setMessageType(showMessage('Account created successfully!', setError, 'success'));
             navigate('/user-dashboard/profile?newUser=true');

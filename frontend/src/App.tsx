@@ -118,16 +118,20 @@ const App = () => {
       const type = getUserType();
       setUserType(type);
       setLoading(false);
-      
-      // Dispatch event when user type changes
-      window.dispatchEvent(new Event('userTypeChanged'));
     };
 
     checkUserType();
 
     // Listen for localStorage changes to update user type
-    const handleStorageChange = () => {
-      checkUserType();
+    const handleStorageChange = (event?: StorageEvent | Event) => {
+      // Only respond to actual storage changes, not our own dispatched events
+      if (event && event.type === 'storage') {
+        const type = getUserType();
+        setUserType(type);
+      } else if (event && event.type === 'userTypeChanged') {
+        const type = getUserType();
+        setUserType(type);
+      }
     };
 
     window.addEventListener('storage', handleStorageChange);
