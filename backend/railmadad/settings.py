@@ -104,19 +104,28 @@ TEMPLATES = [
 WSGI_APPLICATION = 'railmadad.wsgi.application'
 
 # Database configuration for production
+# Database configuration - Using SQLite for free deployment
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.environ.get('RDS_DB_NAME', 'rail_madad'),
-        'USER': os.environ.get('RDS_USERNAME', 'admin'),
-        'PASSWORD': os.environ.get('RDS_PASSWORD', 'your-password'),
-        'HOST': os.environ.get('RDS_HOSTNAME', 'localhost'),
-        'PORT': os.environ.get('RDS_PORT', '3306'),
-        'OPTIONS': {
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"
-        }
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# Optional: MySQL configuration for future use
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': os.environ.get('RDS_DB_NAME', 'rail_madad'),
+#         'USER': os.environ.get('RDS_USERNAME', 'admin'),
+#         'PASSWORD': os.environ.get('RDS_PASSWORD', 'your-password'),
+#         'HOST': os.environ.get('RDS_HOSTNAME', 'localhost'),
+#         'PORT': os.environ.get('RDS_PORT', '3306'),
+#         'OPTIONS': {
+#             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"
+#         }
+#     }
+# }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
