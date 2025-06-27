@@ -28,19 +28,21 @@ export default defineConfig({
         },
       },
       '/sms': {
-        target: 'http://127.0.0.1:8000', // Same backend as the `/api` proxy
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/sms/, '/sms'),
       },
-      // Proxy for Admin Frontend (runs on port 5173)
       '/admin-api': {
-        target: 'http://127.0.0.1:8000', // Assuming the admin also connects to the same backend
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/admin-api/, '/admin-api'),
       },
     },
+  },
+  define: {
+    'import.meta.env.VITE_API_BASE_URL': JSON.stringify('http://127.0.0.1:8000'),
   },
   build: {
     outDir: 'build',

@@ -3,20 +3,20 @@ from .models import FirebaseUser
 
 @admin.register(FirebaseUser)
 class FirebaseUserAdmin(admin.ModelAdmin):
-    list_display = ['email', 'name', 'role', 'created_at', 'is_active']
-    list_filter = ['role', 'created_at', 'is_active']
-    search_fields = ['email', 'name', 'uid']
-    readonly_fields = ['uid', 'created_at', 'updated_at']
+    list_display = ['email', 'full_name', 'user_type', 'date_joined', 'is_active']
+    list_filter = ['user_type', 'date_joined', 'is_active']
+    search_fields = ['email', 'full_name', 'firebase_uid']
+    readonly_fields = ['firebase_uid', 'date_joined']
     
     fieldsets = (
         ('User Information', {
-            'fields': ('uid', 'email', 'name', 'profile_picture')
+            'fields': ('firebase_uid', 'email', 'full_name', 'phone_number', 'gender', 'address')
         }),
         ('Permissions', {
-            'fields': ('role', 'is_active')
+            'fields': ('user_type', 'is_active', 'is_staff', 'is_admin')
         }),
         ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
+            'fields': ('date_joined',),
             'classes': ('collapse',)
         }),
     )

@@ -18,7 +18,7 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'change_this_in_production')
 DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
 
 # Allowed hosts with comma-separated values from environment
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost').split(',')
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 # Application definition
 INSTALLED_APPS = [
@@ -31,11 +31,11 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
-    'accounts',  # From first settings.py
+    'accounts',
     'complaints',
 ]
 
-# Custom User Model (from first settings.py)
+# Custom User Model
 AUTH_USER_MODEL = 'accounts.FirebaseUser'
 
 # DRF Authentication Configuration
@@ -47,13 +47,13 @@ REST_FRAMEWORK = {
 
 # Middleware Configuration
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # CORS Middleware at the top
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',  # Must come before FirebaseAuthMiddleware
-    'accounts.middleware.FirebaseAuthMiddleware',  # Correct placement
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'accounts.middleware.FirebaseAuthMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -78,17 +78,25 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'backend.wsgi.application'
 
-# Database Configuration
+# Database Configuration - Use SQLite for development
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.getenv('MYSQL_DATABASE', 'rail_madad'),
-        'USER': os.getenv('MYSQL_USER', 'root'),
-        'PASSWORD': os.getenv('MYSQL_PASSWORD', 'Lu@B9pk@3k4WP'),
-        'HOST': os.getenv('MYSQL_HOST', 'localhost'),
-        'PORT': os.getenv('MYSQL_PORT', '3306'),
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# Uncomment below for MySQL if needed:
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': os.getenv('MYSQL_DATABASE', 'rail_madad'),
+#         'USER': os.getenv('MYSQL_USER', 'root'),
+#         'PASSWORD': os.getenv('MYSQL_PASSWORD', 'Lu@B9pk@3k4WP'),
+#         'HOST': os.getenv('MYSQL_HOST', 'localhost'),
+#         'PORT': os.getenv('MYSQL_PORT', '3306'),
+#     }
+# }
 
 # Password Validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -114,12 +122,16 @@ USE_TZ = True
 
 # Static and Media Files Configuration
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+# Create media directory if it doesn't exist
+os.makedirs(MEDIA_ROOT, exist_ok=True)
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Admin Credentials (from first settings.py)
+# Admin Credentials
 ADMIN_EMAIL = 'adm.railmadad@gmail.com'
 ADMIN_PASSWORD = 'admin@2025'
 
@@ -133,8 +145,7 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
     'Authorization',
 ]
 
-# Optional: Uncomment the line below for allowing all origins (use cautiously)
-# CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
 
 # Firebase Configuration
 FIREBASE_CERT = os.path.join(BASE_DIR, 'backend/railmadad-login-firebase-adminsdk-fbsvc-5305d3439b.json')
