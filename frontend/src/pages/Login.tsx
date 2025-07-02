@@ -9,7 +9,6 @@ import { handleMFAChallenge } from '../utils/mfa';
 import { sendSMS, validatePhoneNumber, formatPhoneNumber } from '../utils/smsGateway';
 import { handleEmailSignIn, handlePhoneSignIn, validatePhoneVerification, handleMockVerification } from '../utils/authHandlers';
 import axios from 'axios';
-import apiClient from '../utils/api';
 
 const MALE_DEFAULT_AVATAR = 'https://uxwing.com/wp-content/themes/uxwing/download/peoples-avatars/default-profile-picture-male-icon.png';
 const FEMALE_DEFAULT_AVATAR = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRHEJ-8GyKlZr5ZmEfRMmt5nR4tH_aP-crbgg&s';
@@ -218,7 +217,7 @@ const Login: React.FC = () => {
     }
 
     try {
-      const userResponse = await apiClient.get('/api/accounts/profile/');
+      const userResponse = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/accounts/profile/`);
       const userData = userResponse.data;
       const role = userData.user_type || 'passenger';
 
@@ -256,7 +255,7 @@ const Login: React.FC = () => {
           profileImage: user.photoURL || '',
         };
 
-        await apiClient.post('/api/accounts/profile/create/', initialUserData);
+        await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/accounts/profile/create/`, initialUserData);
         localStorage.setItem('isAuthenticated', 'true');
         localStorage.setItem('userRole', 'passenger');
         navigate('/user-dashboard/profile?newUser=true');
