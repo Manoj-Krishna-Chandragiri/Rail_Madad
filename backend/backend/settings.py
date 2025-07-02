@@ -18,8 +18,8 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'change_this_in_production')
 DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
 
 # Allowed hosts with comma-separated values from environment
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
-
+# Allowed hosts with comma-separated values from environment
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,rail-madad-backend.onrender.com').split(',')
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -138,6 +138,8 @@ ADMIN_PASSWORD = 'admin@2025'
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5174",
+    "https://rail-madad-backend.onrender.com",  # Add your backend domain
+    "https://main.dhpx91sx6cx3f.amplifyapp.com",  # Add your frontend domain when ready
 ]
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
