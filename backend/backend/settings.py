@@ -18,7 +18,7 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'change_this_in_production')
 DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
 
 # Allowed hosts with comma-separated values from environment
-ALLOWED_HOSTS = [host.strip() for host in os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,rail-madad-backend.onrender.com').split(',')]
+ALLOWED_HOSTS = [host.strip() for host in os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,rail-madad-backend.onrender.com,rail-madad.manojkrishna.me').split(',')]
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',

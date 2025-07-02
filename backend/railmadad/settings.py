@@ -20,7 +20,8 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     '.elasticbeanstalk.com',
     '.amazonaws.com',
-    'main.dhpx91sx6cx3f.amplifyapp.com',  # Your frontend domain
+    'main.dhpx91sx6cx3f.amplifyapp.com',
+    'rail-madad.manojkrishna.me'  # Your frontend domain
 ]
 
 # Application definition
