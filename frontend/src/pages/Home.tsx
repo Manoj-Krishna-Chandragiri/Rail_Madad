@@ -531,6 +531,7 @@ const Home = () => {
                     </div>
                     <div className="coupling-system flex items-center absolute right-[-12px] top-[35px]">
                       <div className="coupling-rear w-[16px] h-[6px] bg-gray-600 rounded-r"></div>
+                      <div className="coupling-chain w-[6px] h-[2px] bg-gray-500 absolute right-[-6px]"></div>
                     </div>
                   </div>
                 </div>

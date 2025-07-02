@@ -31,8 +31,12 @@ const AdminProfile = () => {
           return;
         }
 
+        // Check your frontend axios configuration
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+        // Make sure all API calls use this base URL
         const response = await axios.get(
-          `${import.meta.env.VITE_API_BASE_URL}/api/admin/profile/`,
+          `${API_BASE_URL}/api/admin/profile/`,
           {
             headers: {
               'Authorization': `Token ${token}`, // Changed from Bearer to Token

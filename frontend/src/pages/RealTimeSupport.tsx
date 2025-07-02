@@ -54,7 +54,11 @@ const RealTimeSupport = () => {
     const fetchStaffData = async () => {
       setLoading(true);
       try {
-        const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/complaints/staff/`);
+        // Check your frontend axios configuration
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+        
+        // Make sure all API calls use this base URL
+        const response = await axios.get(`${API_BASE_URL}/api/complaints/staff/`);
         
         // Transform data to match SupportAgent interface
         const supportAgents = response.data.map((staff: any) => ({

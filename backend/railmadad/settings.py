@@ -53,22 +53,41 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# Database Configuration
+if os.getenv('USE_SQLITE', 'False') == 'True':
+    # Use SQLite for local development
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+else:
+    # Use MySQL for production
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': os.getenv('MYSQL_DATABASE'),
+            'USER': os.getenv('MYSQL_USER'),
+            'PASSWORD': os.getenv('MYSQL_PASSWORD'),
+            'HOST': os.getenv('MYSQL_HOST'),
+            'PORT': os.getenv('MYSQL_PORT'),
+            'OPTIONS': {
+                'sql_mode': 'traditional',
+                'charset': 'utf8mb4',
+                'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+                'ssl': {
+                    'ssl_mode': 'REQUIRED',
+                }
+            }
+        }
+    }
+
 # CORS settings for production
 CORS_ALLOWED_ORIGINS = [
-    "https://main.dhpx91sx6cx3f.amplifyapp.com",  # Your frontend domain
-    "http://localhost:5174",  # For local development
-]
-
-CORS_ALLOW_CREDENTIALS = True
-
-# Enable CORS headers for all HTTP methods
-CORS_ALLOW_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
+    "http://localhost:5174",  # Local development
+    "https://main.dhpx91sx6cx3f.amplifyapp.com",  # Your AWS Amplify frontend
+    "https://rail-madad-backend.onrender.com",  # Your backend domain
 ]
 
 CORS_ALLOW_HEADERS = [
@@ -81,6 +100,28 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
+    'X-CSRFToken',
+    'Authorization',
+    'Content-Type',
+    'X-Requested-With',
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+# Also add for Django's CSRF protection
+CSRF_TRUSTED_ORIGINS = [
+    "https://main.dhpx91sx6cx3f.amplifyapp.com",
+    "https://rail-madad-backend.onrender.com",
+]
+
+# Enable CORS headers for all HTTP methods
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
 ]
 
 ROOT_URLCONF = 'railmadad.urls'
@@ -102,30 +143,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'railmadad.wsgi.application'
-
-# Database configuration for production
-# Database configuration - Using SQLite for free deployment
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-
-# Optional: MySQL configuration for future use
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.mysql',
-#         'NAME': os.environ.get('RDS_DB_NAME', 'rail_madad'),
-#         'USER': os.environ.get('RDS_USERNAME', 'admin'),
-#         'PASSWORD': os.environ.get('RDS_PASSWORD', 'your-password'),
-#         'HOST': os.environ.get('RDS_HOSTNAME', 'localhost'),
-#         'PORT': os.environ.get('RDS_PORT', '3306'),
-#         'OPTIONS': {
-#             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"
-#         }
-#     }
-# }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [

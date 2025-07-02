@@ -78,25 +78,35 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'backend.wsgi.application'
 
-# Database Configuration - Use SQLite for development
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Database Configuration
+if os.getenv('USE_SQLITE', 'False') == 'True':
+    # Use SQLite for local development
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
-
-# Uncomment below for MySQL if needed:
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.mysql',
-#         'NAME': os.getenv('MYSQL_DATABASE', 'rail_madad'),
-#         'USER': os.getenv('MYSQL_USER', 'root'),
-#         'PASSWORD': os.getenv('MYSQL_PASSWORD', 'Lu@B9pk@3k4WP'),
-#         'HOST': os.getenv('MYSQL_HOST', 'localhost'),
-#         'PORT': os.getenv('MYSQL_PORT', '3306'),
-#     }
-# }
+else:
+    # Use MySQL for production
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': os.getenv('MYSQL_DATABASE'),
+            'USER': os.getenv('MYSQL_USER'),
+            'PASSWORD': os.getenv('MYSQL_PASSWORD'),
+            'HOST': os.getenv('MYSQL_HOST'),
+            'PORT': os.getenv('MYSQL_PORT'),
+            'OPTIONS': {
+                'sql_mode': 'traditional',
+                'charset': 'utf8mb4',
+                'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+                'ssl': {
+                    'ssl_mode': 'REQUIRED',
+                }
+            }
+        }
+    }
 
 # Password Validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -138,17 +148,33 @@ ADMIN_PASSWORD = 'admin@2025'
 
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5174",
-    "https://rail-madad-backend.onrender.com",  # Add your backend domain
-    "https://main.dhpx91sx6cx3f.amplifyapp.com",  # Add your frontend domain when ready
+    "http://localhost:5174",  # Local development
+    "https://main.dhpx91sx6cx3f.amplifyapp.com",  # Your AWS Amplify frontend
+    "https://rail-madad-backend.onrender.com",  # Your backend domain
 ]
 
-CORS_ALLOW_HEADERS = list(default_headers) + [
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
     'X-CSRFToken',
     'Authorization',
+    'Content-Type',
+    'X-Requested-With',
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://main.dhpx91sx6cx3f.amplifyapp.com",
+    "https://rail-madad-backend.onrender.com",
+]
 
 # Firebase Configuration
 FIREBASE_CERT = os.path.join(BASE_DIR, 'backend/railmadad-login-firebase-adminsdk-fbsvc-5305d3439b.json')

@@ -14,6 +14,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import axios from 'axios';
 
+// Check your frontend axios configuration
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 interface StaffMember {
   id: string;
   name: string;
@@ -113,7 +116,7 @@ const Staff = () => {
   const fetchStaffData = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/complaints/staff/`);
+      const response = await axios.get(`${API_BASE_URL}/api/complaints/staff/`);
       
       // Parse expertise and languages fields if they're strings
       const processedData = response.data.map((staff: any) => {
@@ -225,7 +228,7 @@ const Staff = () => {
 
       // Send to backend
       const response = await axios.post(
-        `${import.meta.env.VITE_API_BASE_URL}/api/complaints/staff/`,
+        `${API_BASE_URL}/api/complaints/staff/`,
         formData,
         {
           headers: {
@@ -482,7 +485,7 @@ const Staff = () => {
 
       // Send to backend
       const response = await axios.put(
-        `${import.meta.env.VITE_API_BASE_URL}/api/complaints/staff/${selectedStaff.id}/`,
+        `${API_BASE_URL}/api/complaints/staff/${selectedStaff.id}/`,
         formData,
         {
           headers: {
@@ -542,7 +545,7 @@ const Staff = () => {
     setLoading(true);
     try {
       await axios.delete(
-        `${import.meta.env.VITE_API_BASE_URL}/api/complaints/staff/${selectedStaff.id}/`
+        `${API_BASE_URL}/api/complaints/staff/${selectedStaff.id}/`
       );
 
       // Remove from staff list
