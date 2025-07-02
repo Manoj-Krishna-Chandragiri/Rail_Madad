@@ -17,7 +17,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
-import axios from 'axios';
+import apiClient from '../utils/api';
 import { getAuth } from 'firebase/auth';
 
 interface SearchResult {
@@ -71,15 +71,12 @@ const Home = () => {
       const token = await currentUser.getIdToken();
       
       // Make API request with authorization header
-      const response = await axios.get(
-        `${import.meta.env.VITE_API_BASE_URL}/api/complaints/search/`,
-        {
-          params: { q: searchQuery.trim() },
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+      const response = await apiClient.get('/api/complaints/search/', {
+        params: { q: searchQuery.trim() },
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
-      );
+      });
 
       setSearchResults(response.data.complaints || []);
       setShowResults(true);

@@ -1,6 +1,6 @@
 import { Clock, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
 import { getAuth } from 'firebase/auth';
 import { useLocation } from 'react-router-dom';
@@ -39,14 +39,11 @@ const TrackStatus = () => {
         const token = await currentUser.getIdToken();
         
         // Make API request with authorization header
-        const response = await axios.get(
-          `${import.meta.env.VITE_API_BASE_URL}/api/complaints/user/`,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
+        const response = await apiClient.get('/api/complaints/user/', {
+          headers: {
+            'Authorization': `Bearer ${token}`
           }
-        );
+        });
 
         const formatted = response.data.map((item: any) => ({
           id: `CMP${item.id.toString().padStart(3, '0')}`,
