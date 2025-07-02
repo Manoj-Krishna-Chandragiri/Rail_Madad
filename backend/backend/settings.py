@@ -18,8 +18,7 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'change_this_in_production')
 DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
 
 # Allowed hosts with comma-separated values from environment
-# Allowed hosts with comma-separated values from environment
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,rail-madad-backend.onrender.com').split(',')
+ALLOWED_HOSTS = [host.strip() for host in os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,rail-madad-backend.onrender.com').split(',')]
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -48,6 +47,7 @@ REST_FRAMEWORK = {
 # Middleware Configuration
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Add this line
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -121,8 +121,9 @@ USE_I18N = True
 USE_TZ = True
 
 # Static and Media Files Configuration
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'  # Add leading slash
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
@@ -189,5 +190,15 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': True,
         },
+    },
+}
+
+# Replace STATICFILES_STORAGE with STORAGES
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
