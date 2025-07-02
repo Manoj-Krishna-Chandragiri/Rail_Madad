@@ -203,55 +203,31 @@ def create_profile(request):
         if not hasattr(request, 'firebase_uid') or not request.firebase_uid:
             return Response({'error': 'Authentication required'}, status=401)
         
-        # Set user type from request data
-        user_type = request.data.get('user_type', 'passenger')
-        request.user_type_override = user_type
+        user_data = request.data
         
-        # Get or create user in the database
-        user, created = get_or_create_user(request)
+        # Get user_type from request, default to 'passenger'
+        user_type = user_data.get('user_type', 'passenger')
         
-        if not user:
-            return Response({'error': 'Failed to create or find user record'}, status=500)
-        
-        # Update user data from request
-        update_fields = {
-            'full_name': request.data.get('name'),
-            'phone_number': request.data.get('phone_number'),
-            'gender': request.data.get('gender'),
-            'address': request.data.get('address'),
-            'user_type': user_type
-        }
-        
-        # Remove None values and update only provided fields
-        update_fields = {k: v for k, v in update_fields.items() if v is not None}
-        
-        for field, value in update_fields.items():
-            setattr(user, field, value)
-        
-        # Update admin/staff status based on user type
-        if user_type == 'admin':
-            user.is_admin = True
-            user.is_staff = True
-        elif user_type == 'staff':
-            user.is_staff = True
-        
-        user.save()
+        # Create or update profile
+        profile, created = User.objects.update_or_create(
+            email=user_data.get('email'),
+            defaults={
+                'full_name': user_data.get('name', ''),
+                'phone_number': user_data.get('phone_number', ''),
+                'gender': user_data.get('gender', ''),
+                'address': user_data.get('address', ''),
+                'user_type': user_type,  # ✅ Use the provided user_type
+            }
+        )
         
         return Response({
-            'message': 'Profile created/updated successfully',
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'full_name': user.full_name,
-                'user_type': user.user_type,
-                'is_admin': user.is_user_admin,
-                'created_now': created
-            }
-        }, status=201 if created else 200)
+            'message': 'Profile created successfully',
+            'user_type': profile.user_type,
+            'is_admin': profile.user_type == 'admin'
+        })
         
     except Exception as e:
-        logger.error(f"Error in create_profile: {str(e)}")
-        return Response({'error': str(e)}, status=500)
+        return Response({'error': str(e)}, status=400)
 
 @api_view(['GET'])
 @admin_required

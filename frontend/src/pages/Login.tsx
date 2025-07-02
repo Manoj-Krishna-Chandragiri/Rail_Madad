@@ -8,6 +8,7 @@ import { getFirestore, setDoc, doc, getDoc } from "firebase/firestore";
 import { handleMFAChallenge } from '../utils/mfa';
 import { sendSMS, validatePhoneNumber, formatPhoneNumber } from '../utils/smsGateway';
 import { handleEmailSignIn, handlePhoneSignIn, validatePhoneVerification, handleMockVerification } from '../utils/authHandlers';
+import apiClient from '../utils/api'; // ✅ Import apiClient
 import axios from 'axios';
 
 const MALE_DEFAULT_AVATAR = 'https://uxwing.com/wp-content/themes/uxwing/download/peoples-avatars/default-profile-picture-male-icon.png';
@@ -192,16 +193,16 @@ const Login: React.FC = () => {
     const token = await user.getIdToken();
     localStorage.setItem('authToken', token);
     localStorage.setItem('userEmail', user.email || '');
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
-    // Special handling for admin account
+    // Special handling for admin accounts
     const adminEmails = ['adm.railmadad@gmail.com', 'admin@railmadad.in'];
-    if (adminEmails.includes(email)) {
+    const isAdminEmail = adminEmails.includes(email);
+
+    if (isAdminEmail) {
       localStorage.setItem('isAuthenticated', 'true');
       localStorage.setItem('userRole', 'admin');
       localStorage.setItem('adminToken', token);
       
-      // Dispatch event to notify components of user type change
       setTimeout(() => {
         window.dispatchEvent(new Event('userTypeChanged'));
       }, 100);
@@ -217,18 +218,21 @@ const Login: React.FC = () => {
     }
 
     try {
-      const userResponse = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/accounts/profile/`);
+      // ✅ Use apiClient instead of direct axios
+      console.log('Making request to backend...');
+      const userResponse = await apiClient.get('/api/accounts/profile/');
+      console.log('Backend response:', userResponse.data);
+      
       const userData = userResponse.data;
       const role = userData.user_type || 'passenger';
 
       localStorage.setItem('isAuthenticated', 'true');
       
-      // Check if user is admin based on backend data
-      if (role === 'admin' || userData.is_admin || adminEmails.includes(user.email || '')) {
+      // ✅ Properly check for admin role
+      if (role === 'admin' || userData.is_admin || isAdminEmail) {
         localStorage.setItem('userRole', 'admin');
         localStorage.setItem('adminToken', token);
         
-        // Dispatch event to notify components of user type change
         setTimeout(() => {
           window.dispatchEvent(new Event('userTypeChanged'));
         }, 100);
@@ -238,7 +242,6 @@ const Login: React.FC = () => {
       } else {
         localStorage.setItem('userRole', role);
         
-        // Dispatch event to notify components of user type change
         setTimeout(() => {
           window.dispatchEvent(new Event('userTypeChanged'));
         }, 100);
@@ -248,14 +251,19 @@ const Login: React.FC = () => {
       }
 
     } catch (backendError: any) {
-      if (axios.isAxiosError(backendError) && backendError.response?.status === 404) {
+      console.error('Backend request failed:', backendError);
+      
+      if (backendError.response?.status === 404) {
+        // User doesn't exist in backend - create with default passenger role
         const initialUserData = {
           email: user.email,
           name: user.displayName,
           profileImage: user.photoURL || '',
+          user_type: 'passenger' // Default for existing Firebase users
         };
 
-        await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/accounts/profile/create/`, initialUserData);
+        // ✅ Use apiClient instead of direct axios
+        await apiClient.post('/api/accounts/profile/create/', initialUserData);
         localStorage.setItem('isAuthenticated', 'true');
         localStorage.setItem('userRole', 'passenger');
         navigate('/user-dashboard/profile?newUser=true');
@@ -604,39 +612,73 @@ const handleGoogleSignIn = async () => {
       // Send email verification
       await sendEmailVerification(user);
       
-      // Save user data to Firestore
+      // Get token for backend authentication
+      const token = await user.getIdToken();
+      localStorage.setItem('authToken', token);
+      localStorage.setItem('userEmail', user.email || '');
+      
+      // Prepare user data for Firestore
       const userData = {
         email: signUpData.email,
         name: signUpData.name,
         phoneNumber: signUpData.phoneNumber,
         gender: signUpData.gender,
         address: signUpData.address,
-        userType: signUpData.userType,
+        userType: signUpData.userType, // ✅ Use selected userType
         profileImage: signUpData.gender === 'male' ? MALE_DEFAULT_AVATAR : FEMALE_DEFAULT_AVATAR,
-        emailVerified: false
+        emailVerified: false,
+        createdAt: new Date().toISOString()
       };
 
+      // Save to Firestore
       await setDoc(doc(db, "users", user.uid), userData);
       
-      // Also register in Django backend
+      // ✅ Register in Django backend with correct user_type
       try {
-        const token = await user.getIdToken();
-        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        
-        await axios.post('/api/accounts/profile/create/', {
+        await apiClient.post('/api/accounts/profile/create/', {
+          email: signUpData.email,
           name: signUpData.name,
           phone_number: signUpData.phoneNumber,
           gender: signUpData.gender,
           address: signUpData.address,
-          user_type: signUpData.userType
+          user_type: signUpData.userType, // ✅ This is the key - use selected userType
+          profile_image: signUpData.gender === 'male' ? MALE_DEFAULT_AVATAR : FEMALE_DEFAULT_AVATAR
         });
+        
+        console.log('✅ Backend registration successful with user_type:', signUpData.userType);
       } catch (backendError) {
-        console.error('Backend registration failed:', backendError);
+        console.error('❌ Backend registration failed:', backendError);
         // Continue with frontend flow even if backend fails
       }
       
-      setMessageType(showMessage('Verification email sent! Please check your inbox and verify your email before signing in.', setError, 'success'));
+      // ✅ Set localStorage based on selected userType
+      localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('userRole', signUpData.userType);
+      
+      if (signUpData.userType === 'admin') {
+        localStorage.setItem('adminToken', token);
+      }
+      
+      setMessageType(showMessage(
+        `Account created successfully! Please check your email and verify before signing in. You registered as: ${signUpData.userType}`, 
+        setError, 
+        'success'
+      ));
       setShowSignUp(false);
+      
+      // Clear the form
+      setSignUpData({
+        name: '',
+        email: '',
+        password: '',
+        confirmPassword: '',
+        phoneNumber: '',
+        gender: '',
+        address: '',
+        profileImage: '',
+        userType: 'passenger'
+      });
+      
     } catch (error: any) {
       console.error('Error during signup:', error);
       if (error.code === 'auth/email-already-in-use') {
