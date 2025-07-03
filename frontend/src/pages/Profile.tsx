@@ -397,7 +397,15 @@ const Profile: React.FC = () => {
               className="w-32 h-32 rounded-full object-cover mb-4"
               onError={(e) => {
                 const img = e.target as HTMLImageElement;
-                img.src = userData.gender === 'female' ? FEMALE_DEFAULT_AVATAR : MALE_DEFAULT_AVATAR;
+                // Use a data URL as ultimate fallback
+                img.src = `data:image/svg+xml;base64,${btoa(`
+                  <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+                    <rect width="200" height="200" fill="#3b82f6"/>
+                    <circle cx="100" cy="80" r="30" fill="white"/>
+                    <circle cx="100" cy="160" r="50" fill="white"/>
+                    <text x="100" y="190" text-anchor="middle" fill="#3b82f6" font-size="14">User</text>
+                  </svg>
+                `)}`;
               }}
             />
             {isEditing && (
