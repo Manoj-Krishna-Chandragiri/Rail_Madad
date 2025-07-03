@@ -96,10 +96,6 @@ const AIAssistance = () => {
   const { isRecording, toggleRecording } = AudioTranscription({
     onTranscriptionComplete: (text) => {
       setMessage(text);
-      // Optional: Auto-submit after transcription
-      // if (text && inputRef.current) {
-      //   inputRef.current.form?.requestSubmit();
-      // }
     }
   });
 
@@ -162,21 +158,21 @@ const AIAssistance = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className={`${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white'} rounded-lg shadow-lg p-6 mb-6`}>
-        <div className="flex items-center gap-3 mb-6">
-          <Bot className={`h-8 w-8 ${theme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'}`} />
-          <h1 className="text-2xl font-semibold">AI Assistant</h1>
+    <div className="max-w-4xl mx-auto p-4 sm:p-6">
+      <div className={`${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white'} rounded-lg shadow-lg p-4 sm:p-6 mb-4 sm:mb-6`}>
+        <div className="flex items-center gap-3 mb-4 sm:mb-6">
+          <Bot className={`h-6 w-6 sm:h-8 sm:w-8 ${theme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'} flex-shrink-0`} />
+          <h1 className="text-xl sm:text-2xl font-semibold">AI Assistant</h1>
         </div>
 
-        <div className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'} rounded-lg p-4 h-[500px] overflow-y-auto mb-4`}>
+        <div className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'} rounded-lg p-3 sm:p-4 h-[400px] sm:h-[500px] overflow-y-auto mb-3 sm:mb-4`}>
           {messages.map((msg, index) => (
             <div
               key={index}
-              className={`mb-4 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`mb-3 sm:mb-4 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-[80%] rounded-lg p-4 ${
+                className={`max-w-[85%] sm:max-w-[80%] rounded-lg p-3 sm:p-4 text-sm sm:text-base ${
                   msg.role === 'user'
                     ? 'bg-indigo-600 text-white'
                     : theme === 'dark'
@@ -189,49 +185,51 @@ const AIAssistance = () => {
             </div>
           ))}
           {isLoading && (
-            <div className={`flex items-center gap-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-              <Loader className="h-5 w-5 animate-spin" />
+            <div className={`flex items-center gap-2 text-sm sm:text-base ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              <Loader className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
               <span>AI is thinking...</span>
             </div>
           )}
           <div ref={messagesEndRef} />
         </div>
 
-        <form onSubmit={handleSubmit} className="flex gap-4">
+        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 sm:gap-4">
           <input
             ref={inputRef}
             type="text"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Type your message here..."
-            className={`flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+            className={`flex-1 px-3 sm:px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base ${
               theme === 'dark' 
                 ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
                 : 'bg-white border-gray-300'
             }`}
           />
-          <button
-            type="button"
-            onClick={toggleRecording}
-            className={`p-2 rounded-lg ${
-              isRecording 
-                ? 'bg-red-600 hover:bg-red-700' 
-                : 'bg-gray-600 hover:bg-gray-700'
-            } text-white`}
-            title={isRecording ? "Stop Recording" : "Start Recording"}
-            disabled={isLoading}
-          >
-            {isRecording ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-          </button>
-          <button
-            type="submit"
-            disabled={isLoading}
-            className={`bg-indigo-600 text-white px-6 py-2 rounded-lg flex items-center gap-2 
-              ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'}`}
-          >
-            <MessageCircle className="h-5 w-5" />
-            Send
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={toggleRecording}
+              className={`p-2 rounded-lg ${
+                isRecording 
+                  ? 'bg-red-600 hover:bg-red-700' 
+                  : 'bg-gray-600 hover:bg-gray-700'
+              } text-white flex-shrink-0`}
+              title={isRecording ? "Stop Recording" : "Start Recording"}
+              disabled={isLoading}
+            >
+              {isRecording ? <MicOff className="h-4 w-4 sm:h-5 sm:w-5" /> : <Mic className="h-4 w-4 sm:h-5 sm:w-5" />}
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className={`bg-indigo-600 text-white px-4 sm:px-6 py-2 rounded-lg flex items-center gap-2 text-sm sm:text-base
+                ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'}`}
+            >
+              <MessageCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="hidden sm:inline">Send</span>
+            </button>
+          </div>
         </form>
       </div>
     </div>

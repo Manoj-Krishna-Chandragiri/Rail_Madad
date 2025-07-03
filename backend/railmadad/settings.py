@@ -87,6 +87,7 @@ else:
 # CORS settings for production
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5174",  # Local development
+    "http://127.0.0.1:8000",
     "https://main.dhpx91sx6cx3f.amplifyapp.com",  # Your AWS Amplify frontend
     "https://rail-madad-backend.onrender.com",  # Your backend domain
     "https://rail-madad.manojkrishna.me",  # Your frontend domain
@@ -112,6 +113,8 @@ CORS_ALLOW_CREDENTIALS = True
 
 # Also add for Django's CSRF protection
 CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5174",
+    "http://127.0.0.1:8000",
     "https://main.dhpx91sx6cx3f.amplifyapp.com",
     "https://rail-madad-backend.onrender.com",
     "https://rail-madad.manojkrishna.me",
