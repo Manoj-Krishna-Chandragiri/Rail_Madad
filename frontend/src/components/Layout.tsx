@@ -65,15 +65,6 @@ const Layout = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Determine which sidebar to render
-  const renderSidebar = () => {
-    if (userType === 'admin') {
-      return <AdminSidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />;
-    } else {
-      return <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />;
-    }
-  };
-
   return (
     <div className={`min-h-screen ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'} relative transition-colors duration-300`}>
       {/* Fixed navbar with higher z-index */}
@@ -81,20 +72,38 @@ const Layout = () => {
         <Navbar toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
       </div>
 
+      {/* Mobile overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Conditional Sidebar rendering based on user type */}
       <div className="fixed left-0 top-0 z-40 h-full">
-        {renderSidebar()}
+        {userType === 'admin' ? (
+          <AdminSidebar 
+            isOpen={isSidebarOpen} 
+            setIsOpen={setIsSidebarOpen}
+          />
+        ) : (
+          <Sidebar 
+            isOpen={isSidebarOpen} 
+            setIsOpen={setIsSidebarOpen}
+          />
+        )}
       </div>
 
-      {/* Main content with top padding for navbar and left margin for sidebar */}
+      {/* Main content with responsive margins */}
       <main 
         className={`pt-16 transition-all duration-500 ease-in-out ${
-          isSidebarOpen ? 'ml-64' : 'ml-0'
+          isSidebarOpen ? 'lg:ml-64' : 'ml-0'
         } ${
           isPageLoading ? 'opacity-0' : 'opacity-100'
         }`}
       >
-        <div className="p-6">
+        <div className="p-3 sm:p-4 lg:p-6">
           <Outlet />
         </div>
       </main>

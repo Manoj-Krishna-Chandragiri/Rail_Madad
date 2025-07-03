@@ -833,7 +833,7 @@ const Home = () => {
         </div>
       </div>
       
-      {/* CSS for animations */}
+      {/* Enhanced CSS for animations with improved smoke effects */}
       <style>
   {`
   @keyframes train-move-ltr {
@@ -846,68 +846,110 @@ const Home = () => {
     100% { transform: rotate(-360deg); }
   }
 
-  @keyframes glow {
-    0%, 100% { opacity: 0.7; box-shadow: 0 0 10px 5px rgba(255, 255, 100, 0.7); }
-    50% { opacity: 1; box-shadow: 0 0 20px 10px rgba(255, 255, 100, 0.9); }
-  }
-
   @keyframes smoke-1 {
-    0% { transform: translateY(0) scale(0.8); opacity: 0.8; }
-    100% { transform: translateY(-30px) scale(2); opacity: 0; }
+    0% { opacity: 0.9; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-50px) scale(1.5); }
   }
 
   @keyframes smoke-2 {
-    0% { transform: translateY(0) scale(0.8); opacity: 0.8; }
-    100% { transform: translateY(-30px) scale(2); opacity: 0; }
+    0% { opacity: 0.7; transform: translateY(0) scale(0.8); }
+    100% { opacity: 0; transform: translateY(-40px) scale(1.2); }
   }
 
   @keyframes smoke-3 {
-    0% { transform: translateY(0) scale(0.8); opacity: 0.8; }
-    100% { transform: translateY(-30px) scale(2); opacity: 0; }
+    0% { opacity: 0.5; transform: translateY(0) scale(0.6); }
+    100% { opacity: 0; transform: translateY(-30px) scale(1); }
+  }
+
+  @keyframes smoke-4 {
+    0% { opacity: 0.8; transform: translateY(0) scale(0.7); }
+    100% { opacity: 0; transform: translateY(-60px) scale(1.4); }
+  }
+
+  @keyframes smoke-5 {
+    0% { opacity: 0.5; transform: translateY(0) scale(0.9); }
+    100% { opacity: 0; transform: translateY(-70px) scale(1.5); }
+  }
+
+  @keyframes glow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
   }
 
   @keyframes twinkle-1 {
-    0%, 100% { opacity: 0.2; }
+    0%, 100% { opacity: 0.3; }
     50% { opacity: 1; }
   }
 
   @keyframes twinkle-2 {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.2; }
+    0%, 100% { opacity: 0.5; }
+    30% { opacity: 1; }
   }
 
   @keyframes twinkle-3 {
-    0%, 100% { opacity: 0.5; }
-    30% { opacity: 1; }
-    70% { opacity: 0.2; }
+    0%, 100% { opacity: 0.7; }
+    70% { opacity: 1; }
   }
 
   .animate-twinkle-1 {
-    animation: twinkle-1 4s ease-in-out infinite;
+    animation: twinkle-1 2s ease-in-out infinite;
   }
 
   .animate-twinkle-2 {
-    animation: twinkle-2 5s ease-in-out infinite;
+    animation: twinkle-2 2.5s ease-in-out infinite;
   }
 
   .animate-twinkle-3 {
-    animation: twinkle-3 7s ease-in-out infinite;
+    animation: twinkle-3 3s ease-in-out infinite;
   }
 
   .animate-train-move-ltr {
-    animation: train-move-ltr 20s linear infinite;
+    animation: train-move-ltr 10s linear infinite;
   }
 
   .animate-wheel-turn-ltr {
-    animation: wheel-turn-ltr 2s linear infinite;
+    animation: wheel-turn-ltr 1s linear infinite;
   }
 
-  .rotate-x-\\[45deg\\] {
-    transform: rotateX(45deg);
+  .animate-smoke-1 {
+    animation: smoke-1 0.8s ease-out infinite;
   }
 
-  .bg-brown-800 {
-    background-color: #654321;
+  .animate-smoke-2 {
+    animation: smoke-2 1s ease-out infinite 0.15s;
+  }
+
+  .animate-smoke-3 {
+    animation: smoke-3 1.2s ease-out infinite 0.3s;
+  }
+
+  .animate-smoke-4 {
+    animation: smoke-4 1.4s ease-out infinite 0.45s;
+  }
+
+  .animate-smoke-5 {
+    animation: smoke-5 1.6s ease-out infinite 0.6s;
+  }
+
+  .animate-glow {
+    animation: glow 1.5s ease-in-out infinite;
+  }
+
+  /* Mobile responsive improvements with faster speeds */
+  @media (max-width: 768px) {
+    .train-container {
+      animation: train-move-ltr 8s linear infinite;
+    }
+    
+    .scene {
+      overflow-x: hidden;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .train-container {
+      animation: train-move-ltr 6s linear infinite;
+    }
   }
 
   .bg-gray-650 {
