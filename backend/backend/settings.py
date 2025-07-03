@@ -151,7 +151,13 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5174",  # Local development
     "https://main.dhpx91sx6cx3f.amplifyapp.com",  # Your AWS Amplify frontend
     "https://rail-madad-backend.onrender.com",  # Your backend domain
-    "https://rail-madad.manojkrishna.me",  # Your frontend domain
+    "https://rail-madad.manojkrishna.me",  # Your custom domain
+]
+
+# Add Cloudinary domains for image uploads
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.cloudinary\.com$",
 ]
 
 CORS_ALLOW_HEADERS = [
@@ -175,7 +181,7 @@ CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     "https://main.dhpx91sx6cx3f.amplifyapp.com",
     "https://rail-madad-backend.onrender.com",
-    "https://rail-madad.manojkrishna.me",  
+    "https://rail-madad.manojkrishna.me",
 ]
 
 # Firebase Configuration

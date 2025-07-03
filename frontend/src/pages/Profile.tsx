@@ -57,11 +57,33 @@ const Profile: React.FC = () => {
     if (!auth.currentUser) return null;
 
     try {
-      const compressedFile = await compressImage(file);
-      const cloudinaryUrl = await uploadToCloudinary(compressedFile as File);
-      return cloudinaryUrl;
+      console.log('🔧 Uploading image to Cloudinary...');
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', 'profile_images'); // Make sure this preset exists
+      formData.append('folder', 'rail-madad-profiles');
+
+      const response = await fetch(
+        'https://api.cloudinary.com/v1_1/dtfpje06i/image/upload', // Your cloud name
+        {
+          method: 'POST',
+          body: formData
+        }
+      );
+
+      const data = await response.json();
+      console.log('🔧 Cloudinary response:', data);
+      
+      if (data.secure_url) {
+        console.log('✅ Image uploaded successfully:', data.secure_url);
+        return data.secure_url;
+      } else {
+        console.error('❌ Cloudinary upload failed:', data);
+        throw new Error('Upload failed');
+      }
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error('❌ Upload error:', error);
       throw error;
     }
   };
@@ -470,7 +492,7 @@ const Profile: React.FC = () => {
                     type="button"
                     onClick={handleCancel}
                     disabled={updating}
-                    className={`flex-1 border py-2 rounded-lg 
+                    className={`flex-1 border py-2 rounded 
                       ${theme === 'dark' ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-300 hover:bg-gray-50'}`}
                   >
                     Cancel
