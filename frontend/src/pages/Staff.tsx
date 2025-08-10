@@ -61,6 +61,7 @@ const Staff = () => {
   const editFileInputRef = useRef<HTMLInputElement>(null);
   // Authentication and role state
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isLegacyAdmin, setIsLegacyAdmin] = useState(false);
   
   // Filter state
   const [showFilters, setShowFilters] = useState(false);
@@ -107,6 +108,11 @@ const Staff = () => {
     // Use auth service result or fallback to localStorage
     const finalIsAdmin = authState.isAdmin || (isAuthenticated && (userRole === 'admin' || userRole === 'staff') && (!!adminToken || !!authToken || !!token));
     setIsAdmin(finalIsAdmin);
+    
+    // Get legacy admin status from auth state
+    setIsLegacyAdmin(authState.isLegacyAdmin);
+    
+    console.log('Is Legacy Admin (joined before Aug 10, 2025):', authState.isLegacyAdmin);
   }, []);
 
   const processAvatarUrl = (avatarPath: string, staffName: string): string => {
@@ -221,6 +227,13 @@ const Staff = () => {
   };
 
   const handleAddStaff = async () => {
+    // Check if user is a legacy admin (joined before Aug 10, 2025)
+    if (!isLegacyAdmin) {
+      setError("Only administrators who joined before August 10, 2025 can add staff members. This is a security measure to prevent new administrators from modifying staff data.");
+      setTimeout(() => setError(""), 5000);
+      return;
+    }
+    
     // Validate form data first
     if (!validateForm()) {
       console.error("Form validation failed", formErrors);
@@ -493,6 +506,13 @@ const Staff = () => {
   };
 
   const handleUpdateStaff = async () => {
+    // Check if user is a legacy admin (joined before Aug 10, 2025)
+    if (!isLegacyAdmin) {
+      setError("Only administrators who joined before August 10, 2025 can edit staff members. This is a security measure to prevent new administrators from modifying staff data.");
+      setTimeout(() => setError(""), 5000);
+      return;
+    }
+    
     if (!selectedStaff || !newStaff.name || !newStaff.email || !newStaff.phone || !newStaff.role || !newStaff.department) {
       alert('Please fill in all required fields');
       return;
@@ -590,6 +610,14 @@ const Staff = () => {
   const handleDeleteStaff = async () => {
     if (!selectedStaff) return;
 
+    // Check if user is a legacy admin (joined before Aug 10, 2025)
+    if (!isLegacyAdmin) {
+      setError("Only administrators who joined before August 10, 2025 can remove staff members. This is a security measure to prevent new administrators from modifying staff data.");
+      setTimeout(() => setError(""), 5000);
+      setShowDeleteConfirmation(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const token = localStorage.getItem('adminToken') || localStorage.getItem('authToken') || localStorage.getItem('token');
@@ -681,7 +709,7 @@ const Staff = () => {
                 {staff.email}
               </span>
             </div>
-            {isAdmin && (
+            {isAdmin && isLegacyAdmin ? (
               <div className="flex gap-2">
                 <button 
                   onClick={() => handleEditStaff(staff)}
@@ -701,7 +729,32 @@ const Staff = () => {
                   <TrashIcon className="h-4 w-4" />
                 </button>
               </div>
-            )}
+            ) : isAdmin ? (
+              <div className="flex gap-2">
+                <button 
+                  style={{ cursor: 'no-drop' }}
+                  onClick={() => {
+                    setError("Only administrators who joined before August 10, 2025 can edit staff members. This is a security measure to prevent new administrators from modifying staff data.");
+                    setTimeout(() => setError(""), 5000);
+                  }}
+                  className="p-2 bg-gray-400 text-white rounded"
+                  title="Edit Staff (Legacy Admin Only)"
+                >
+                  <PencilIcon className="h-4 w-4" />
+                </button>
+                <button
+                  style={{ cursor: 'no-drop' }}
+                  onClick={() => {
+                    setError("Only administrators who joined before August 10, 2025 can remove staff members. This is a security measure to prevent new administrators from modifying staff data.");
+                    setTimeout(() => setError(""), 5000);
+                  }}
+                  className="p-2 bg-gray-400 text-white rounded"
+                  title="Remove Staff (Legacy Admin Only)"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -716,7 +769,7 @@ const Staff = () => {
             <Users className="h-8 w-8 text-indigo-400" />
             <h1 className="text-2xl font-semibold">Staff Management</h1>
           </div>
-          {isAdmin ? (
+          {isAdmin && isLegacyAdmin ? (
             <button 
               className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
               onClick={() => setShowAddStaffModal(true)}
@@ -724,32 +777,36 @@ const Staff = () => {
               <Users className="h-5 w-5" />
               Add Staff
             </button>
-          ) : (
+          ) : isAdmin ? (
             <button 
-              className="px-4 py-2 bg-gray-400 text-white rounded-lg cursor-help flex items-center gap-2"
+              className="px-4 py-2 bg-gray-400 text-white rounded-lg flex items-center gap-2"
+              style={{ cursor: 'no-drop' }}
               onClick={() => {
-                setError("Only administrators can add staff members. Please contact an administrator if you need assistance.");
+                setError("Only administrators who joined before August 10, 2025 can add staff members. This is a security measure to prevent new administrators from modifying staff data.");
                 setTimeout(() => setError(""), 5000); // Clear message after 5 seconds
               }}
             >
               <Users className="h-5 w-5" />
-              Add Staff
+              Add Staff <span className="ml-1 text-red-300">×</span>
+            </button>
+          ) : (
+            <button 
+              className="px-4 py-2 bg-gray-400 text-white rounded-lg flex items-center gap-2"
+              style={{ cursor: 'not-allowed' }}
+              onClick={() => {
+                setError("Only administrators can view staff management details. Please contact an administrator if you need assistance.");
+                setTimeout(() => setError(""), 5000); // Clear message after 5 seconds
+              }}
+            >
+              <Users className="h-5 w-5" />
+              Add Staff <span className="ml-1 text-red-300">×</span>
             </button>
           )}
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg flex items-center justify-between">
-            <div className="flex items-center">
-              <ExclamationTriangleIcon className="h-5 w-5 mr-2" />
-              {error}
-            </div>
-            <button 
-              onClick={() => setError('')}
-              className="text-red-700 hover:text-red-900"
-            >
-              <X className="h-5 w-5" />
-            </button>
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
+            {error}
           </div>
         )}
 

@@ -11,6 +11,7 @@ import { handleEmailSignIn, handlePhoneSignIn, validatePhoneVerification, handle
 import apiClient from '../utils/api'; // ✅ Import apiClient
 import axios from 'axios';
 import TermsModal from '../components/TermsModal';
+import { fetchAndStoreUserProfile } from '../utils/auth-helpers'; // Import the helper function
 
 const MALE_DEFAULT_AVATAR = 'https://uxwing.com/wp-content/themes/uxwing/download/peoples-avatars/default-profile-picture-male-icon.png';
 const FEMALE_DEFAULT_AVATAR = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRHEJ-8GyKlZr5ZmEfRMmt5nR4tH_aP-crbgg&s';
@@ -217,6 +218,9 @@ const Login: React.FC = () => {
       
       const userData = userResponse.data;
       const role = userData.user_type || 'passenger';
+
+      // Store the user profile data with date_joined
+      await fetchAndStoreUserProfile();
 
       localStorage.setItem('isAuthenticated', 'true');
       
@@ -446,6 +450,9 @@ const handleGoogleSignIn = async () => {
     
     // Set basic authentication state
     localStorage.setItem('isAuthenticated', 'true');
+    
+    // Store the user profile data with date_joined
+    await fetchAndStoreUserProfile();
     
     // Check if user already exists in Firestore
     const userDoc = await getDoc(doc(db, 'users', user.uid));

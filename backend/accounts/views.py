@@ -145,6 +145,7 @@ def user_profile(request):
                 'user_type': user.user_type,
                 'is_admin': is_admin,
                 'is_staff': is_staff,
+                'date_joined': user.date_joined.isoformat(),  # Include date_joined in ISO format
                 'created_now': created  # Indicate if this is a newly created user
             }
         else:

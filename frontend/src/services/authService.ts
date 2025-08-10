@@ -1,5 +1,6 @@
 import { auth } from '../config/firebase';
 import { User } from 'firebase/auth';
+import { isLegacyAdmin } from '../utils/auth-helpers';
 
 export interface AuthState {
   user: User | null;
@@ -7,6 +8,7 @@ export interface AuthState {
   isAdmin: boolean;
   userRole: string;
   token: string | null;
+  isLegacyAdmin: boolean;
 }
 
 class AuthService {
@@ -25,8 +27,14 @@ class AuthService {
       isAuthenticated,
       isAdmin,
       userRole,
-      token
+      token,
+      isLegacyAdmin: isAdmin ? isLegacyAdmin() : false
     };
+  }
+  
+  // Check if user is an admin who joined before August 10, 2025
+  checkLegacyAdminStatus(): boolean {
+    return isLegacyAdmin();
   }
 
   // Get auth headers for API calls
