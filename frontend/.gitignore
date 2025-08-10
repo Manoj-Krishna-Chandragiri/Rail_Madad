@@ -1,0 +1,58 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependency directories
+node_modules/
+.venv/
+env/
+venv/
+__pycache__/
+
+# Compiled Python files
+*.pyc
+*.pyo
+*.pyd
+
+# Python cache and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.cache/
+
+# Environment files
+.env
+.env.*
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+
+# Media uploads (if not tracking them in Git)
+backend/media/
+frontend/dist/
+frontend/build/
+
+# Editor settings
+.vscode/
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Misc
+*.bak
+*.tmp
+*.orig

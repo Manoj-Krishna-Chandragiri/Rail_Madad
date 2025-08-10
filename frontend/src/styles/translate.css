@@ -1,0 +1,171 @@
+.google-translate-container {
+  display: inline-block;
+  position: relative;
+  padding: 4px;
+  border-radius: 8px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* Fix duplicate elements */
+.goog-te-gadget-simple {
+  border: none !important;
+  background-color: transparent !important;
+  padding: 0 !important;
+  width: 100%;
+  border: 1px solid #ccc !important;
+  border-radius: 4px !important;
+  padding: 8px 12px !important;
+  background-color: #fff !important;
+}
+
+.goog-te-gadget {
+  color: transparent !important;
+  font-family: inherit !important;
+  font-size: 14px !important;
+}
+
+/* Hide the first dropdown in the targetLanguage div */
+#\:0\.targetLanguage select.goog-te-combo:first-of-type {
+  display: none !important;
+}
+
+/* Style only the second dropdown */
+#\:0\.targetLanguage select.goog-te-combo:nth-of-type(2) {
+  margin: 4px 0 !important;
+  padding: 8px 12px !important;
+  border-radius: 6px !important;
+  border: 1px solid #e2e8f0 !important;
+  background-color: white !important;
+  color: #1f2937 !important;
+  font-size: 14px !important;
+  width: 200px !important;
+  display: block !important;
+}
+
+/* Dark mode support */
+.dark #\:0\.targetLanguage select.goog-te-combo:nth-of-type(2) {
+  background-color: #374151 !important;
+  border-color: #4b5563 !important;
+  color: #e5e7eb !important;
+}
+
+/* Hide duplicate elements */
+.goog-logo-link {
+  display: none !important;
+}
+
+.goog-te-banner-frame {
+  display: none !important;
+}
+
+#goog-gt-tt, .goog-te-balloon-frame {
+  display: none !important;
+}
+
+.goog-text-highlight {
+  background: none !important;
+  box-shadow: none !important;
+}
+
+/* Move Google Translate banner and adjust spacing */
+body {
+  padding-top: 40px !important;
+  top: 0 !important;
+  position: relative !important;
+}
+
+/* Hide duplicate selector */
+.goog-te-gadget-simple,
+.goog-te-gadget .goog-te-gadget-simple,
+.goog-logo-link,
+.goog-te-banner,
+#goog-gt-tt, 
+.goog-te-balloon-frame,
+.goog-te-gadget span {
+  display: none !important;
+}
+
+/* Style the main dropdown */
+.goog-te-gadget select.goog-te-combo:not(:first-of-type) {
+  margin: 4px 0 !important;
+  padding: 8px 12px !important;
+  border-radius: 6px !important;
+  border: 1px solid #e2e8f0 !important;
+  background-color: white !important;
+  color: #1f2937 !important;
+  font-size: 14px !important;
+  width: 200px !important;
+  appearance: auto !important;
+}
+
+/* Dark mode support */
+.dark .goog-te-gadget select.goog-te-combo:not(:first-of-type) {
+  background-color: #374151 !important;
+  border-color: #4b5563 !important;
+  color: #e5e7eb !important;
+}
+
+/* Add space for Google Translate bar */
+body {
+  padding-top: 40px !important;
+  position: relative !important;
+  top: 0 !important;
+}
+
+/* Style the Google Translate bar */
+.skiptranslate {
+  opacity: 0.9;
+}
+
+.goog-te-banner-frame {
+  top: 0;
+  height: 40px !important;
+  display: none !important;
+}
+
+.goog-te-menu-frame {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Remove highlight */
+.goog-text-highlight {
+  background: none !important;
+  box-shadow: none !important;
+}
+
+/* Hide "Powered By" text */
+.goog-te-gadget:after {
+  content: none !important;
+}
+
+/* More specific selector to hide the first dropdown */
+.VIpgJd-ZVi9od-l4eHX-hSRGPd,
+#\:0\.targetLanguage > select:first-child {
+  display: none !important;
+}
+
+/* More specific selector to display only the second dropdown */
+#\:0\.targetLanguage > select:nth-child(2) {
+  display: block !important;
+}
+
+/* Google Translate Element styles */
+.goog-te-gadget-simple .goog-te-menu-value {
+  color: #333 !important;
+}
+
+/* Dark mode adjustments */
+.dark .goog-te-gadget-simple {
+  background-color: #374151 !important;
+  border-color: #4B5563 !important;
+}
+
+.dark .goog-te-gadget-simple .goog-te-menu-value {
+  color: #E5E7EB !important;
+}
+
+/* Fix for Google Translate bar */
+body {
+  top: 0 !important;
+}

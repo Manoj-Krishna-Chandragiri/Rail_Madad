@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="https://spng.pngfind.com/pngs/s/459-4595601_indian-railways-logo-south-central-railway-indian-indian.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Rail Madad - Indian Railways Complaint Management System" />
+    <meta name="theme-color" content="#4338ca" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="apple-touch-icon" href="https://railmadad-dashboard.web.app/assets/logo-railmadad-B9R2Xeqc.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>Rail Madad - Complaint Management System</title>
+    <script type="module" src="firebaseauth.js"></script>
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Rail Madad - Complaint Management System" />
+    <meta property="og:description" content="Indian Railways integrated helpline for passenger grievance redressal" />
+    <meta property="og:image" content="https://railmadad-dashboard.web.app/assets/logo-railmadad-B9R2Xeqc.png" />
+    <meta property="og:url" content="https://railmadad.indianrailways.gov.in" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Rail Madad - Complaint Management System" />
+    <meta name="twitter:description" content="Indian Railways integrated helpline for passenger grievance redressal" />
+    <meta name="twitter:image" content="https://railmadad-dashboard.web.app/assets/logo-railmadad-B9R2Xeqc.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+
+    <style>
+      .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #4338ca;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+
+      @keyframes spin {
+        0% { transform: translate(-50%, -50%) rotate(0deg); }
+        100% { transform: translate(-50%, -50%) rotate(360deg); }
+      }
+
+      #root:empty {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #f3f4f6;
+      }
+
+      #root:empty::after {
+        content: "";
+        width: 50px;
+        height: 50px;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #4338ca;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: #555;
+      }
+
+      :focus {
+        outline: 2px solid #4338ca;
+        outline-offset: 2px;
+      }
+
+      ::selection {
+        background-color: #4338ca;
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <div style="padding: 20px; text-align: center;">
+        <img src="https://railmadad-dashboard.web.app/assets/logo-railmadad-B9R2Xeqc.png" alt="Rail Madad Logo" style="width: 100px; margin-bottom: 20px;" />
+        <h1 style="margin-bottom: 10px;">JavaScript is required</h1>
+        <p>Please enable JavaScript to use the Rail Madad Complaint Management System.</p>
+      </div>
+    </noscript>
+    
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
