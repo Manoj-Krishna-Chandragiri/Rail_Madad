@@ -37,6 +37,33 @@ const LandingPage = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [animationLoaded, setAnimationLoaded] = useState(true); // Start with true to avoid loading screen
   const stackTriggerRef = useRef<HTMLDivElement>(null);
+  const [currentCarouselSlide, setCurrentCarouselSlide] = useState(0);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const [isCarouselPaused, setIsCarouselPaused] = useState(false);
+  const totalCarouselSlides = 19; // Total number of images in the carousel
+  
+  // Railway image gallery
+  const railwayImages = [
+    "https://res.cloudinary.com/dbnkhibzi/image/upload/v1754838752/Screenshot_2025-08-10_204040_skrm4a.png",
+    "https://res.cloudinary.com/dbnkhibzi/image/upload/v1754838233/Screenshot_2025-08-10_203235_gnws2l.png",
+    "https://res.cloudinary.com/dbnkhibzi/image/upload/v1754838001/Screenshot_2025-07-29_145504_it7pzi.png",
+    "https://res.cloudinary.com/dbnkhibzi/image/upload/v1754838004/Screenshot_2025-07-29_145252_cjq6bp.png",
+    "https://res.cloudinary.com/dbnkhibzi/image/upload/v1754838004/Screenshot_2025-07-29_145316_ivq0an.png",
+    "https://res.cloudinary.com/dbnkhibzi/image/upload/v1754838006/Screenshot_2025-07-29_145327_rjfuoy.png",
+    "https://res.cloudinary.com/dbnkhibzi/image/upload/v1754838004/Screenshot_2025-08-10_201408_iqpymq.png",
+    "https://res.cloudinary.com/dbnkhibzi/image/upload/v1754838005/Screenshot_2025-07-29_145350_ade2ym.png",
+    "https://res.cloudinary.com/dbnkhibzi/image/upload/v1754838003/Screenshot_2025-07-29_145438_uvik2n.png",
+    "https://res.cloudinary.com/dbnkhibzi/image/upload/v1754838002/Screenshot_2025-08-10_201546_k5b7ab.png",
+    "https://res.cloudinary.com/dbnkhibzi/image/upload/v1754838001/Screenshot_2025-07-29_145456_hsifc5.png",
+    "https://res.cloudinary.com/dbnkhibzi/image/upload/v1754838004/Screenshot_2025-08-10_202317_nmzsre.png",
+    "https://res.cloudinary.com/dbnkhibzi/image/upload/v1754838002/Screenshot_2025-07-29_145708_znqa3q.png",
+    "https://res.cloudinary.com/dbnkhibzi/image/upload/v1754838003/Screenshot_2025-08-10_201748_hls0da.png",
+    "https://res.cloudinary.com/dbnkhibzi/image/upload/v1754838002/Screenshot_2025-08-10_201804_choim8.png",
+    "https://res.cloudinary.com/dbnkhibzi/image/upload/v1754838003/Screenshot_2025-08-10_201915_nghppr.png",
+    "https://res.cloudinary.com/dbnkhibzi/image/upload/v1754838003/Screenshot_2025-08-10_201926_hjxcgv.png",
+    "https://res.cloudinary.com/dbnkhibzi/image/upload/v1754838004/Screenshot_2025-08-10_202220_libdyj.png",
+    "https://res.cloudinary.com/dbnkhibzi/image/upload/v1754838001/Screenshot_2025-07-29_145802_rswp9j.png"
+  ];
 
   useEffect(() => {
     setIsVisible(true);
@@ -45,6 +72,13 @@ const LandingPage = () => {
     const testimonialInterval = setInterval(() => {
       setCurrentTestimonial((prev) => (prev + 1) % testimonials.length);
     }, 5000);
+    
+    // Auto-rotate carousel
+    const carouselInterval = setInterval(() => {
+      if (!isCarouselPaused) {
+        setCurrentCarouselSlide((prev) => (prev + 1) % totalCarouselSlides);
+      }
+    }, 1500);
 
     // Initialize GSAP ScrollTrigger animation - Simplified for better performance
     const initGSAPAnimation = async () => {
@@ -139,6 +173,7 @@ const LandingPage = () => {
 
     return () => {
       clearInterval(testimonialInterval);
+      clearInterval(carouselInterval);
       // Clean up ScrollTrigger instances
       import('gsap/ScrollTrigger').then(({ ScrollTrigger }) => {
         ScrollTrigger.getAll().forEach((trigger: any) => trigger.kill());
@@ -164,6 +199,22 @@ const LandingPage = () => {
       });
     };
   }, []);
+
+  // Add keyboard navigation for carousel
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        setCurrentCarouselSlide(prev => (prev === 0 ? totalCarouselSlides - 1 : prev - 1));
+      } else if (e.key === 'ArrowRight') {
+        setCurrentCarouselSlide(prev => (prev === totalCarouselSlides - 1 ? 0 : prev + 1));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [totalCarouselSlides]);
 
   // Smooth scroll function
   const scrollToSection = (sectionId: string) => {
@@ -361,9 +412,27 @@ const LandingPage = () => {
   ];
 
   return (
-    <div className={`min-h-screen ${isDark ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'} overflow-x-hidden`}>
-      {/* Floating Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+    <div 
+      className={`min-h-screen ${isDark ? 'text-white' : 'text-gray-900'} overflow-x-hidden relative`}
+      style={{
+        backgroundImage: 'url(https://res.cloudinary.com/dbnkhibzi/image/upload/v1751548248/Railways_Image_qxrrvn.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'fixed'
+      }}
+    >
+      {/* Background overlay with blur - reduced opacity */}
+      <div 
+        className="absolute inset-0 backdrop-blur-[3px]"
+        style={{
+          backgroundColor: isDark ? 'rgba(17, 24, 39, 0.6)' : 'rgba(255, 255, 255, 0.6)',
+          pointerEvents: 'none'
+        }}
+      ></div>
+
+      {/* Floating Background Elements - reduced opacity */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0 opacity-40">
         <div className="absolute top-1/4 left-1/4 w-32 h-32 md:w-64 md:h-64 bg-indigo-500/5 rounded-full animate-pulse"></div>
         <div className="absolute top-3/4 right-1/4 w-24 h-24 md:w-48 md:h-48 bg-purple-500/5 rounded-full animate-bounce"></div>
         <div className="absolute top-1/2 left-3/4 w-16 h-16 md:w-32 md:h-32 bg-pink-500/5 rounded-full animate-ping"></div>
@@ -371,16 +440,16 @@ const LandingPage = () => {
       </div>
 
       {/* Enhanced Header */}
-      <header className={`fixed top-0 w-full z-50 ${isDark ? 'bg-gray-900/95' : 'bg-white/95'} backdrop-blur-sm border-b ${isDark ? 'border-gray-700' : 'border-gray-200'} transition-all duration-300`}>
+      <header className={`fixed top-0 w-full z-50 ${isDark ? 'bg-gray-900/60' : 'bg-white/60'} backdrop-blur-sm border-b ${isDark ? 'border-gray-700/50' : 'border-gray-200/50'} transition-all duration-300 relative`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <div className="flex items-center space-x-2 group">
               <div className="relative">
-                <Train className="h-6 w-6 md:h-8 md:w-8 text-indigo-600 group-hover:rotate-12 transition-transform duration-300" />
-                <div className="absolute inset-0 bg-indigo-600/20 rounded-full animate-ping opacity-0 group-hover:opacity-100"></div>
+                <Train className="h-6 w-6 md:h-8 md:w-8 text-indigo-500 group-hover:rotate-12 transition-transform duration-300" />
+                <div className="absolute inset-0 bg-indigo-500/30 rounded-full animate-ping opacity-0 group-hover:opacity-100"></div>
               </div>
-              <span className="text-lg md:text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              <span className="text-lg md:text-xl font-bold bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
                 Rail Madad
               </span>
             </div>
@@ -471,9 +540,9 @@ const LandingPage = () => {
       </header>
 
       {/* Enhanced Hero Section */}
-      <section className={`pt-20 pb-16 relative ${isDark ? 'bg-gradient-to-br from-gray-900 via-indigo-900 to-gray-900' : 'bg-gradient-to-br from-indigo-50 via-white to-purple-50'}`}>
+      <section className={`pt-20 pb-16 relative ${isDark ? 'bg-gradient-to-br from-gray-900/50 via-indigo-900/30 to-gray-900/50' : 'bg-gradient-to-br from-indigo-100/60 via-white/50 to-purple-100/60'}`}>
         {/* Animated Background */}
-        <div className="absolute inset-0 opacity-10">
+        <div className="absolute inset-0 opacity-5">
           <div className="absolute top-20 left-4 md:left-10 w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
           <div className="absolute top-40 right-8 md:right-20 w-3 h-3 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '1s' }}></div>
           <div className="absolute bottom-40 left-8 md:left-20 w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '2s' }}></div>
@@ -483,24 +552,110 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="text-center">
             <div className="mb-6 md:mb-8">
-              <img 
-                src="https://res.cloudinary.com/dbnkhibzi/image/upload/v1751548248/Railways_Image_qxrrvn.png" 
-                alt="Indian Railways" 
-                className="mx-auto w-32 h-20 md:w-48 md:h-32 object-cover rounded-xl shadow-2xl transform hover:scale-105 transition-transform duration-500"
-              />
+              {/* Image Carousel */}
+              <div 
+                className="relative mx-auto w-full max-w-4xl h-64 md:h-96 lg:h-[500px] overflow-hidden rounded-xl shadow-xl"
+                ref={carouselRef}
+                onMouseEnter={() => setIsCarouselPaused(true)}
+                onMouseLeave={() => setIsCarouselPaused(false)}
+              >
+                {/* Carousel Container */}
+                <div className="absolute inset-0 bg-gray-900/10"></div>
+                
+                {/* Carousel Images */}
+                <div 
+                  className="flex w-full h-full transition-transform duration-500 ease-out"
+                  style={{ transform: `translateX(-${currentCarouselSlide * 100}%)` }}
+                >
+                  {/* Real railway system images */}
+                  {railwayImages.map((imageUrl, index) => (
+                    <div key={index} className="w-full h-full flex-shrink-0 relative">
+                      <div className="absolute inset-0">
+                        <img 
+                          src={imageUrl} 
+                          alt={`Rail Madad ${index + 1}`}
+                          className="w-full h-full object-fill"
+                          loading="lazy"
+                        />
+                      </div>
+                      <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-sm text-white px-3 py-1 rounded-lg">
+                        <p className="font-bold text-sm md:text-base">{index + 1}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Navigation Arrows */}
+                <button 
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 dark:bg-gray-800/80 p-2 rounded-full shadow-lg hover:bg-indigo-500 hover:text-white dark:hover:bg-indigo-600 backdrop-blur-sm z-10 transition-colors duration-300"
+                  onClick={() => setCurrentCarouselSlide(prev => (prev === 0 ? totalCarouselSlides - 1 : prev - 1))}
+                  aria-label="Previous slide"
+                >
+                  <ArrowRight className="h-6 w-6 transform rotate-180" />
+                </button>
+                <button 
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 dark:bg-gray-800/80 p-2 rounded-full shadow-lg hover:bg-indigo-500 hover:text-white dark:hover:bg-indigo-600 backdrop-blur-sm z-10 transition-colors duration-300"
+                  onClick={() => setCurrentCarouselSlide(prev => (prev === totalCarouselSlides - 1 ? 0 : prev + 1))}
+                  aria-label="Next slide"
+                >
+                  <ArrowRight className="h-6 w-6" />
+                </button>
+
+                {/* Indicators */}
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex space-x-2 z-10">
+                  {Array.from({ length: Math.min(10, totalCarouselSlides) }).map((_, index) => (
+                    <button
+                      key={index}
+                      className={`h-2 rounded-full transition-all ${
+                        currentCarouselSlide === index 
+                          ? 'w-6 bg-indigo-500' 
+                          : 'w-2 bg-white/50 hover:bg-white/80'
+                      }`}
+                      onClick={() => setCurrentCarouselSlide(index)}
+                      aria-label={`Go to slide ${index + 1}`}
+                    />
+                  ))}
+                  {totalCarouselSlides > 10 && (
+                    <span className="text-white text-xs bg-black/30 px-2 rounded-full">+{totalCarouselSlides - 10}</span>
+                  )}
+                </div>
+              </div>
             </div>
 
             <h1 className={`text-3xl md:text-4xl lg:text-5xl font-bold mb-4 md:mb-6 ${isVisible ? 'animate-fade-in' : 'opacity-0'}`}>
-              <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent px-2 py-1" style={{
+                backgroundColor: isDark ? 'rgba(17, 24, 39, 0.75)' : 'rgba(255, 255, 255, 0.85)',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                border: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(79, 70, 229, 0.2)',
+                textShadow: '0 0 1px rgba(79, 70, 229, 0.5)',
+                filter: 'drop-shadow(0 0 8px rgba(79, 70, 229, 0.5))'
+              }}>
                 Smart Railway
               </span>
               <br />
-              <span className="bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent px-2 py-1" style={{
+                backgroundColor: isDark ? 'rgba(17, 24, 39, 0.75)' : 'rgba(255, 255, 255, 0.85)',
+                borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                border: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(168, 85, 247, 0.2)',
+                marginTop: '0.75rem',
+                display: 'inline-block',
+                textShadow: '0 0 1px rgba(168, 85, 247, 0.5)',
+                filter: 'drop-shadow(0 0 8px rgba(168, 85, 247, 0.5))'
+              }}>
                 Complaint Resolution
               </span>
             </h1>
             
-            <p className={`text-lg md:text-xl lg:text-2xl mb-6 md:mb-8 max-w-3xl mx-auto ${isDark ? 'text-gray-300' : 'text-gray-600'} ${isVisible ? 'animate-fade-in-delay-1' : 'opacity-0'} px-4`}>
+            <p className={`text-lg md:text-xl lg:text-2xl mb-6 md:mb-8 max-w-3xl mx-auto ${isDark ? 'text-white' : 'text-indigo-900'} ${isVisible ? 'animate-fade-in-delay-1' : 'opacity-0'} px-6 py-3 font-medium`} style={{ 
+              textShadow: isDark ? '0 1px 2px rgba(0,0,0,0.6)' : '0 1px 2px rgba(30, 64, 175, 0.4)',
+              backgroundColor: isDark ? 'rgba(17, 24, 39, 0.75)' : 'rgba(255, 255, 255, 0.85)', 
+              borderRadius: '0.5rem',
+              display: 'inline-block',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+              border: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(79, 70, 229, 0.2)'
+            }}>
               AI-powered platform for instant complaint filing, real-time tracking, and 24/7 support. Making your railway journey smooth and hassle-free.
             </p>
 
@@ -541,31 +696,56 @@ const LandingPage = () => {
       <div className="trigger" ref={stackTriggerRef}>
         {/* Hero section for trigger */}
         <div className="hero" style={{ 
-          background: isDark ? 'linear-gradient(135deg, #1f2937 0%, #374151 100%)' : 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
+          background: isDark ? 'linear-gradient(135deg, rgba(17, 24, 39, 0.9) 0%, rgba(31, 41, 55, 0.9) 100%)' : 'linear-gradient(135deg, rgba(30, 64, 175, 0.6) 0%, rgba(79, 70, 229, 0.6) 100%)',
+          backdropFilter: 'blur(3px)'
         }}>
-          <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent text-center px-4">
+          <h2 className="text-3xl md:text-5xl lg:text-6xl font-extrabold mb-6 text-center px-6 py-3" style={{ 
+            color: isDark ? '#fff' : '#1e3a8a',
+            backgroundColor: isDark ? 'rgba(17, 24, 39, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+            borderRadius: '0.75rem',
+            display: 'inline-block',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+            border: isDark ? '2px solid rgba(255, 255, 255, 0.2)' : '2px solid rgba(79, 70, 229, 0.3)',
+            letterSpacing: '0.5px'
+          }}>
             Revolutionary Railway Experience
           </h2>
-          <p className="text-lg md:text-xl lg:text-2xl text-gray-600 dark:text-gray-400 text-center max-w-3xl px-4 mb-8">
+          <p className={`text-lg md:text-xl lg:text-2xl text-center max-w-3xl px-6 py-4 mb-8 mx-auto`} style={{ 
+            color: isDark ? '#fff' : '#1e3a8a',
+            fontWeight: '700',
+            backgroundColor: isDark ? 'rgba(17, 24, 39, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+            borderRadius: '0.5rem',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+            border: isDark ? '2px solid rgba(255, 255, 255, 0.2)' : '2px solid rgba(79, 70, 229, 0.3)',
+            letterSpacing: '0.25px'
+          }}>
             Advanced AI-powered complaint resolution system transforming how passengers interact with Indian Railways
           </p>
           <div className="text-center">
-            <div className="inline-block animate-bounce">
-              <ArrowRight className="h-6 w-6 md:h-8 md:w-8 text-indigo-600 transform rotate-90" />
+            <div className="inline-block animate-bounce bg-indigo-700 p-3 rounded-full shadow-xl border-2 border-white/20">
+              <ArrowRight className="h-6 w-6 md:h-8 md:w-8 text-white transform rotate-90" />
             </div>
-            <p className="text-sm md:text-base text-gray-500 mt-2">Discover innovative features below</p>
+            <p className={`text-sm md:text-base mt-3 font-bold px-5 py-2`} style={{ 
+              color: isDark ? '#fff' : '#1e3a8a',
+              backgroundColor: isDark ? 'rgba(17, 24, 39, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+              borderRadius: '1rem',
+              display: 'inline-block',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+              border: isDark ? '2px solid rgba(255, 255, 255, 0.2)' : '2px solid rgba(79, 70, 229, 0.3)',
+              letterSpacing: '0.25px'
+            }}>Discover innovative features below</p>
           </div>
         </div>
 
         {/* Quick Loading Screen - Shows only briefly */}
         {!animationLoaded && (
-          <div className="fixed inset-0 bg-gradient-to-br from-indigo-900/90 via-purple-900/90 to-pink-900/90 z-30 flex items-center justify-center backdrop-blur-sm">
+          <div className="fixed inset-0 bg-gradient-to-br from-indigo-900/70 via-purple-900/70 to-pink-900/70 z-30 flex items-center justify-center backdrop-blur-sm">
             <div className="text-center">
               <div className="w-16 h-16 mb-6 mx-auto">
                 <div className="w-full h-full border-3 border-white/30 border-t-white rounded-full animate-spin"></div>
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">Loading Experience</h3>
-              <p className="text-white/80">Preparing features...</p>
+              <h3 className="text-xl font-bold text-white mb-2" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.4)' }}>Loading Experience</h3>
+              <p className="text-white/80" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>Preparing features...</p>
             </div>
           </div>
         )}
@@ -575,7 +755,7 @@ const LandingPage = () => {
           <div className="card-container">
             {stackFeatures.map((feature, index) => (
               <div key={feature.id} className="card-wrapper">
-                <div className={`card ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-2 rounded-2xl w-full h-full overflow-hidden shadow-2xl`}>
+                <div className={`card ${isDark ? 'bg-gray-800/70 border-gray-700/80' : 'bg-white/70 border-gray-200/80'} border-2 rounded-2xl w-full h-full overflow-hidden shadow-2xl backdrop-blur-sm`}>
                   <div className="grid md:grid-cols-2 gap-4 md:gap-8 items-center p-4 md:p-6 lg:p-8 h-full">
                     {/* Image Section */}
                     <div className={`relative ${index % 2 === 0 ? 'order-1' : 'md:order-2'}`}>
@@ -602,11 +782,11 @@ const LandingPage = () => {
 
                       {/* Stats overlay */}
                       <div className="absolute bottom-2 left-2 right-2 md:bottom-4 md:left-4 md:right-4">
-                        <div className="grid grid-cols-3 gap-2 bg-white/90 backdrop-blur-sm rounded-lg p-2 md:p-3">
+                        <div className="grid grid-cols-3 gap-2 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-lg p-2 md:p-3">
                           {Object.entries(feature.stats).map(([key, value]) => (
                             <div key={key} className="text-center">
-                              <div className="text-sm md:text-lg font-bold text-gray-900">{value}</div>
-                              <div className="text-xs text-gray-600 capitalize">{key}</div>
+                              <div className="text-sm md:text-lg font-bold text-gray-900 dark:text-white" style={{ textShadow: isDark ? '0 1px 1px rgba(0,0,0,0.3)' : '0 1px 1px rgba(0,0,0,0.1)' }}>{value}</div>
+                              <div className="text-xs text-gray-600 dark:text-gray-300 capitalize">{key}</div>
                             </div>
                           ))}
                         </div>
@@ -617,10 +797,16 @@ const LandingPage = () => {
                     <div className={`${index % 2 === 0 ? 'order-2' : 'md:order-1'} flex flex-col justify-center`}>
                       {/* Header */}
                       <div className="mb-4 md:mb-6">
-                        <div className="inline-block text-xs md:text-sm font-semibold text-indigo-600 uppercase tracking-wide mb-2 md:mb-3 px-3 md:px-4 py-1 md:py-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-full">
+                        <div className="inline-block text-xs md:text-sm font-semibold text-indigo-600 dark:text-indigo-300 uppercase tracking-wide mb-2 md:mb-3 px-3 md:px-4 py-1 md:py-2 bg-indigo-100/90 dark:bg-indigo-900/70 rounded-full">
                           {feature.subtitle}
                         </div>
-                        <h3 className="text-xl md:text-2xl lg:text-3xl font-bold mb-3 md:mb-4 leading-tight">
+                        <h3 className="text-xl md:text-2xl lg:text-3xl font-bold mb-3 md:mb-4 leading-tight text-gray-900 dark:text-white" style={{ 
+                          textShadow: isDark ? '0 2px 4px rgba(0,0,0,0.6)' : '0 2px 4px rgba(30, 64, 175, 0.4)',
+                          backgroundColor: isDark ? 'rgba(31, 41, 55, 0.4)' : 'rgba(255, 255, 255, 0.6)',
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '0.25rem',
+                          display: 'inline-block'
+                        }}>
                           {feature.title}
                         </h3>
                       </div>
@@ -634,7 +820,12 @@ const LandingPage = () => {
                                 <CheckCircle className="h-4 w-4 text-white" />
                               </div>
                             </div>
-                            <div className={`text-sm md:text-base lg:text-lg ${isDark ? 'text-gray-300' : 'text-gray-700'} leading-relaxed`}>
+                            <div className={`text-sm md:text-base lg:text-lg ${isDark ? 'text-white' : 'text-gray-900'} leading-relaxed font-medium`} style={{ 
+                              textShadow: isDark ? '0 1px 2px rgba(0,0,0,0.5)' : '0 1px 2px rgba(30, 64, 175, 0.3)',
+                              backgroundColor: isDark ? 'rgba(31, 41, 55, 0.3)' : 'rgba(255, 255, 255, 0.5)',
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '0.25rem'
+                            }}>
                               {point}
                             </div>
                           </div>
@@ -645,12 +836,12 @@ const LandingPage = () => {
                       <div className="flex flex-col sm:flex-row gap-3">
                         <Link
                           to="/login"
-                          className="inline-flex items-center justify-center space-x-2 md:space-x-3 px-6 md:px-8 py-3 md:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg md:rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 font-semibold text-sm md:text-base"
+                          className="inline-flex items-center justify-center space-x-2 md:space-x-3 px-6 md:px-8 py-3 md:py-4 bg-gradient-to-r from-indigo-600/90 to-purple-600/90 text-white rounded-lg md:rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 font-semibold text-sm md:text-base backdrop-blur-sm"
                         >
                           <span>Experience This Feature</span>
                           <ArrowRight className="h-4 w-4 md:h-5 md:w-5" />
                         </Link>
-                        <button className="inline-flex items-center justify-center space-x-2 px-6 md:px-8 py-3 md:py-4 border-2 border-indigo-600 text-indigo-600 rounded-lg md:rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all duration-300 font-semibold text-sm md:text-base">
+                        <button className="inline-flex items-center justify-center space-x-2 px-6 md:px-8 py-3 md:py-4 border-2 border-indigo-600/90 text-indigo-600 dark:text-indigo-400 rounded-lg md:rounded-xl hover:bg-indigo-50/50 dark:hover:bg-indigo-900/30 transition-all duration-300 font-semibold text-sm md:text-base backdrop-blur-sm">
                           <span>Learn More</span>
                         </button>
                       </div>
@@ -664,7 +855,7 @@ const LandingPage = () => {
       </div>
 
       {/* Enhanced Features Section - Remove extra spacing */}
-      <section id="features" className={`py-8 md:py-12 ${isDark ? 'bg-gray-800' : 'bg-gray-50'} relative`}>
+      <section id="features" className={`py-8 md:py-12 ${isDark ? 'bg-gray-800/50' : 'bg-gray-50/50'} relative backdrop-blur-sm`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 md:mb-16">
             <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
@@ -679,7 +870,7 @@ const LandingPage = () => {
             {features.map((feature, index) => (
               <div 
                 key={index} 
-                className={`group p-4 md:p-6 rounded-xl ${isDark ? 'bg-gray-700' : 'bg-white'} shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 hover:scale-105 overflow-hidden relative`}
+                className={`group p-4 md:p-6 rounded-xl ${isDark ? 'bg-gray-700/70' : 'bg-white/70'} shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 hover:scale-105 overflow-hidden relative backdrop-blur-sm border border-gray-200/20`}
                 style={{ animationDelay: `${index * 0.1}s` }}
               >
                 {/* Feature Image */}
@@ -790,20 +981,33 @@ const LandingPage = () => {
       </section>
 
       {/* Enhanced Testimonials Section */}
-      <section id="reviews" className={`py-16 md:py-20 ${isDark ? 'bg-gray-800' : 'bg-gray-50'}`}>
+      <section id="reviews" className={`py-16 md:py-20 ${isDark ? 'bg-gray-800/40' : 'bg-indigo-100/30'} backdrop-blur-sm`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 md:mb-16">
-            <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-4">What Our Passengers Say</h2>
-            <p className={`text-lg md:text-xl ${isDark ? 'text-gray-400' : 'text-gray-600'} px-4`}>
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-4" style={{ 
+              textShadow: isDark ? '0 2px 4px rgba(0,0,0,0.7)' : '0 2px 4px rgba(30, 64, 175, 0.5)',
+              color: isDark ? 'white' : '#1e3a8a',
+              backgroundColor: isDark ? 'rgba(31, 41, 55, 0.5)' : 'rgba(255, 255, 255, 0.6)',
+              padding: '0.5rem 1rem',
+              borderRadius: '0.5rem',
+              display: 'inline-block'
+            }}>What Our Passengers Say</h2>
+            <p className={`text-lg md:text-xl ${isDark ? 'text-white' : 'text-indigo-900'} px-4 font-medium mt-2`} style={{ 
+              textShadow: isDark ? '0 1px 2px rgba(0,0,0,0.6)' : '0 1px 2px rgba(30, 64, 175, 0.4)',
+              backgroundColor: isDark ? 'rgba(31, 41, 55, 0.5)' : 'rgba(255, 255, 255, 0.6)',
+              padding: '0.25rem 1rem',
+              borderRadius: '0.5rem',
+              display: 'inline-block'
+            }}>
               Real feedback from satisfied customers
             </p>
           </div>
 
           {/* Featured Testimonial Carousel */}
           <div className="mb-12">
-            <div className={`max-w-4xl mx-auto p-8 rounded-2xl ${isDark ? 'bg-gray-700' : 'bg-white'} shadow-2xl transform transition-all duration-500`}>
+            <div className={`max-w-4xl mx-auto p-8 rounded-2xl ${isDark ? 'bg-gray-700/70' : 'bg-white/70'} shadow-2xl transform transition-all duration-500 backdrop-blur-sm border border-gray-200/20`}>
               <div className="text-center">
-                <div className="w-20 h-20 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full flex items-center justify-center font-bold text-2xl mx-auto mb-6">
+                <div className="w-20 h-20 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full flex items-center justify-center font-bold text-2xl mx-auto mb-6">
                   {testimonials[currentTestimonial].avatar}
                 </div>
                 <div className="flex justify-center mb-4">
@@ -811,12 +1015,17 @@ const LandingPage = () => {
                     <Star key={i} className="h-6 w-6 text-yellow-400 fill-current animate-pulse" style={{ animationDelay: `${i * 0.1}s` }} />
                   ))}
                 </div>
-                <p className={`text-lg mb-6 ${isDark ? 'text-gray-300' : 'text-gray-700'} italic`}>
+                <p className={`text-lg mb-6 ${isDark ? 'text-white' : 'text-gray-900'} italic font-medium`} style={{ 
+                  textShadow: isDark ? '0 1px 2px rgba(0,0,0,0.5)' : '0 1px 1px rgba(0,0,0,0.2)',
+                  backgroundColor: isDark ? 'rgba(31, 41, 55, 0.3)' : 'rgba(255, 255, 255, 0.5)',
+                  padding: '1rem',
+                  borderRadius: '0.5rem'
+                }}>
                   "{testimonials[currentTestimonial].content}"
                 </p>
                 <div>
                   <h4 className="font-semibold text-lg">{testimonials[currentTestimonial].name}</h4>
-                  <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <p className={`${isDark ? 'text-gray-100' : 'text-gray-800'} font-medium`}>
                     {testimonials[currentTestimonial].role}
                   </p>
                 </div>
@@ -844,15 +1053,15 @@ const LandingPage = () => {
             {testimonials.map((testimonial, index) => (
               <div 
                 key={index} 
-                className={`p-6 rounded-xl ${isDark ? 'bg-gray-700' : 'bg-white'} shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 group`}
+                className={`p-6 rounded-xl ${isDark ? 'bg-gray-700/60' : 'bg-white/60'} shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 group backdrop-blur-sm border border-gray-200/20`}
               >
                 <div className="flex items-center mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full flex items-center justify-center font-bold mr-4 group-hover:scale-110 transition-transform">
+                  <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full flex items-center justify-center font-bold mr-4 group-hover:scale-110 transition-transform">
                     {testimonial.avatar}
                   </div>
                   <div>
                     <h4 className="font-semibold">{testimonial.name}</h4>
-                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    <p className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
                       {testimonial.role}
                     </p>
                   </div>
@@ -862,7 +1071,7 @@ const LandingPage = () => {
                     <Star key={i} className="h-5 w-5 text-yellow-400 fill-current" />
                   ))}
                 </div>
-                <p className={`${isDark ? 'text-gray-300' : 'text-gray-700'} group-hover:text-opacity-80`}>
+                <p className={`${isDark ? 'text-gray-100' : 'text-gray-800'} group-hover:text-opacity-90`} style={{ textShadow: isDark ? '0 1px 1px rgba(0,0,0,0.2)' : 'none' }}>
                   {testimonial.content}
                 </p>
               </div>
@@ -872,21 +1081,35 @@ const LandingPage = () => {
       </section>
 
       {/* Statistics Section */}
-      <section className={`py-16 md:py-20 ${isDark ? 'bg-gradient-to-r from-indigo-900 to-purple-900' : 'bg-gradient-to-r from-indigo-600 to-purple-600'} relative overflow-hidden`}>
+      <section className={`py-16 md:py-20 ${isDark ? 'bg-gradient-to-r from-indigo-900/70 to-purple-900/70' : 'bg-gradient-to-r from-indigo-600/70 to-purple-600/70'} relative overflow-hidden backdrop-blur-sm`}>
         {/* Animated Background */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-10 left-10 w-20 h-20 bg-white rounded-full animate-bounce"></div>
-          <div className="absolute bottom-10 right-10 w-16 h-16 bg-white rounded-full animate-pulse"></div>
-          <div className="absolute top-1/2 left-1/4 w-8 h-8 bg-white rounded-full animate-ping"></div>
-          <div className="absolute bottom-1/4 left-3/4 w-12 h-12 bg-white rounded-full animate-bounce" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute top-10 left-10 w-20 h-20 bg-white/60 rounded-full animate-bounce"></div>
+          <div className="absolute bottom-10 right-10 w-16 h-16 bg-white/60 rounded-full animate-pulse"></div>
+          <div className="absolute top-1/2 left-1/4 w-8 h-8 bg-white/60 rounded-full animate-ping"></div>
+          <div className="absolute bottom-1/4 left-3/4 w-12 h-12 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '2s' }}></div>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="text-center mb-12 md:mb-16">
-            <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-4">
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-4" style={{ 
+              textShadow: '0 2px 6px rgba(0,0,0,0.7)',
+              backgroundColor: 'rgba(17, 24, 39, 0.5)',
+              padding: '0.5rem 1.5rem',
+              borderRadius: '0.5rem',
+              display: 'inline-block',
+              filter: 'drop-shadow(0 0 8px rgba(99, 102, 241, 0.4))'
+            }}>
               Trusted by Millions of Railway Passengers
             </h2>
-            <p className="text-lg md:text-xl text-white/80 max-w-2xl mx-auto">
+            <p className="text-lg md:text-xl text-white max-w-2xl mx-auto font-medium" style={{ 
+              textShadow: '0 1px 3px rgba(0,0,0,0.6)',
+              backgroundColor: 'rgba(17, 24, 39, 0.5)',
+              padding: '0.5rem 1rem',
+              borderRadius: '0.5rem',
+              display: 'inline-block',
+              marginTop: '0.5rem'
+            }}>
               See how we're transforming railway complaint resolution across India
             </p>
           </div>
@@ -895,13 +1118,13 @@ const LandingPage = () => {
             {stats.map((stat, index) => (
               <div 
                 key={index} 
-                className="text-center group transform hover:scale-110 transition-all duration-300"
+                className="text-center group transform hover:scale-110 transition-all duration-300 bg-black/40 backdrop-blur-sm p-4 rounded-xl"
                 style={{ animationDelay: `${index * 0.2}s` }}
               >
-                <div className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2 group-hover:text-yellow-300 transition-colors">
+                <div className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2 group-hover:text-yellow-300 transition-colors" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.7)' }}>
                   {stat.value}
                 </div>
-                <div className="text-sm md:text-base text-white/80 font-medium uppercase tracking-wide">
+                <div className="text-sm md:text-base text-white font-medium uppercase tracking-wide" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
                   {stat.label}
                 </div>
                 <div className="w-full h-1 bg-white/20 rounded-full mt-3 overflow-hidden">
@@ -915,7 +1138,7 @@ const LandingPage = () => {
           <div className="text-center mt-12 md:mt-16">
             <Link
               to="/login"
-              className="inline-flex items-center space-x-3 px-8 py-4 bg-white text-indigo-600 rounded-lg font-semibold hover:bg-gray-100 transition-all duration-300 transform hover:scale-105 shadow-xl hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
+              className="inline-flex items-center space-x-3 px-8 py-4 bg-white/80 text-indigo-600 rounded-lg font-semibold hover:bg-white/90 transition-all duration-300 transform hover:scale-105 shadow-xl hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 backdrop-blur-sm"
             >
               <span>Join Our Success Story</span>
               <ArrowRight className="h-5 w-5" />
@@ -925,13 +1148,13 @@ const LandingPage = () => {
       </section>
 
       {/* Creator Credits Section */}
-      <section className={`py-12 md:py-16 ${isDark ? 'bg-gray-900' : 'bg-white'} border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+      <section className={`py-12 md:py-16 ${isDark ? 'bg-gray-900/60' : 'bg-white/60'} border-t ${isDark ? 'border-gray-700/50' : 'border-gray-200/50'} backdrop-blur-sm`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <div className="mb-6 md:mb-8">
-              <Award className="h-12 w-12 md:h-16 md:w-16 text-indigo-600 mx-auto mb-4 animate-bounce" />
-              <h3 className="text-xl md:text-2xl font-bold mb-4">Created with 💖 by</h3>
-              <div className={`p-4 md:p-6 rounded-xl ${isDark ? 'bg-gray-800' : 'bg-gray-50'} shadow-lg max-w-md mx-auto`}>
+              <Award className="h-12 w-12 md:h-16 md:w-16 text-indigo-500 mx-auto mb-4 animate-bounce" />
+              <h3 className="text-xl md:text-2xl font-bold mb-4" style={{ textShadow: isDark ? '0 2px 4px rgba(0,0,0,0.5)' : '0 1px 2px rgba(0,0,0,0.2)' }}>Created with 💖 by</h3>
+              <div className={`p-4 md:p-6 rounded-xl ${isDark ? 'bg-gray-800/70' : 'bg-gray-50/70'} shadow-lg max-w-md mx-auto backdrop-blur-sm border border-gray-200/20`}>
                 <div className="flex items-center justify-center space-x-3 mb-4">
                   <Code className="h-6 w-6 md:h-8 md:w-8 text-indigo-600" />
                   <span className="text-lg md:text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
@@ -951,14 +1174,14 @@ const LandingPage = () => {
       </section>
 
       {/* Enhanced Footer */}
-      <footer id="contact" className={`py-12 md:py-16 ${isDark ? 'bg-gray-900' : 'bg-gray-900'} text-white relative overflow-hidden`}>
+      <footer id="contact" className={`py-12 md:py-16 ${isDark ? 'bg-gray-900/70' : 'bg-gray-900/70'} text-white relative overflow-hidden z-10`}>
         {/* Animated Background */}
         <div className="absolute inset-0 opacity-5">
           <div className="grid grid-cols-12 gap-2 transform -rotate-12">
             {Array.from({ length: 144 }).map((_, i) => (
               <div 
                 key={i}
-                className="w-2 h-2 bg-white rounded-full animate-pulse"
+                className="w-2 h-2 bg-white/70 rounded-full animate-pulse"
                 style={{ animationDelay: `${i * 0.05}s` }}
               ></div>
             ))}
@@ -980,10 +1203,10 @@ const LandingPage = () => {
                   <a 
                     key={social}
                     href="#" 
-                    className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-indigo-600 transition-colors transform hover:scale-110"
+                    className="w-10 h-10 bg-gray-800/70 rounded-full flex items-center justify-center hover:bg-indigo-600/90 transition-colors transform hover:scale-110 backdrop-blur-sm"
                   >
                     <span className="sr-only">{social}</span>
-                    <div className="w-5 h-5 bg-gray-400 rounded"></div>
+                    <div className="w-5 h-5 bg-gray-400/90 rounded"></div>
                   </a>
                 ))}
               </div>
@@ -1113,7 +1336,9 @@ const LandingPage = () => {
           border-radius: 1.5rem;
           overflow: hidden;
           box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-          backdrop-filter: blur(10px);
+          backdrop-filter: blur(5px);
+          background-color: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         /* Simplified progress indicator */
