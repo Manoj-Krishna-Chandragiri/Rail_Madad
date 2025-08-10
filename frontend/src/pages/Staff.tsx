@@ -716,10 +716,21 @@ const Staff = () => {
             <Users className="h-8 w-8 text-indigo-400" />
             <h1 className="text-2xl font-semibold">Staff Management</h1>
           </div>
-          {isAdmin && (
+          {isAdmin ? (
             <button 
               className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
               onClick={() => setShowAddStaffModal(true)}
+            >
+              <Users className="h-5 w-5" />
+              Add Staff
+            </button>
+          ) : (
+            <button 
+              className="px-4 py-2 bg-gray-400 text-white rounded-lg cursor-help flex items-center gap-2"
+              onClick={() => {
+                setError("Only administrators can add staff members. Please contact an administrator if you need assistance.");
+                setTimeout(() => setError(""), 5000); // Clear message after 5 seconds
+              }}
             >
               <Users className="h-5 w-5" />
               Add Staff
@@ -728,8 +739,17 @@ const Staff = () => {
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
-            {error}
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg flex items-center justify-between">
+            <div className="flex items-center">
+              <ExclamationTriangleIcon className="h-5 w-5 mr-2" />
+              {error}
+            </div>
+            <button 
+              onClick={() => setError('')}
+              className="text-red-700 hover:text-red-900"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
         )}
 
