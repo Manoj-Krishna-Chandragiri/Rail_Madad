@@ -18,6 +18,7 @@ class FirebaseUserManager(BaseUserManager):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
         extra_fields.setdefault('is_admin', True)
+        extra_fields.setdefault('is_super_admin', True)
         
         return self.create_user(email, firebase_uid, password, **extra_fields)
 
@@ -42,6 +43,7 @@ class FirebaseUser(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     is_admin = models.BooleanField(default=False)
+    is_super_admin = models.BooleanField(default=False)
 
     objects = FirebaseUserManager()
 

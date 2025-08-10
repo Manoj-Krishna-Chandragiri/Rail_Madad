@@ -36,7 +36,7 @@ const LandingPage = () => {
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [animationLoaded, setAnimationLoaded] = useState(true); // Start with true to avoid loading screen
-  const stackTriggerRef = useRef<HTMLDivElement>(null);
+  // const stackTriggerRef = useRef<HTMLDivElement>(null);
   const [currentCarouselSlide, setCurrentCarouselSlide] = useState(0);
   const carouselRef = useRef<HTMLDivElement>(null);
   const [isCarouselPaused, setIsCarouselPaused] = useState(false);
@@ -68,17 +68,23 @@ const LandingPage = () => {
   useEffect(() => {
     setIsVisible(true);
     
-    // Auto-rotate testimonials
+    // Auto-rotate testimonials - use a fixed value (4) for number of testimonials
     const testimonialInterval = setInterval(() => {
-      setCurrentTestimonial((prev) => (prev + 1) % testimonials.length);
+      setCurrentTestimonial((prev) => (prev + 1) % 4);
     }, 5000);
     
-    // Auto-rotate carousel
+    // Auto-rotate carousel - checking isCarouselPaused state at each interval
     const carouselInterval = setInterval(() => {
+      // Get the current state of isCarouselPaused at each interval execution
       if (!isCarouselPaused) {
+        console.log("Advancing carousel slide, paused =", isCarouselPaused);
         setCurrentCarouselSlide((prev) => (prev + 1) % totalCarouselSlides);
+      } else {
+        console.log("Carousel is paused, not advancing");
       }
     }, 1500);
+
+    console.log("Carousel auto-rotation set up with pause state:", isCarouselPaused);
 
     // Initialize GSAP ScrollTrigger animation - Simplified for better performance
     const initGSAPAnimation = async () => {
@@ -198,7 +204,7 @@ const LandingPage = () => {
         document.head.appendChild(style);
       });
     };
-  }, []);
+  }, [isCarouselPaused, totalCarouselSlides]);
 
   // Add keyboard navigation for carousel
   useEffect(() => {
@@ -210,11 +216,47 @@ const LandingPage = () => {
       }
     };
 
+    // Add CSS to reset body margin
+    document.body.style.margin = '0';
+    document.body.style.padding = '0';
+
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [totalCarouselSlides]);
+  
+  // Dedicated effect for carousel pause
+  useEffect(() => {
+    console.log("Carousel pause state changed:", isCarouselPaused);
+  }, [isCarouselPaused]);
+
+  // Additional direct DOM event listeners for carousel pause
+  useEffect(() => {
+    if (!carouselRef.current) return;
+    
+    const carousel = carouselRef.current;
+    
+    const handleMouseEnter = () => {
+      console.log("Direct event: Mouse enter");
+      setIsCarouselPaused(true);
+    };
+    
+    const handleMouseLeave = () => {
+      console.log("Direct event: Mouse leave");
+      setIsCarouselPaused(false);
+    };
+    
+    // Add event listeners directly to the DOM node
+    carousel.addEventListener('mouseenter', handleMouseEnter);
+    carousel.addEventListener('mouseleave', handleMouseLeave);
+    
+    return () => {
+      // Clean up event listeners
+      carousel.removeEventListener('mouseenter', handleMouseEnter);
+      carousel.removeEventListener('mouseleave', handleMouseLeave);
+    };
+  }, [carouselRef.current]); // Only re-run if the carousel ref changes
 
   // Smooth scroll function
   const scrollToSection = (sectionId: string) => {
@@ -285,14 +327,6 @@ const LandingPage = () => {
     }
   ];
 
-  const steps = [
-    { number: 1, title: "File Complaint", description: "Submit your complaint with details and evidence" },
-    { number: 2, title: "Smart Classification", description: "AI automatically categorizes and prioritizes" },
-    { number: 3, title: "Agent Assignment", description: "Assigned to the most suitable agent" },
-    { number: 4, title: "Real-time Updates", description: "Receive notifications about progress" },
-    { number: 5, title: "Resolution", description: "Quick and satisfactory resolution" }
-  ];
-
   const testimonials = [
     {
       name: "Rajesh Kumar",
@@ -315,6 +349,25 @@ const LandingPage = () => {
       content: "The video support feature saved my day when I had an urgent issue. Quick, efficient, and professional service.",
       avatar: "A"
     }
+  ];
+
+  // Separate effect for testimonial rotation that runs after testimonials are defined
+  useEffect(() => {
+    const testimonialInterval = setInterval(() => {
+      setCurrentTestimonial((prev) => (prev + 1) % testimonials.length);
+    }, 5000);
+    
+    return () => {
+      clearInterval(testimonialInterval);
+    };
+  }, [testimonials.length]); // Add testimonials.length as a dependency
+
+  const steps = [
+    { number: 1, title: "File Complaint", description: "Submit your complaint with details and evidence" },
+    { number: 2, title: "Smart Classification", description: "AI automatically categorizes and prioritizes" },
+    { number: 3, title: "Agent Assignment", description: "Assigned to the most suitable agent" },
+    { number: 4, title: "Real-time Updates", description: "Receive notifications about progress" },
+    { number: 5, title: "Resolution", description: "Quick and satisfactory resolution" }
   ];
 
   const stats = [
@@ -352,68 +405,68 @@ const LandingPage = () => {
   ];
 
   // Stack features with comprehensive information for landing page showcase
-  const stackFeatures = [
-    {
-      id: 1,
-      image: "https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?w=800&h=600&fit=crop&crop=center",
-      title: "AI-Powered Smart Classification",
-      subtitle: "Intelligent Complaint Processing",
-      badge: "🤖 AI-Enabled",
-      stats: { accuracy: "98.5%", speed: "3x faster", languages: "15+" },
-      points: [
-        "Automatic categorization using advanced machine learning",
-        "Smart priority assignment based on severity and impact",
-        "Intelligent routing to specialized railway departments",
-        "Multi-language support with natural language processing"
-      ]
-    },
-    {
-      id: 2,
-      image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=600&fit=crop&crop=center",
-      title: "Real-Time Tracking & Updates",
-      subtitle: "Complete Transparency",
-      badge: "⚡ Live Updates",
-      stats: { updates: "Real-time", channels: "5+", response: "< 30s" },
-      points: [
-        "Live status updates throughout resolution process",
-        "Multi-channel notifications via SMS, email, and app",
-        "Predictive resolution time estimates",
-        "Interactive progress timeline with milestones"
-      ]
-    },
-    {
-      id: 3,
-      image: "https://images.unsplash.com/photo-1589254065878-42c9da997008?w=800&h=600&fit=crop&crop=center",
-      title: "Multi-Modal Communication",
-      subtitle: "Voice, Video & Chat Support",
-      badge: "🎥 Premium Support",
-      stats: { availability: "24/7", experts: "500+", satisfaction: "4.9/5" },
-      points: [
-        "Voice-to-text complaint filing with accent recognition",
-        "HD video calls with certified railway specialists",
-        "AI chatbot with seamless human escalation",
-        "Screen sharing for visual issue demonstration"
-      ]
-    },
-    {
-      id: 4,
-      image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&h=600&fit=crop&crop=center",
-      title: "Advanced Analytics Dashboard",
-      subtitle: "Data-Driven Insights",
-      badge: "📊 Analytics Pro",
-      stats: { insights: "Live", reports: "50+", accuracy: "99%" },
-      points: [
-        "Comprehensive sentiment analysis of feedback",
-        "Predictive maintenance alerts using IoT data",
-        "Customizable performance metrics dashboard",
-        "Trend analysis for proactive improvements"
-      ]
-    }
-  ];
+  // const stackFeatures = [
+  //   {
+  //     id: 1,
+  //     image: "https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?w=800&h=600&fit=crop&crop=center",
+  //     title: "AI-Powered Smart Classification",
+  //     subtitle: "Intelligent Complaint Processing",
+  //     badge: "🤖 AI-Enabled",
+  //     stats: { accuracy: "98.5%", speed: "3x faster", languages: "15+" },
+  //     points: [
+  //       "Automatic categorization using advanced machine learning",
+  //       "Smart priority assignment based on severity and impact",
+  //       "Intelligent routing to specialized railway departments",
+  //       "Multi-language support with natural language processing"
+  //     ]
+  //   },
+  //   {
+  //     id: 2,
+  //     image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=600&fit=crop&crop=center",
+  //     title: "Real-Time Tracking & Updates",
+  //     subtitle: "Complete Transparency",
+  //     badge: "⚡ Live Updates",
+  //     stats: { updates: "Real-time", channels: "5+", response: "< 30s" },
+  //     points: [
+  //       "Live status updates throughout resolution process",
+  //       "Multi-channel notifications via SMS, email, and app",
+  //       "Predictive resolution time estimates",
+  //       "Interactive progress timeline with milestones"
+  //     ]
+  //   },
+  //   {
+  //     id: 3,
+  //     image: "https://images.unsplash.com/photo-1589254065878-42c9da997008?w=800&h=600&fit=crop&crop=center",
+  //     title: "Multi-Modal Communication",
+  //     subtitle: "Voice, Video & Chat Support",
+  //     badge: "🎥 Premium Support",
+  //     stats: { availability: "24/7", experts: "500+", satisfaction: "4.9/5" },
+  //     points: [
+  //       "Voice-to-text complaint filing with accent recognition",
+  //       "HD video calls with certified railway specialists",
+  //       "AI chatbot with seamless human escalation",
+  //       "Screen sharing for visual issue demonstration"
+  //     ]
+  //   },
+  //   {
+  //     id: 4,
+  //     image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&h=600&fit=crop&crop=center",
+  //     title: "Advanced Analytics Dashboard",
+  //     subtitle: "Data-Driven Insights",
+  //     badge: "📊 Analytics Pro",
+  //     stats: { insights: "Live", reports: "50+", accuracy: "99%" },
+  //     points: [
+  //       "Comprehensive sentiment analysis of feedback",
+  //       "Predictive maintenance alerts using IoT data",
+  //       "Customizable performance metrics dashboard",
+  //       "Trend analysis for proactive improvements"
+  //     ]
+  //   }
+  // ];
 
   return (
     <div 
-      className={`min-h-screen ${isDark ? 'text-white' : 'text-gray-900'} overflow-x-hidden relative`}
+      className={`min-h-screen ${isDark ? 'text-white' : 'text-gray-900'} overflow-x-hidden relative m-0 p-0`}
       style={{
         backgroundImage: 'url(https://res.cloudinary.com/dbnkhibzi/image/upload/v1751548248/Railways_Image_qxrrvn.png)',
         backgroundSize: 'cover',
@@ -440,15 +493,16 @@ const LandingPage = () => {
       </div>
 
       {/* Enhanced Header */}
-      <header className={`fixed top-0 w-full z-50 ${isDark ? 'bg-gray-900/60' : 'bg-white/60'} backdrop-blur-sm border-b ${isDark ? 'border-gray-700/50' : 'border-gray-200/50'} transition-all duration-300 relative`}>
+      <header className={`fixed top-0 left-0 right-0 m-0 w-full z-50 ${isDark ? 'bg-gray-900' : 'bg-white'} border-b ${isDark ? 'border-gray-700' : 'border-gray-200'} transition-all duration-300 shadow-md`} style={{ margin: 0, padding: 0 }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <div className="flex items-center space-x-2 group">
-              <div className="relative">
-                <Train className="h-6 w-6 md:h-8 md:w-8 text-indigo-500 group-hover:rotate-12 transition-transform duration-300" />
-                <div className="absolute inset-0 bg-indigo-500/30 rounded-full animate-ping opacity-0 group-hover:opacity-100"></div>
-              </div>
+              <img 
+                src="https://railmadad-dashboard.web.app/assets/logo-railmadad-B9R2Xeqc.png" 
+                alt="Rail Madad" 
+                className="h-6 sm:h-8"
+              />
               <span className="text-lg md:text-xl font-bold bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
                 Rail Madad
               </span>
@@ -540,7 +594,7 @@ const LandingPage = () => {
       </header>
 
       {/* Enhanced Hero Section */}
-      <section className={`pt-20 pb-16 relative ${isDark ? 'bg-gradient-to-br from-gray-900/50 via-indigo-900/30 to-gray-900/50' : 'bg-gradient-to-br from-indigo-100/60 via-white/50 to-purple-100/60'}`}>
+      <section className={`pt-16 pb-16 relative ${isDark ? 'bg-gradient-to-br from-gray-900/50 via-indigo-900/30 to-gray-900/50' : 'bg-gradient-to-br from-indigo-100/60 via-white/50 to-purple-100/60'}`} style={{ marginTop: '64px' }}>
         {/* Animated Background */}
         <div className="absolute inset-0 opacity-5">
           <div className="absolute top-20 left-4 md:left-10 w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
@@ -554,10 +608,24 @@ const LandingPage = () => {
             <div className="mb-6 md:mb-8">
               {/* Image Carousel */}
               <div 
-                className="relative mx-auto w-full max-w-4xl h-64 md:h-96 lg:h-[500px] overflow-hidden rounded-xl shadow-xl"
+                className="relative mx-auto w-full max-w-4xl h-64 md:h-96 lg:h-[500px] overflow-hidden rounded-xl shadow-xl carousel-container"
                 ref={carouselRef}
-                onMouseEnter={() => setIsCarouselPaused(true)}
-                onMouseLeave={() => setIsCarouselPaused(false)}
+                onMouseEnter={() => {
+                  console.log("Mouse enter carousel");
+                  setIsCarouselPaused(true);
+                }}
+                onMouseOver={() => {
+                  console.log("Mouse over carousel");
+                  setIsCarouselPaused(true);
+                }}
+                onMouseLeave={() => {
+                  console.log("Mouse leave carousel");
+                  setIsCarouselPaused(false);
+                }}
+                onMouseOut={() => {
+                  console.log("Mouse out of carousel");
+                  setIsCarouselPaused(false);
+                }}
               >
                 {/* Carousel Container */}
                 <div className="absolute inset-0 bg-gray-900/10"></div>
@@ -668,7 +736,7 @@ const LandingPage = () => {
                 <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link 
-                to="/track-status" 
+                to="/login" 
                 className={`px-6 md:px-8 py-3 md:py-4 border-2 border-indigo-600 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2 group focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50`}
               >
                 <span>Track Your Complaint</span>
@@ -691,168 +759,6 @@ const LandingPage = () => {
           </div>
         </div>
       </section>
-
-      {/* GSAP Stack Animation Section */}
-      <div className="trigger" ref={stackTriggerRef}>
-        {/* Hero section for trigger */}
-        <div className="hero" style={{ 
-          background: isDark ? 'linear-gradient(135deg, rgba(17, 24, 39, 0.9) 0%, rgba(31, 41, 55, 0.9) 100%)' : 'linear-gradient(135deg, rgba(30, 64, 175, 0.6) 0%, rgba(79, 70, 229, 0.6) 100%)',
-          backdropFilter: 'blur(3px)'
-        }}>
-          <h2 className="text-3xl md:text-5xl lg:text-6xl font-extrabold mb-6 text-center px-6 py-3" style={{ 
-            color: isDark ? '#fff' : '#1e3a8a',
-            backgroundColor: isDark ? 'rgba(17, 24, 39, 0.9)' : 'rgba(255, 255, 255, 0.9)',
-            borderRadius: '0.75rem',
-            display: 'inline-block',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-            border: isDark ? '2px solid rgba(255, 255, 255, 0.2)' : '2px solid rgba(79, 70, 229, 0.3)',
-            letterSpacing: '0.5px'
-          }}>
-            Revolutionary Railway Experience
-          </h2>
-          <p className={`text-lg md:text-xl lg:text-2xl text-center max-w-3xl px-6 py-4 mb-8 mx-auto`} style={{ 
-            color: isDark ? '#fff' : '#1e3a8a',
-            fontWeight: '700',
-            backgroundColor: isDark ? 'rgba(17, 24, 39, 0.9)' : 'rgba(255, 255, 255, 0.9)',
-            borderRadius: '0.5rem',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-            border: isDark ? '2px solid rgba(255, 255, 255, 0.2)' : '2px solid rgba(79, 70, 229, 0.3)',
-            letterSpacing: '0.25px'
-          }}>
-            Advanced AI-powered complaint resolution system transforming how passengers interact with Indian Railways
-          </p>
-          <div className="text-center">
-            <div className="inline-block animate-bounce bg-indigo-700 p-3 rounded-full shadow-xl border-2 border-white/20">
-              <ArrowRight className="h-6 w-6 md:h-8 md:w-8 text-white transform rotate-90" />
-            </div>
-            <p className={`text-sm md:text-base mt-3 font-bold px-5 py-2`} style={{ 
-              color: isDark ? '#fff' : '#1e3a8a',
-              backgroundColor: isDark ? 'rgba(17, 24, 39, 0.9)' : 'rgba(255, 255, 255, 0.9)',
-              borderRadius: '1rem',
-              display: 'inline-block',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-              border: isDark ? '2px solid rgba(255, 255, 255, 0.2)' : '2px solid rgba(79, 70, 229, 0.3)',
-              letterSpacing: '0.25px'
-            }}>Discover innovative features below</p>
-          </div>
-        </div>
-
-        {/* Quick Loading Screen - Shows only briefly */}
-        {!animationLoaded && (
-          <div className="fixed inset-0 bg-gradient-to-br from-indigo-900/70 via-purple-900/70 to-pink-900/70 z-30 flex items-center justify-center backdrop-blur-sm">
-            <div className="text-center">
-              <div className="w-16 h-16 mb-6 mx-auto">
-                <div className="w-full h-full border-3 border-white/30 border-t-white rounded-full animate-spin"></div>
-              </div>
-              <h3 className="text-xl font-bold text-white mb-2" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.4)' }}>Loading Experience</h3>
-              <p className="text-white/80" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>Preparing features...</p>
-            </div>
-          </div>
-        )}
-
-        {/* Stack cards section */}
-        <div className={`extra-trigger transition-opacity duration-1000 ${animationLoaded ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="card-container">
-            {stackFeatures.map((feature, index) => (
-              <div key={feature.id} className="card-wrapper">
-                <div className={`card ${isDark ? 'bg-gray-800/70 border-gray-700/80' : 'bg-white/70 border-gray-200/80'} border-2 rounded-2xl w-full h-full overflow-hidden shadow-2xl backdrop-blur-sm`}>
-                  <div className="grid md:grid-cols-2 gap-4 md:gap-8 items-center p-4 md:p-6 lg:p-8 h-full">
-                    {/* Image Section */}
-                    <div className={`relative ${index % 2 === 0 ? 'order-1' : 'md:order-2'}`}>
-                      <img
-                        src={feature.image}
-                        loading="eager"
-                        alt={`Rail Madad ${feature.title}`}
-                        className="w-full h-48 md:h-64 lg:h-80 object-cover rounded-lg md:rounded-xl shadow-lg"
-                      />
-                      
-                      {/* Feature number overlay */}
-                      <div className="absolute top-2 left-2 md:top-4 md:left-4">
-                        <div className="w-12 h-12 md:w-16 md:h-16 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full flex items-center justify-center font-bold text-lg md:text-2xl shadow-lg">
-                          {feature.id}
-                        </div>
-                      </div>
-
-                      {/* Badge overlay */}
-                      <div className="absolute top-2 right-2 md:top-4 md:right-4">
-                        <div className="px-3 py-1 md:px-4 md:py-2 bg-black/80 text-white text-xs md:text-sm font-semibold rounded-full backdrop-blur-sm">
-                          {feature.badge}
-                        </div>
-                      </div>
-
-                      {/* Stats overlay */}
-                      <div className="absolute bottom-2 left-2 right-2 md:bottom-4 md:left-4 md:right-4">
-                        <div className="grid grid-cols-3 gap-2 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-lg p-2 md:p-3">
-                          {Object.entries(feature.stats).map(([key, value]) => (
-                            <div key={key} className="text-center">
-                              <div className="text-sm md:text-lg font-bold text-gray-900 dark:text-white" style={{ textShadow: isDark ? '0 1px 1px rgba(0,0,0,0.3)' : '0 1px 1px rgba(0,0,0,0.1)' }}>{value}</div>
-                              <div className="text-xs text-gray-600 dark:text-gray-300 capitalize">{key}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Content Section */}
-                    <div className={`${index % 2 === 0 ? 'order-2' : 'md:order-1'} flex flex-col justify-center`}>
-                      {/* Header */}
-                      <div className="mb-4 md:mb-6">
-                        <div className="inline-block text-xs md:text-sm font-semibold text-indigo-600 dark:text-indigo-300 uppercase tracking-wide mb-2 md:mb-3 px-3 md:px-4 py-1 md:py-2 bg-indigo-100/90 dark:bg-indigo-900/70 rounded-full">
-                          {feature.subtitle}
-                        </div>
-                        <h3 className="text-xl md:text-2xl lg:text-3xl font-bold mb-3 md:mb-4 leading-tight text-gray-900 dark:text-white" style={{ 
-                          textShadow: isDark ? '0 2px 4px rgba(0,0,0,0.6)' : '0 2px 4px rgba(30, 64, 175, 0.4)',
-                          backgroundColor: isDark ? 'rgba(31, 41, 55, 0.4)' : 'rgba(255, 255, 255, 0.6)',
-                          padding: '0.25rem 0.5rem',
-                          borderRadius: '0.25rem',
-                          display: 'inline-block'
-                        }}>
-                          {feature.title}
-                        </h3>
-                      </div>
-
-                      {/* Enhanced Points */}
-                      <div className="space-y-3 md:space-y-4 mb-6 md:mb-8">
-                        {feature.points.map((point, pointIndex) => (
-                          <div key={pointIndex} className="flex items-start space-x-3">
-                            <div className="flex-shrink-0 mt-1">
-                              <div className="w-6 h-6 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center">
-                                <CheckCircle className="h-4 w-4 text-white" />
-                              </div>
-                            </div>
-                            <div className={`text-sm md:text-base lg:text-lg ${isDark ? 'text-white' : 'text-gray-900'} leading-relaxed font-medium`} style={{ 
-                              textShadow: isDark ? '0 1px 2px rgba(0,0,0,0.5)' : '0 1px 2px rgba(30, 64, 175, 0.3)',
-                              backgroundColor: isDark ? 'rgba(31, 41, 55, 0.3)' : 'rgba(255, 255, 255, 0.5)',
-                              padding: '0.25rem 0.5rem',
-                              borderRadius: '0.25rem'
-                            }}>
-                              {point}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Enhanced CTA Button */}
-                      <div className="flex flex-col sm:flex-row gap-3">
-                        <Link
-                          to="/login"
-                          className="inline-flex items-center justify-center space-x-2 md:space-x-3 px-6 md:px-8 py-3 md:py-4 bg-gradient-to-r from-indigo-600/90 to-purple-600/90 text-white rounded-lg md:rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 font-semibold text-sm md:text-base backdrop-blur-sm"
-                        >
-                          <span>Experience This Feature</span>
-                          <ArrowRight className="h-4 w-4 md:h-5 md:w-5" />
-                        </Link>
-                        <button className="inline-flex items-center justify-center space-x-2 px-6 md:px-8 py-3 md:py-4 border-2 border-indigo-600/90 text-indigo-600 dark:text-indigo-400 rounded-lg md:rounded-xl hover:bg-indigo-50/50 dark:hover:bg-indigo-900/30 transition-all duration-300 font-semibold text-sm md:text-base backdrop-blur-sm">
-                          <span>Learn More</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
 
       {/* Enhanced Features Section - Remove extra spacing */}
       <section id="features" className={`py-8 md:py-12 ${isDark ? 'bg-gray-800/50' : 'bg-gray-50/50'} relative backdrop-blur-sm`}>
@@ -1008,10 +914,10 @@ const LandingPage = () => {
             <div className={`max-w-4xl mx-auto p-8 rounded-2xl ${isDark ? 'bg-gray-700/70' : 'bg-white/70'} shadow-2xl transform transition-all duration-500 backdrop-blur-sm border border-gray-200/20`}>
               <div className="text-center">
                 <div className="w-20 h-20 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full flex items-center justify-center font-bold text-2xl mx-auto mb-6">
-                  {testimonials[currentTestimonial].avatar}
+                  {testimonials[currentTestimonial]?.avatar || 'U'}
                 </div>
                 <div className="flex justify-center mb-4">
-                  {[...Array(testimonials[currentTestimonial].rating)].map((_, i) => (
+                  {testimonials[currentTestimonial] && [...Array(testimonials[currentTestimonial]?.rating || 5)].map((_, i) => (
                     <Star key={i} className="h-6 w-6 text-yellow-400 fill-current animate-pulse" style={{ animationDelay: `${i * 0.1}s` }} />
                   ))}
                 </div>
@@ -1021,12 +927,12 @@ const LandingPage = () => {
                   padding: '1rem',
                   borderRadius: '0.5rem'
                 }}>
-                  "{testimonials[currentTestimonial].content}"
+                  "{testimonials[currentTestimonial]?.content || 'Great experience with Rail Madad!'}"
                 </p>
                 <div>
-                  <h4 className="font-semibold text-lg">{testimonials[currentTestimonial].name}</h4>
+                  <h4 className="font-semibold text-lg">{testimonials[currentTestimonial]?.name || 'User'}</h4>
                   <p className={`${isDark ? 'text-gray-100' : 'text-gray-800'} font-medium`}>
-                    {testimonials[currentTestimonial].role}
+                    {testimonials[currentTestimonial]?.role || 'Traveler'}
                   </p>
                 </div>
               </div>
@@ -1217,7 +1123,7 @@ const LandingPage = () => {
               <ul className="space-y-2">
                 {[
                   { text: "File Complaint", link: "/login" },
-                  { text: "Track Status", link: "/track-status" },
+                  { text: "Track Status", link: "/login" },
                   { text: "AI Assistant", link: "/ai-assistance" },
                   { text: "Voice Support", link: "/real-time-support" }
                 ].map((item, index) => (
