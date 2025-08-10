@@ -192,9 +192,32 @@ FIREBASE_CERT = os.path.join(BASE_DIR, 'backend/railmadad-login-firebase-adminsd
 
 if not firebase_admin._apps:
     try:
-        cred = credentials.Certificate(FIREBASE_CERT)
-        firebase_admin.initialize_app(cred)
-        print("Firebase initialized successfully")
+        # Check if environment variables for Firebase are available
+        if os.environ.get('FIREBASE_TYPE') and os.environ.get('FIREBASE_PROJECT_ID') and os.environ.get('FIREBASE_PRIVATE_KEY_ID') and os.environ.get('FIREBASE_PRIVATE_KEY') and os.environ.get('FIREBASE_CLIENT_EMAIL'):
+            # Use environment variables
+            firebase_credentials = {
+                'type': os.environ.get('FIREBASE_TYPE'),
+                'project_id': os.environ.get('FIREBASE_PROJECT_ID'),
+                'private_key_id': os.environ.get('FIREBASE_PRIVATE_KEY_ID'),
+                'private_key': os.environ.get('FIREBASE_PRIVATE_KEY').replace('\\n', '\n'),
+                'client_email': os.environ.get('FIREBASE_CLIENT_EMAIL'),
+                'client_id': os.environ.get('FIREBASE_CLIENT_ID'),
+                'auth_uri': os.environ.get('FIREBASE_AUTH_URI', 'https://accounts.google.com/o/oauth2/auth'),
+                'token_uri': os.environ.get('FIREBASE_TOKEN_URI', 'https://oauth2.googleapis.com/token'),
+                'auth_provider_x509_cert_url': os.environ.get('FIREBASE_AUTH_PROVIDER_X509_CERT_URL', 'https://www.googleapis.com/oauth2/v1/certs'),
+                'client_x509_cert_url': os.environ.get('FIREBASE_CLIENT_X509_CERT_URL'),
+                'universe_domain': os.environ.get('FIREBASE_UNIVERSE_DOMAIN', 'googleapis.com')
+            }
+            cred = credentials.Certificate(firebase_credentials)
+            firebase_admin.initialize_app(cred)
+            print("Firebase initialized successfully from environment variables")
+        # Fall back to JSON file if environment variables not set
+        elif os.path.exists(FIREBASE_CERT):
+            cred = credentials.Certificate(FIREBASE_CERT)
+            firebase_admin.initialize_app(cred)
+            print("Firebase initialized successfully from JSON file")
+        else:
+            print("Firebase credentials not found in environment variables or JSON file")
     except Exception as e:
         print(f"Firebase initialization error: {str(e)}")
 
