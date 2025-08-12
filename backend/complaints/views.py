@@ -192,27 +192,90 @@ def admin_profile(request):
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 @api_view(['POST'])
 def submit_feedback(request):
-    serializer = FeedbackSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response({"message": "Feedback submitted successfully"}, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-@api_view(['GET', 'POST'])
-def feedback_view(request):
-    if request.method == 'POST':
+    try:
+        # Import the sentiment analysis function
+        from ai_models.sentiment_analyzer import analyze_sentiment, map_rating_to_sentiment
+        
         serializer = FeedbackSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response({'message': 'Feedback submitted successfully'}, status=201)
-        return Response(serializer.errors, status=400)
- 
-    elif request.method == 'GET':
-        complaint_id = request.GET.get('complaint_id')
-        if not complaint_id:
-            return Response({'error': 'complaint_id parameter is required'}, status=400)
-        feedbacks = Feedback.objects.filter(complaint=complaint_id).order_by('-created_at')
-        serializer = FeedbackSerializer(feedbacks, many=True)
-        return Response(serializer.data, status=200)
+            # First get sentiment analysis results
+            feedback_message = serializer.validated_data.get('feedback_message', '')
+            rating = serializer.validated_data.get('rating', 3)
+            
+            sentiment = None
+            sentiment_confidence = None
+            
+            # Analyze sentiment if there's a feedback message
+            if feedback_message:
+                try:
+                    result = analyze_sentiment(feedback_message)
+                    sentiment = result['sentiment']
+                    sentiment_confidence = result['confidence']
+                except Exception as e:
+                    logger.error(f"Error in sentiment analysis: {str(e)}")
+                    # Fallback to rating-based sentiment if analysis fails
+                    sentiment = map_rating_to_sentiment(rating)
+                    sentiment_confidence = 0.7
+            else:
+                # If no message, use rating to determine sentiment
+                sentiment = map_rating_to_sentiment(rating)
+                sentiment_confidence = 0.7
+            
+            # Now save with the sentiment data
+            feedback = serializer.save(sentiment=sentiment, sentiment_confidence=sentiment_confidence)
+            return Response({"message": "Feedback submitted successfully"}, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.error(f"Error in submit_feedback: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET', 'POST'])
+def feedback_view(request):
+    try:
+        if request.method == 'POST':
+            # Import the sentiment analysis function
+            from ai_models.sentiment_analyzer import analyze_sentiment, map_rating_to_sentiment
+            
+            serializer = FeedbackSerializer(data=request.data)
+            if serializer.is_valid():
+                # First get sentiment analysis results
+                feedback_message = serializer.validated_data.get('feedback_message', '')
+                rating = serializer.validated_data.get('rating', 3)
+                
+                sentiment = None
+                sentiment_confidence = None
+                
+                # Analyze sentiment if there's a feedback message
+                if feedback_message:
+                    try:
+                        result = analyze_sentiment(feedback_message)
+                        sentiment = result['sentiment']
+                        sentiment_confidence = result['confidence']
+                    except Exception as e:
+                        logger.error(f"Error in sentiment analysis: {str(e)}")
+                        # Fallback to rating-based sentiment if analysis fails
+                        sentiment = map_rating_to_sentiment(rating)
+                        sentiment_confidence = 0.7
+                else:
+                    # If no message, use rating to determine sentiment
+                    sentiment = map_rating_to_sentiment(rating)
+                    sentiment_confidence = 0.7
+                
+                # Now save with the sentiment data
+                feedback = serializer.save(sentiment=sentiment, sentiment_confidence=sentiment_confidence)
+                return Response({'message': 'Feedback submitted successfully'}, status=201)
+            return Response(serializer.errors, status=400)
+        
+        elif request.method == 'GET':
+            complaint_id = request.GET.get('complaint_id')
+            if not complaint_id:
+                return Response({'error': 'complaint_id parameter is required'}, status=400)
+            feedbacks = Feedback.objects.filter(complaint_id=complaint_id).order_by('-submitted_at')
+            serializer = FeedbackSerializer(feedbacks, many=True)
+            return Response(serializer.data, status=200)
+    except Exception as e:
+        logger.error(f"Error in feedback_view: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET', 'POST'])
 def staff_list(request):
@@ -1387,4 +1450,176 @@ def quick_resolution_solutions(request):
         
     except Exception as e:
         logger.error(f"Error in quick_resolution_solutions: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+def feedback_sentiment_stats(request):
+    """
+    Get sentiment analysis statistics for feedback
+    """
+    # Check authentication using custom middleware attributes
+    if not hasattr(request, 'is_authenticated') or not request.is_authenticated:
+        return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+    
+    if not (getattr(request, 'is_admin', False) or getattr(request, 'is_staff', False)):
+        return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        # Get sentiment statistics
+        total_feedback = Feedback.objects.count()
+        positive_feedback = Feedback.objects.filter(sentiment='POSITIVE').count()
+        negative_feedback = Feedback.objects.filter(sentiment='NEGATIVE').count()
+        neutral_feedback = Feedback.objects.filter(sentiment='NEUTRAL').count()
+        
+        # Calculate percentages
+        if total_feedback > 0:
+            positive_percent = round((positive_feedback / total_feedback) * 100, 1)
+            negative_percent = round((negative_feedback / total_feedback) * 100, 1)
+            neutral_percent = round((neutral_feedback / total_feedback) * 100, 1)
+        else:
+            positive_percent = 0
+            negative_percent = 0
+            neutral_percent = 0
+        
+        # Get average feedback rating
+        avg_rating = Feedback.objects.aggregate(Avg('rating'))['rating__avg'] or 0
+        
+        # Get sentiment by category
+        categories = Feedback.objects.values_list('category', flat=True).distinct()
+        category_sentiment = []
+        
+        for category in categories:
+            category_feedback = Feedback.objects.filter(category=category)
+            category_total = category_feedback.count()
+            category_positive = category_feedback.filter(sentiment='POSITIVE').count()
+            
+            if category_total > 0:
+                sentiment_score = round((category_positive / category_total) * 100, 1)
+            else:
+                sentiment_score = 0
+            
+            category_sentiment.append({
+                'category': category,
+                'total': category_total,
+                'positive_percent': sentiment_score,
+                'avg_rating': category_feedback.aggregate(Avg('rating'))['rating__avg'] or 0
+            })
+        
+        # Get recent feedback with sentiment
+        recent_feedback = Feedback.objects.order_by('-submitted_at')[:10].values(
+            'id', 'feedback_message', 'rating', 'sentiment', 'sentiment_confidence', 'submitted_at'
+        )
+        
+        return Response({
+            'total_feedback': total_feedback,
+            'sentiment_distribution': {
+                'positive': positive_feedback,
+                'negative': negative_feedback,
+                'neutral': neutral_feedback,
+                'positive_percent': positive_percent,
+                'negative_percent': negative_percent,
+                'neutral_percent': neutral_percent
+            },
+            'avg_rating': round(avg_rating, 1),
+            'category_sentiment': category_sentiment,
+            'recent_feedback': list(recent_feedback)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in feedback_sentiment_stats: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# Feedback views
+@api_view(['POST'])
+def submit_feedback(request):
+    """
+    Submit feedback for a complaint and analyze sentiment.
+    """
+    try:
+        # Import the sentiment analysis function
+        from ai_models.sentiment_analyzer import analyze_sentiment, map_rating_to_sentiment
+        
+        serializer = FeedbackSerializer(data=request.data)
+        if serializer.is_valid():
+            # First get sentiment analysis results
+            feedback_message = serializer.validated_data.get('feedback_message', '')
+            rating = serializer.validated_data.get('rating', 3)
+            
+            sentiment = None
+            sentiment_confidence = None
+            
+            # Analyze sentiment if there's a feedback message
+            if feedback_message:
+                try:
+                    result = analyze_sentiment(feedback_message)
+                    sentiment = result['sentiment']
+                    sentiment_confidence = result['confidence']
+                except Exception as e:
+                    logger.error(f"Error in sentiment analysis: {str(e)}")
+                    # Fallback to rating-based sentiment if analysis fails
+                    sentiment = map_rating_to_sentiment(rating)
+                    sentiment_confidence = 0.7
+            else:
+                # If no message, use rating to determine sentiment
+                sentiment = map_rating_to_sentiment(rating)
+                sentiment_confidence = 0.7
+            
+            # Now save with the sentiment data
+            feedback = serializer.save(sentiment=sentiment, sentiment_confidence=sentiment_confidence)
+            return Response({"message": "Feedback submitted successfully"}, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.error(f"Error in submit_feedback: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET', 'POST'])
+def feedback_view(request):
+    """
+    Get or submit feedback for a specific complaint.
+    """
+    try:
+        if request.method == 'POST':
+            # Import the sentiment analysis function
+            from ai_models.sentiment_analyzer import analyze_sentiment, map_rating_to_sentiment
+            
+            serializer = FeedbackSerializer(data=request.data)
+            if serializer.is_valid():
+                # First get sentiment analysis results
+                feedback_message = serializer.validated_data.get('feedback_message', '')
+                rating = serializer.validated_data.get('rating', 3)
+                
+                sentiment = None
+                sentiment_confidence = None
+                
+                # Analyze sentiment if there's a feedback message
+                if feedback_message:
+                    try:
+                        result = analyze_sentiment(feedback_message)
+                        sentiment = result['sentiment']
+                        sentiment_confidence = result['confidence']
+                    except Exception as e:
+                        logger.error(f"Error in sentiment analysis: {str(e)}")
+                        # Fallback to rating-based sentiment if analysis fails
+                        sentiment = map_rating_to_sentiment(rating)
+                        sentiment_confidence = 0.7
+                else:
+                    # If no message, use rating to determine sentiment
+                    sentiment = map_rating_to_sentiment(rating)
+                    sentiment_confidence = 0.7
+                
+                # Now save with the sentiment data
+                feedback = serializer.save(sentiment=sentiment, sentiment_confidence=sentiment_confidence)
+                return Response({'message': 'Feedback submitted successfully'}, status=201)
+            return Response(serializer.errors, status=400)
+        
+        elif request.method == 'GET':
+            complaint_id = request.GET.get('complaint_id')
+            if not complaint_id:
+                return Response({'error': 'complaint_id parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            feedbacks = Feedback.objects.filter(complaint_id=complaint_id).order_by('-submitted_at')
+            serializer = FeedbackSerializer(feedbacks, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+    except Exception as e:
+        logger.error(f"Error in feedback_view: {str(e)}")
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -108,8 +108,14 @@ const AIAssistance = () => {
     setIsLoading(true);
 
     try {
+      // Check if API key is set
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey || apiKey === 'YOUR_GEMINI_API_KEY_HERE') {
+        throw new Error('API key not configured. Please set a valid Gemini API key in the .env file.');
+      }
+      
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: {
@@ -140,6 +146,11 @@ const AIAssistance = () => {
         let errorMessage = 'An error occurred while processing your request.';
         if (data.error) {
           errorMessage = `Error: ${data.error.message || data.error.status}`;
+          
+          // Show a more user-friendly message for API key errors
+          if (data.error.message?.includes('API key')) {
+            errorMessage = 'The AI service is currently unavailable. Please contact the administrator to check the API key configuration.';
+          }
         }
         setMessages(prev => [...prev, { 
           role: 'assistant', 

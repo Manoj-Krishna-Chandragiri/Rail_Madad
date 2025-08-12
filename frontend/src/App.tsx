@@ -14,6 +14,7 @@ import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import AdminCreator from './pages/AdminCreator';
 import ResetPassword from './pages/ResetPassword';
+import SentimentAnalysisPage from './pages/SentimentAnalysisPage';
 
 // User routes components
 import AIAssistance from './pages/AIAssistance';
@@ -193,6 +194,7 @@ const App = () => {
               <Route path="staff" element={<Staff />} />
               <Route path="settings" element={<Settings />} />
               <Route path="profile" element={<Profile />} />
+              <Route path="sentiment-analysis" element={<SentimentAnalysisPage />} />
             </Route>
 
             {/* User/Passenger Routes */}
@@ -232,6 +234,7 @@ const App = () => {
             <Route path="/staff" element={<Navigate to="/admin-dashboard/staff" />} />
             <Route path="/settings" element={<Navigate to={userType === 'admin' ? '/admin-dashboard/settings' : '/user-dashboard/settings'} />} />
             <Route path="/profile" element={<Navigate to={userType === 'admin' ? '/admin-dashboard/profile' : '/user-dashboard/profile'} />} />
+            <Route path="/sentiment-analysis" element={<Navigate to="/admin-dashboard/sentiment-analysis" />} />
             
             {/* Additional missing routes that are referenced */}
             <Route path="/tutorials" element={<Navigate to="/user-dashboard/help" />} />

@@ -6,7 +6,8 @@ from .views import (
     complaint_list, 
     admin_profile,
     submit_feedback,  
-    feedback_view     
+    feedback_view,
+    feedback_sentiment_stats
 )
 from . import views
 
@@ -17,7 +18,8 @@ urlpatterns = [
     path('', complaint_list, name='complaint_list'),
     path('admin/profile/', admin_profile, name='admin_profile'),
     path('feedback/', submit_feedback, name='submit_feedback'),  
-    path('feedback/view/', feedback_view, name='feedback_view'),  
+    path('feedback/view/', feedback_view, name='feedback_view'), 
+    path('feedback/sentiment-stats/', feedback_sentiment_stats, name='feedback_sentiment_stats'),
 
     # Admin API endpoints
     path('admin/complaints/', views.admin_get_all_complaints, name='admin-complaints'),

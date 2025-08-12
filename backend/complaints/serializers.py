@@ -19,6 +19,7 @@ class FeedbackSerializer(serializers.ModelSerializer):
     class Meta:
         model = Feedback
         fields = '__all__'
+        read_only_fields = ['sentiment', 'sentiment_confidence']
 
 class StaffSerializer(serializers.ModelSerializer):
     avatar_url = serializers.SerializerMethodField()
