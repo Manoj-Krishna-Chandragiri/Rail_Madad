@@ -196,14 +196,14 @@ const AdminHome = () => {
       {/* Hero Section */}
       <div className={`relative overflow-hidden rounded-xl shadow-2xl mb-8 ${isDark ? 'bg-gray-800' : 'bg-gradient-to-r from-indigo-500 to-purple-600'}`}>
         <div className="absolute inset-0 opacity-10">
-          <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
+                <path d="M 10 0 L 0 0 0 10" fill="none" stroke="white" strokeWidth="0.5" />
+              </pattern>
+            </defs>
             <path d="M0,0 L100,0 L100,100 L0,100 Z" fill="url(#grid)" />
           </svg>
-          <defs>
-            <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="white" strokeWidth="0.5" />
-            </pattern>
-          </defs>
         </div>
         <div className="relative p-8 sm:p-12">
           <h1 className="text-3xl sm:text-4xl font-bold mb-3 text-white flex items-center gap-3">

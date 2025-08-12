@@ -1548,8 +1548,16 @@ def submit_feedback(request):
             sentiment = None
             sentiment_confidence = None
             
-            # Analyze sentiment if there's a feedback message
-            if feedback_message:
+            # First check if the rating is high (4 or 5) - in which case we always set to POSITIVE
+            if rating in [4, 5]:
+                sentiment = 'POSITIVE'
+                sentiment_confidence = 0.8
+            # Or if rating is low (1 or 2) - in which case we always set to NEGATIVE
+            elif rating in [1, 2]:
+                sentiment = 'NEGATIVE'
+                sentiment_confidence = 0.8
+            # Otherwise, try text analysis if available
+            elif feedback_message:
                 try:
                     result = analyze_sentiment(feedback_message)
                     sentiment = result['sentiment']
@@ -1560,9 +1568,9 @@ def submit_feedback(request):
                     sentiment = map_rating_to_sentiment(rating)
                     sentiment_confidence = 0.7
             else:
-                # If no message, use rating to determine sentiment
-                sentiment = map_rating_to_sentiment(rating)
-                sentiment_confidence = 0.7
+                # If no message and rating is 3, use NEUTRAL
+                sentiment = 'NEUTRAL'
+                sentiment_confidence = 0.6
             
             # Now save with the sentiment data
             feedback = serializer.save(sentiment=sentiment, sentiment_confidence=sentiment_confidence)
@@ -1591,8 +1599,16 @@ def feedback_view(request):
                 sentiment = None
                 sentiment_confidence = None
                 
-                # Analyze sentiment if there's a feedback message
-                if feedback_message:
+                # First check if the rating is high (4 or 5) - in which case we always set to POSITIVE
+                if rating in [4, 5]:
+                    sentiment = 'POSITIVE'
+                    sentiment_confidence = 0.8
+                # Or if rating is low (1 or 2) - in which case we always set to NEGATIVE
+                elif rating in [1, 2]:
+                    sentiment = 'NEGATIVE'
+                    sentiment_confidence = 0.8
+                # Otherwise, try text analysis if available
+                elif feedback_message:
                     try:
                         result = analyze_sentiment(feedback_message)
                         sentiment = result['sentiment']
@@ -1603,9 +1619,9 @@ def feedback_view(request):
                         sentiment = map_rating_to_sentiment(rating)
                         sentiment_confidence = 0.7
                 else:
-                    # If no message, use rating to determine sentiment
-                    sentiment = map_rating_to_sentiment(rating)
-                    sentiment_confidence = 0.7
+                    # If no message and rating is 3, use NEUTRAL
+                    sentiment = 'NEUTRAL'
+                    sentiment_confidence = 0.6
                 
                 # Now save with the sentiment data
                 feedback = serializer.save(sentiment=sentiment, sentiment_confidence=sentiment_confidence)

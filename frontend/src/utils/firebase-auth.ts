@@ -1,6 +1,14 @@
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
 export const getValidToken = async (): Promise<string | null> => {
+  // First check if we have an admin token in localStorage
+  const adminToken = localStorage.getItem('adminToken');
+  if (adminToken) {
+    console.log('Using stored admin token');
+    return adminToken;
+  }
+  
+  // Otherwise, use Firebase auth
   const auth = getAuth();
   const user = auth.currentUser;
   

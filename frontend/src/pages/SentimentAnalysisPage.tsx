@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
-import { PieChart, BarChart2, TrendingUp, MessageCircle, AlertTriangle } from 'lucide-react';
+import { PieChart, BarChart2, TrendingUp, MessageCircle } from 'lucide-react';
 import { SentimentPieChart, CategoryBarChart } from '../components/admin/SentimentCharts';
 import apiClient from '../utils/axios-config';
 import { useNavigate } from 'react-router-dom';
-import { getAuth } from 'firebase/auth';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { waitForAuthReady } from '../utils/firebase-auth';
 import '../config/firebase'; // Ensure Firebase is initialized
 
 interface SentimentStats {
@@ -40,44 +41,43 @@ const SentimentAnalysisPage: React.FC = () => {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [stats, setStats] = React.useState<SentimentStats | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = React.useState<boolean>(true);
   const navigate = useNavigate();
 
   React.useEffect(() => {
-    // Check if user is logged in as admin
-    const adminToken = localStorage.getItem('adminToken');
-    const userRole = localStorage.getItem('userRole');
-    const auth = getAuth();
+    // The AdminRoute component already checks if the user is logged in as an admin
+    // But we need to make sure Firebase auth is ready before making the API call
     
-    if (!adminToken || userRole !== 'admin' || !auth.currentUser) {
-      setIsAuthenticated(false);
-      setError('You must be logged in as an admin to view this page');
-      return;
-    }
-
     const fetchStats = async () => {
       try {
         setLoading(true);
-        // Get a fresh token before making the request
-        const token = await auth.currentUser?.getIdToken(true);
         
-        // Make the request with the token
-        const response = await apiClient.get('/api/complaints/feedback/sentiment-stats/', {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+        // Wait for Firebase auth to be ready
+        const auth = getAuth();
+        
+        // Wait for auth state to be ready
+        await new Promise<void>((resolve) => {
+          const unsubscribe = onAuthStateChanged(auth, () => {
+            unsubscribe();
+            resolve();
+          });
         });
+        
+        // Ensure we have a current user before proceeding
+        if (!auth.currentUser) {
+          console.log('No authenticated user found after waiting');
+          setError('Authentication required. Please try logging in again.');
+          setLoading(false);
+          return;
+        }
+        
+        // Now make the API call
+        const response = await apiClient.get('/api/complaints/feedback/sentiment-stats/');
         
         setStats(response.data);
         setError(null);
       } catch (err: any) {
         console.error('Error fetching sentiment stats:', err);
-        if (err.response?.status === 401) {
-          setIsAuthenticated(false);
-          setError('You must be logged in as an admin to view this page');
-        } else {
-          setError('Failed to load sentiment analysis data. Please try again later.');
-        }
+        setError('Failed to load sentiment analysis data. Please try again later.');
       } finally {
         setLoading(false);
       }
@@ -86,25 +86,7 @@ const SentimentAnalysisPage: React.FC = () => {
     fetchStats();
   }, [navigate]);
 
-  if (!isAuthenticated) {
-    return (
-      <div className="p-6 max-w-7xl mx-auto">
-        <div className="p-6 bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 text-red-700 dark:text-red-300">
-          <div className="flex items-center mb-2">
-            <AlertTriangle className="h-5 w-5 mr-2" />
-            <p className="font-bold">Authentication Required</p>
-          </div>
-          <p>You must be logged in as an administrator to view this page.</p>
-          <button 
-            onClick={() => navigate('/login')} 
-            className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded"
-          >
-            Go to Login
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // We don't need the authentication check block since AdminRoute already handles this
 
   if (loading) {
     return (
