@@ -45,3 +45,19 @@ dist-ssr
 # Firebase service account credentials
 railmadad-login-firebase-adminsdk-fbsvc-5305d3439b.json
 backend/backend/railmadad-login-firebase-adminsdk-fbsvc-5305d3439b.json
+
+# Large AI model files (>100MB)
+backend/ai_models/models/
+*.safetensors
+
+# Python virtual environment (large)
+backend/ai_venv/
+ai_venv/
+
+# Large torch/AI libraries in venv
+*/torch/lib/*.dll
+*/torch/lib/*.so
+
+# Database file (contains sensitive data)
+*.sqlite3
+db.sqlite3

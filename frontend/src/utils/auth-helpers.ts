@@ -1,10 +1,9 @@
-import axios from "axios";
-import { getAuth } from "firebase/auth";
+import apiClient from "./api";
+import { auth } from "../config/firebase";
 
 // Function to fetch user profile and store date_joined in localStorage
 export const fetchAndStoreUserProfile = async () => {
   try {
-    const auth = getAuth();
     const user = auth.currentUser;
     
     if (!user) {
@@ -15,9 +14,9 @@ export const fetchAndStoreUserProfile = async () => {
     // Get a fresh token
     const token = await user.getIdToken(true);
     
-    // Make API call to get user profile
-    const response = await axios.get(
-      `${import.meta.env.VITE_API_BASE_URL}/api/accounts/profile/`,
+    // Make API call to get user profile using apiClient
+    const response = await apiClient.get(
+      `/api/accounts/profile/`,
       {
         headers: {
           Authorization: `Bearer ${token}`,

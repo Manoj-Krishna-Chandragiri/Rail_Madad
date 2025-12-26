@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => ({
     ...(mode === 'development' && {
       proxy: {
         '/api': {
-          target: 'http://127.0.0.1:8000', // Only use for local development
+          target: 'http://127.0.0.1:8000', // Django backend port
           changeOrigin: true,
           secure: false,
           timeout: 30000,
@@ -29,13 +29,13 @@ export default defineConfig(({ mode }) => ({
           },
         },
         '/sms': {
-          target: 'http://127.0.0.1:8000',
+          target: 'http://127.0.0.1:8001',
           changeOrigin: true,
           secure: false,
           rewrite: (path) => path.replace(/^\/sms/, '/sms'),
         },
         '/admin-api': {
-          target: 'http://127.0.0.1:8000',
+          target: 'http://127.0.0.1:8001',
           changeOrigin: true,
           secure: false,
           rewrite: (path) => path.replace(/^\/admin-api/, '/admin-api'),

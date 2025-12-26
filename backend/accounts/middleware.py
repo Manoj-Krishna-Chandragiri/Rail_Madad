@@ -17,6 +17,86 @@ class FirebaseAuthMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        # Check if we're in development mode without Firebase
+        if hasattr(settings, 'DEVELOPMENT_MODE') and settings.DEVELOPMENT_MODE:
+            logger.info("Running in development mode - Firebase authentication bypassed")
+            
+            # Check if there's a specific user email in the request headers or session
+            # This allows the frontend to specify which user to simulate
+            dev_user_email = request.META.get('HTTP_X_DEV_USER_EMAIL')
+            
+            # Set default values for development
+            request.firebase_user = None
+            request.firebase_uid = 'dev-uid-12345'
+            request.is_authenticated = True  # Enable authentication in development
+            request.user = None
+            
+            # Try to get a development user from database
+            try:
+                User = get_user_model()
+                dev_user = None
+                
+                # If a specific email is provided, use that user
+                if dev_user_email:
+                    dev_user = User.objects.filter(email=dev_user_email).first()
+                    logger.info(f"Development mode: Requested specific user: {dev_user_email}")
+                
+                # If no specific email or user not found, default to a passenger user
+                # to avoid always defaulting to admin
+                if not dev_user:
+                    # First try to find a passenger user (more realistic default)
+                    dev_user = User.objects.filter(is_passenger=True, is_admin=False, is_staff=False).first()
+                    if not dev_user:
+                        # If no passengers, then try staff
+                        dev_user = User.objects.filter(is_staff=True, is_admin=False).first()
+                        if not dev_user:
+                            # If no staff, try admin
+                            dev_user = User.objects.filter(is_admin=True).first()
+                            if not dev_user:
+                                dev_user = User.objects.first()
+                
+                if dev_user:
+                    request.user_id = dev_user.id
+                    request.user = dev_user
+                    # Set user attributes based on actual user data
+                    request.user_type = dev_user.user_type
+                    request.is_admin = dev_user.is_admin
+                    request.is_staff = dev_user.is_staff
+                    request.firebase_email = dev_user.email
+                    logger.info(f"Development mode: Using user ID {dev_user.id} ({dev_user.email}) - Type: {dev_user.user_type}, Admin: {request.is_admin}, Staff: {request.is_staff}")
+                    logger.info(f"Development mode: Final attributes - is_authenticated: {request.is_authenticated}, is_admin: {request.is_admin}, is_staff: {request.is_staff}")
+                else:
+                    request.user_id = None
+                    request.user_type = 'passenger'
+                    request.is_admin = False
+                    request.is_staff = False
+                    request.firebase_email = 'dev@test.com'
+                    logger.info("Development mode: No users found in database")
+            except Exception as e:
+                logger.warning(f"Development mode: Could not fetch user - {e}")
+                request.user_id = None
+                request.user_type = 'passenger'
+                request.is_admin = False
+                request.is_staff = False
+                request.firebase_email = 'dev@test.com'
+            
+            return self.get_response(request)
+        
+        # Check if Firebase is properly initialized
+        if not firebase_admin._apps:
+            logger.warning("Firebase not initialized - skipping authentication")
+            # Set default values for unauthenticated request
+            request.firebase_user = None
+            request.firebase_email = None
+            request.firebase_uid = None
+            request.user_type = 'passenger'
+            request.is_authenticated = False
+            request.is_admin = False
+            request.is_staff = False
+            request.user = None
+            request.user_id = None
+            return self.get_response(request)
+        
         # Try to resolve the url and get the url name
         try:
             current_url_match = resolve(request.path_info)
@@ -49,6 +129,14 @@ class FirebaseAuthMiddleware:
             token = auth_header.split(' ')[1]
             
             try:
+                # Check if Firebase app is properly initialized before using auth
+                if not firebase_admin._apps:
+                    logger.error("Firebase auth error: The default Firebase app does not exist. Make sure to initialize the SDK by calling initialize_app().")
+                    return JsonResponse({
+                        'error': 'Firebase not initialized',
+                        'code': 'FIREBASE_NOT_INITIALIZED'
+                    }, status=401)
+                
                 # Verify the token with Firebase
                 decoded_token = auth.verify_id_token(token)
                 

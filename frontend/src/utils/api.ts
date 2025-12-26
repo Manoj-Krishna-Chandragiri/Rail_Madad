@@ -14,7 +14,7 @@ console.log('🚀 Final API_BASE_URL:', API_BASE_URL);
 // Create axios instance with base URL
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000, // Increased for Render free tier
+  timeout: 60000, // Increased timeout for slow connections
   headers: {
     'Content-Type': 'application/json',
   },
@@ -39,16 +39,32 @@ apiClient.interceptors.request.use(
 // Add response interceptor for error handling
 apiClient.interceptors.response.use(
   (response) => {
-    console.log('✅ Response received from:', response.config.url);
+    if (import.meta.env.DEV) {
+      console.log('✅ Response received from:', response.config.url);
+    }
     return response;
   },
   (error) => {
-    console.error('❌ Response error:', error.message);
-    console.error('❌ URL that failed:', error.config?.url);
-    if (error.response?.status === 401) {
+    // Only log detailed errors in development
+    if (import.meta.env.DEV) {
+      console.error('❌ Response error:', error.message);
+      console.error('❌ URL that failed:', error.config?.url);
+    }
+    
+    // Handle specific error cases
+    if (error.code === 'ERR_NETWORK') {
+      console.warn('Network connection issue - backend may be offline');
+    } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      console.warn('Request timeout - please check your connection and try again');
+      error.message = 'Request timeout. Please check your connection and try again.';
+    } else if (error.response?.status === 401) {
+      console.warn('Authentication expired - redirecting to login');
       localStorage.removeItem('authToken');
       window.location.href = '/login';
+    } else if (error.response?.status >= 500) {
+      console.warn('Server error occurred - please try again later');
     }
+    
     return Promise.reject(error);
   }
 );

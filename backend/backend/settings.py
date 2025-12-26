@@ -149,6 +149,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5175",  # Local development alternative port
     "http://localhost:5176",  # Local development alternative port
     "http://127.0.0.1:8000",
+    "http://127.0.0.1:8001",
     "https://main.dhpx91sx6cx3f.amplifyapp.com",  # Your AWS Amplify frontend
     "https://rail-madad-backend.onrender.com",  # Your backend domain
     "https://rail-madad.manojkrishna.me",  # Your custom domain
@@ -187,39 +188,54 @@ CSRF_TRUSTED_ORIGINS = [
     "https://rail-madad.manojkrishna.me",
 ]
 
-# Firebase Configuration
-FIREBASE_CERT = os.path.join(BASE_DIR, 'backend/railmadad-login-firebase-adminsdk-fbsvc-5305d3439b.json')
-
+# Firebase Configuration - Secure Environment Variable Based Setup
 if not firebase_admin._apps:
     try:
         # Check if environment variables for Firebase are available
-        if os.environ.get('FIREBASE_TYPE') and os.environ.get('FIREBASE_PROJECT_ID') and os.environ.get('FIREBASE_PRIVATE_KEY_ID') and os.environ.get('FIREBASE_PRIVATE_KEY') and os.environ.get('FIREBASE_CLIENT_EMAIL'):
-            # Use environment variables
-            firebase_credentials = {
-                'type': os.environ.get('FIREBASE_TYPE'),
-                'project_id': os.environ.get('FIREBASE_PROJECT_ID'),
-                'private_key_id': os.environ.get('FIREBASE_PRIVATE_KEY_ID'),
-                'private_key': os.environ.get('FIREBASE_PRIVATE_KEY').replace('\\n', '\n'),
-                'client_email': os.environ.get('FIREBASE_CLIENT_EMAIL'),
-                'client_id': os.environ.get('FIREBASE_CLIENT_ID'),
-                'auth_uri': os.environ.get('FIREBASE_AUTH_URI', 'https://accounts.google.com/o/oauth2/auth'),
-                'token_uri': os.environ.get('FIREBASE_TOKEN_URI', 'https://oauth2.googleapis.com/token'),
-                'auth_provider_x509_cert_url': os.environ.get('FIREBASE_AUTH_PROVIDER_X509_CERT_URL', 'https://www.googleapis.com/oauth2/v1/certs'),
-                'client_x509_cert_url': os.environ.get('FIREBASE_CLIENT_X509_CERT_URL'),
-                'universe_domain': os.environ.get('FIREBASE_UNIVERSE_DOMAIN', 'googleapis.com')
-            }
-            cred = credentials.Certificate(firebase_credentials)
-            firebase_admin.initialize_app(cred)
-            print("Firebase initialized successfully from environment variables")
-        # Fall back to JSON file if environment variables not set
-        elif os.path.exists(FIREBASE_CERT):
-            cred = credentials.Certificate(FIREBASE_CERT)
-            firebase_admin.initialize_app(cred)
-            print("Firebase initialized successfully from JSON file")
+        firebase_type = os.environ.get('FIREBASE_TYPE')
+        firebase_project_id = os.environ.get('FIREBASE_PROJECT_ID')
+        firebase_private_key_id = os.environ.get('FIREBASE_PRIVATE_KEY_ID')
+        firebase_private_key = os.environ.get('FIREBASE_PRIVATE_KEY')
+        firebase_client_email = os.environ.get('FIREBASE_CLIENT_EMAIL')
+        
+        if all([firebase_type, firebase_project_id, firebase_private_key_id, firebase_private_key, firebase_client_email]):
+            # Check if these are placeholder values
+            if (firebase_private_key_id == 'placeholder_key_id' or 
+                'placeholder' in firebase_private_key):
+                print("⚠️  Firebase using placeholder credentials - some features may not work")
+                print("💡 Generate real Firebase credentials for full functionality")
+                print("🔗 Visit: https://console.cloud.google.com/iam-admin/serviceaccounts")
+            else:
+                # Use real environment variables (RECOMMENDED for production)
+                firebase_credentials = {
+                    'type': firebase_type,
+                    'project_id': firebase_project_id,
+                    'private_key_id': firebase_private_key_id,
+                    'private_key': firebase_private_key.replace('\\n', '\n'),
+                    'client_email': firebase_client_email,
+                    'client_id': os.environ.get('FIREBASE_CLIENT_ID'),
+                    'auth_uri': os.environ.get('FIREBASE_AUTH_URI', 'https://accounts.google.com/o/oauth2/auth'),
+                    'token_uri': os.environ.get('FIREBASE_TOKEN_URI', 'https://oauth2.googleapis.com/token'),
+                    'auth_provider_x509_cert_url': os.environ.get('FIREBASE_AUTH_PROVIDER_X509_CERT_URL', 'https://www.googleapis.com/oauth2/v1/certs'),
+                    'client_x509_cert_url': os.environ.get('FIREBASE_CLIENT_X509_CERT_URL'),
+                    'universe_domain': os.environ.get('FIREBASE_UNIVERSE_DOMAIN', 'googleapis.com')
+                }
+                cred = credentials.Certificate(firebase_credentials)
+                firebase_admin.initialize_app(cred)
+                print("✅ Firebase initialized successfully from environment variables")
         else:
-            print("Firebase credentials not found in environment variables or JSON file")
+            print("❌ Firebase credentials not found in environment variables")
+            print("Please set up Firebase environment variables in your .env file")
+            print("See .env.example for required variables")
     except Exception as e:
-        print(f"Firebase initialization error: {str(e)}")
+        print(f"⚠️  Firebase initialization error: {str(e)}")
+        print("The app will continue to work, but Firebase features may be limited")
+        if DEBUG:
+            print("This is normal in development mode with placeholder credentials")
+
+# Development mode flag for bypassing Firebase when not configured
+DEVELOPMENT_MODE = DEBUG and not firebase_admin._apps
+print(f"🔧 DEVELOPMENT_MODE set to: {DEVELOPMENT_MODE} (DEBUG={DEBUG}, firebase_apps={len(firebase_admin._apps)})")
 
 # Logging Configuration
 LOGGING = {

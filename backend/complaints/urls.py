@@ -7,9 +7,19 @@ from .views import (
     admin_profile,
     submit_feedback,  
     feedback_view,
-    feedback_sentiment_stats
+    feedback_sentiment_stats,
+    translate_text,
+    detect_language,
+    supported_languages
 )
 from . import views
+from .ai_classification_views import (
+    classify_complaint_view,
+    classify_batch_complaints_view,
+    get_classification_info,
+    auto_assign_complaint,
+    health_check
+)
 
 urlpatterns = [
     path('file/', file_complaint, name='file_complaint'),
@@ -40,6 +50,29 @@ urlpatterns = [
 
     # Search endpoint
     path('search/', views.search_user_complaints, name='search_user_complaints'),
+    
+    # Translation endpoints
+    path('translate/', translate_text, name='translate_text'),
+    path('detect-language/', detect_language, name='detect_language'),
+    path('supported-languages/', supported_languages, name='supported_languages'),
+    
+    # AI-powered endpoints
+    path('ai/categorize/', views.categorize_complaint, name='categorize_complaint'),
+    path('ai/create-smart/', views.create_smart_complaint, name='create_smart_complaint'),
+    path('ai/train-model/', views.train_ai_model, name='train_ai_model'),
+    path('ai/model-status/', views.ai_model_status, name='ai_model_status'),
+    path('ai/available-staff/', views.get_available_staff, name='get_available_staff'),
+    
+    # New BERT/DistilBERT AI Classification endpoints
+    path('ai/classify/', classify_complaint_view, name='classify_complaint'),
+    path('ai/classify-batch/', classify_batch_complaints_view, name='classify_batch_complaints'),
+    path('ai/classification-info/', get_classification_info, name='classification_info'),
+    path('ai/<int:complaint_id>/auto-assign/', auto_assign_complaint, name='auto_assign_complaint'),
+    path('ai/health/', health_check, name='ai_health_check'),
+    
+    # Staff management endpoints
+    path('staff/dashboard/', views.staff_dashboard, name='staff_dashboard'),
+    path('staff/resolve/<int:complaint_id>/', views.resolve_complaint, name='resolve_complaint'),
     
     # Public staff endpoints (for passengers to view staff)
     path('staff/', views.staff_list, name='staff-list'),

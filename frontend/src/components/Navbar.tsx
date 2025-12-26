@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Bell, User } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import GlobalLanguageSelector from './GlobalLanguageSelector';
 
 interface NavbarProps {
   toggleSidebar: () => void;
@@ -87,6 +88,19 @@ const Navbar = ({ toggleSidebar }: NavbarProps) => {
         </div>
         
         <div className="flex items-center gap-2 sm:gap-4">
+          {/* Translation Test Link (Development) */}
+          {import.meta.env.DEV && (
+            <Link 
+              to="/translation-test" 
+              className={`px-3 py-1 text-xs rounded-lg ${theme === 'dark' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-100 hover:bg-blue-200 text-blue-800'}`}
+            >
+              🔧 Translation Test
+            </Link>
+          )}
+          
+          {/* Global Language Selector */}
+          <GlobalLanguageSelector />
+          
           <div className="relative" ref={notificationsRef}>
             <button 
               className={`p-2 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} rounded-lg`}

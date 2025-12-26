@@ -29,9 +29,12 @@ export const feedbackService = {
       console.log('✅ Feedback submitted successfully:', response.data);
       return response.data;
     } catch (error: any) {
-      console.error('❌ Submission error details:', error);
-      console.error('❌ Error response:', error.response?.data);
-      console.error('❌ Error status:', error.response?.status);
+      // Only log detailed errors in development
+      if (import.meta.env.DEV) {
+        console.error('❌ Submission error details:', error);
+        console.error('❌ Error response:', error.response?.data);
+        console.error('❌ Error status:', error.response?.status);
+      }
       
       if (error.response?.data) {
         const data = error.response.data;
@@ -40,6 +43,17 @@ export const feedbackService = {
           : data;
         throw new Error(errorMessages || 'Failed to submit feedback');
       }
+      
+      // Don't log network errors in production
+      if (error.code === 'ERR_NETWORK') {
+        throw new Error('Network connection issue - please check your connection');
+      }
+      
+      // Handle timeout errors specifically
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        throw new Error('Request timeout - please try again or check your connection');
+      }
+      
       throw new Error('Failed to submit feedback');
     }
   },
@@ -51,6 +65,12 @@ export const feedbackService = {
       return response.data;
     } catch (error: any) {
       console.error('❌ Fetching error:', error);
+      
+      // Handle timeout errors for feedback fetching
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        throw new Error('Request timeout while fetching feedback - please try again');
+      }
+      
       throw new Error('Failed to fetch feedback');
     }
   }

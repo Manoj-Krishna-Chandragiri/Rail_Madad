@@ -25,7 +25,7 @@ interface SignUpData {
   gender: 'male' | 'female' | '';
   address: string;
   profileImage: string;
-  userType: 'passenger' | 'admin';
+  userType: 'passenger' | 'admin' | 'staff';
 }
 
 interface PasswordInputProps {
@@ -961,12 +961,13 @@ const handleGoogleSignIn = async () => {
                     </label>
                     <select
                       value={signUpData.userType}
-                      onChange={(e) => setSignUpData({ ...signUpData, userType: e.target.value as 'passenger' | 'admin' })}
+                      onChange={(e) => setSignUpData({ ...signUpData, userType: e.target.value as 'passenger' | 'admin' | 'staff' })}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 
                         ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
                       required
                     >
                       <option value="passenger">Passenger</option>
+                      <option value="staff">Staff</option>
                       <option value="admin">Admin</option>
                     </select>
                   </div>

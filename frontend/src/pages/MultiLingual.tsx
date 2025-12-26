@@ -1,21 +1,18 @@
 import { Globe, ChevronDown } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useState, useEffect, useRef } from 'react';
-
-declare global {
-  interface Window {
-    google: any;
-    googleTranslateElementInit?: () => void;
-  }
-}
+import backendTranslationService from '../utils/backendTranslation';
 
 const MultiLingual = () => {
   const { theme } = useTheme();
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [translationStatus, setTranslationStatus] = useState('idle');
+  const [translatedElements, setTranslatedElements] = useState<Record<string, string>>({});
+  const [errorMessage, setErrorMessage] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const googleElementLoaded = useRef(false);
-
+  
+  // List of supported languages
   const languages = [
     { code: 'en', name: 'English', native: 'English' },
     { code: 'hi', name: 'Hindi', native: 'हिंदी' },
@@ -44,195 +41,109 @@ const MultiLingual = () => {
     };
   }, []);
 
-  // Custom language switcher function
-  const changeLanguage = (langCode: string) => {
-    setSelectedLanguage(langCode);
-    setShowDropdown(false);
-    
-    // Try to find the Google Translate element
-    const attemptToChangeLanguage = () => {
-      // Use multiple selectors to try to find the language selector
-      const langSelector = 
-        document.querySelector('.goog-te-combo') || 
-        document.querySelector('.VIpgJd-ZVi9od-xl07Ob-lTBxed') ||
-        document.querySelector('select[aria-label="Language Translate Widget"]');
-        
-      if (langSelector && langSelector instanceof HTMLSelectElement) {
-        console.log("Found Google Translate element:", langSelector);
-        langSelector.value = langCode;
-        langSelector.dispatchEvent(new Event('change'));
-        return true;
+  // Load saved language preference
+  useEffect(() => {
+    const savedLanguage = localStorage.getItem('selectedLanguage');
+    if (savedLanguage && languages.find(lang => lang.code === savedLanguage)) {
+      setSelectedLanguage(savedLanguage);
+      if (savedLanguage !== 'en') {
+        translatePage(savedLanguage);
       }
-      return false;
-    };
+    }
+  }, []);
+
+  // Function to translate a single text element
+  const translateText = async (text: string, targetLanguage: string) => {
+    if (!text || targetLanguage === 'en') return text;
     
-    // Try immediately
-    if (!attemptToChangeLanguage()) {
-      // If not found, try again after a short delay to allow the element to load
-      console.log("Google Translate element not immediately available, waiting...");
-      setTimeout(() => {
-        if (!attemptToChangeLanguage()) {
-          console.error('Google Translate element not found after delay');
-          // Try one more time with a longer delay
-          setTimeout(() => {
-            if (!attemptToChangeLanguage()) {
-              console.error('Google Translate element not found. Translation service may not be loaded.');
-              // Show the error message
-              const errorElement = document.getElementById('google_translate_error');
-              if (errorElement) {
-                errorElement.style.display = 'block';
-              }
-            }
-          }, 2000);
-        }
-      }, 500);
+    try {
+      const result = await backendTranslationService.translateText(text, targetLanguage);
+      return result.translated_text;
+    } catch (error) {
+      console.error('Translation error:', error);
+      return text; // Return original text on error
     }
   };
 
-  useEffect(() => {
-    // Add Google Translate script
-    const addScript = () => {
-      // Check if script already exists
-      const existingScript = document.querySelector('script[src*="translate.google.com"]');
-      if (existingScript) return;
-
-      // First, add the translate element to the DOM
-      const translateElement = document.getElementById('google_translate_element');
-      if (!translateElement) {
-        console.error('Google Translate container not found');
-        return;
-      }
-
-      // Create the script element
-      const script = document.createElement('script');
-      script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
-      script.async = true;
-      script.defer = true;
-      
-      // Add error handling
-      script.onerror = (error) => {
-        console.error('Failed to load Google Translate script:', error);
-        const errorElement = document.getElementById('google_translate_error');
-        if (errorElement) {
-          errorElement.style.display = 'block';
-        }
-      };
-      
-      // Add the init function before adding the script
-      window.googleTranslateElementInit = () => {
-        try {
-          if (!window.google || !window.google.translate || !window.google.translate.TranslateElement) {
-            console.error('Google Translate API not available');
-            const errorElement = document.getElementById('google_translate_error');
-            if (errorElement) {
-              errorElement.style.display = 'block';
-            }
-            return;
-          }
-          
-          console.log("Initializing Google Translate element...");
-          const translateElement = new window.google.translate.TranslateElement(
-            {
-              pageLanguage: 'en',
-              includedLanguages: 'en,hi,bn,te,ta,mr,gu,kn,ml,pa,ur',
-              layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
-              autoDisplay: false,
-              gaTrack: false,
-            },
-            'google_translate_element'
-          );
-          
-          // Check if the translate element was created successfully
-          if (translateElement) {
-            console.log("Google Translate element initialized successfully");
-            googleElementLoaded.current = true;
-            
-            // Apply the selected language if it's not English
-            setTimeout(() => {
-              if (selectedLanguage !== 'en') {
-                changeLanguage(selectedLanguage);
-              }
-            }, 1000);
-          } else {
-            console.error("Failed to initialize Google Translate element");
-          }
-        } catch (error) {
-          console.error('Error initializing Google Translate:', error);
-          const errorElement = document.getElementById('google_translate_error');
-          if (errorElement) {
-            errorElement.style.display = 'block';
-          }
-        }
-      };
-      
-      // Add the script to the DOM
-      document.body.appendChild(script);
-    };
-
-    addScript();
-
-    // Cleanup
-    return () => {
-      delete window.googleTranslateElementInit;
-    };
-  }, [selectedLanguage]);
-
-  // Check if Google Translate is actually loaded
-  useEffect(() => {
-    const checkTranslateElement = () => {
-      const langSelector = 
-        document.querySelector('.goog-te-combo') || 
-        document.querySelector('.VIpgJd-ZVi9od-xl07Ob-lTBxed') ||
-        document.querySelector('select[aria-label="Language Translate Widget"]');
-        
-      if (langSelector) {
-        console.log("Google Translate element found:", langSelector);
-        googleElementLoaded.current = true;
-        
-        // Update status message
-        const statusElement = document.getElementById('google_translate_status');
-        if (statusElement) {
-          statusElement.textContent = "Translation service ready.";
-        }
-        
-        return true;
-      }
-      return false;
-    };
-    
-    // Check immediately
-    if (!checkTranslateElement()) {
-      // If not found, set up a periodic check
-      const checkInterval = setInterval(() => {
-        if (checkTranslateElement()) {
-          clearInterval(checkInterval);
-        }
-      }, 1000);
-      
-      // Clear the interval after 10 seconds to avoid infinite checking
-      setTimeout(() => {
-        clearInterval(checkInterval);
-        if (!googleElementLoaded.current) {
-          console.error("Google Translate element not found after 10 seconds");
-          const errorElement = document.getElementById('google_translate_error');
-          if (errorElement) {
-            errorElement.style.display = 'block';
-          }
-          
-          // Update status message
-          const statusElement = document.getElementById('google_translate_status');
-          if (statusElement) {
-            statusElement.textContent = "Translation service failed to load.";
-            statusElement.className = "text-sm text-red-500";
-          }
-        }
-      }, 10000);
-      
-      return () => {
-        clearInterval(checkInterval);
-      };
+  // Function to translate the entire page
+  const translatePage = async (langCode: string) => {
+    if (langCode === 'en') {
+      // Reset to original English content
+      setTranslatedElements({});
+      setSelectedLanguage('en');
+      localStorage.setItem('selectedLanguage', 'en');
+      return;
     }
-  }, []);
+
+    setTranslationStatus('loading');
+    setErrorMessage('');
+    
+    try {
+      // Get all text elements on the page that need translation
+      const textElements = document.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, button, a, li, label');
+      const newTranslatedElements: Record<string, string> = {};
+      
+      // Store original text content if not already stored
+      textElements.forEach((element, index) => {
+        const originalText = element.textContent?.trim();
+        if (originalText && originalText.length > 0) {
+          const elementId = `elem-${index}`;
+          
+          // Add a data attribute to track this element
+          element.setAttribute('data-translate-id', elementId);
+          
+          // Store original text if we don't have it yet
+          if (!element.getAttribute('data-original-text')) {
+            element.setAttribute('data-original-text', originalText);
+          }
+        }
+      });
+      
+      // Translate elements in batches to avoid overwhelming the API
+      const batchSize = 10;
+      const elementsArray = Array.from(textElements);
+      
+      for (let i = 0; i < elementsArray.length; i += batchSize) {
+        const batch = elementsArray.slice(i, i + batchSize);
+        
+        await Promise.all(batch.map(async (element) => {
+          const elementId = element.getAttribute('data-translate-id');
+          const originalText = element.getAttribute('data-original-text');
+          
+          if (elementId && originalText && originalText.length > 0) {
+            try {
+              const translatedText = await translateText(originalText, langCode);
+              newTranslatedElements[elementId] = translatedText;
+              
+              // Update the element text
+              element.textContent = translatedText;
+            } catch (error) {
+              console.error(`Error translating element ${elementId}:`, error);
+            }
+          }
+        }));
+      }
+      
+      setTranslatedElements(newTranslatedElements);
+      setTranslationStatus('success');
+      setSelectedLanguage(langCode);
+      localStorage.setItem('selectedLanguage', langCode);
+      
+    } catch (error) {
+      console.error('Page translation error:', error);
+      setErrorMessage('Failed to translate page. Please try again later.');
+      setTranslationStatus('error');
+    }
+  };
+
+  // Function to change the language
+  const changeLanguage = (langCode: string) => {
+    setShowDropdown(false);
+    
+    if (langCode === selectedLanguage) return;
+    
+    translatePage(langCode);
+  };
 
   const getSelectedLanguageName = () => {
     const lang = languages.find(lang => lang.code === selectedLanguage);
@@ -254,10 +165,12 @@ const MultiLingual = () => {
               Choose from a variety of Indian languages to view the website in your preferred language.
             </p>
             
-            {/* Add error message display */}
-            <div id="google_translate_error" style={{display: 'none'}} className="mb-4 p-3 bg-red-100 text-red-700 rounded">
-              Unable to load translation service. Please try refreshing the page or check your internet connection.
-            </div>
+            {/* Error message display */}
+            {errorMessage && (
+              <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
+                {errorMessage}
+              </div>
+            )}
             
             {/* Custom language selector dropdown */}
             <div className="relative mb-4" ref={dropdownRef}>
@@ -304,26 +217,34 @@ const MultiLingual = () => {
               )}
             </div>
             
-            {/* Hidden Google Translate element */}
-            <div className="google-translate-container" style={{ marginBottom: '20px' }}>
-              <div 
-                id="google_translate_element" 
-                style={{ 
-                  minHeight: '20px',
-                  marginBottom: '10px',
-                  position: 'relative'
-                }}
-              ></div>
-              {/* Translation service status */}
-              <div id="google_translate_status" className="text-sm text-gray-500">
-                {googleElementLoaded.current ? 
-                  "Translation service ready." : 
-                  "Loading translation service..."}
+            {/* Translation status */}
+            <div className="mb-4">
+              <div className="flex items-center">
+                {translationStatus === 'loading' ? (
+                  <div className="flex items-center text-blue-500">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Translating page...</span>
+                  </div>
+                ) : translationStatus === 'success' && selectedLanguage !== 'en' ? (
+                  <div className="text-green-500 flex items-center">
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <span>Page translated to {getSelectedLanguageName()}</span>
+                  </div>
+                ) : translationStatus === 'error' ? (
+                  <div className="text-red-500">
+                    Translation failed. Please try again.
+                  </div>
+                ) : (
+                  <div className="text-gray-500">
+                    {selectedLanguage === 'en' ? 'Currently viewing in English' : 'Select a language to translate the page'}
+                  </div>
+                )}
               </div>
-              {/* Fallback for when Google Translate fails */}
-              <noscript>
-                <p className="mt-2 text-sm text-red-500">JavaScript must be enabled to use translation features.</p>
-              </noscript>
             </div>
           </div>
 
@@ -369,7 +290,7 @@ const MultiLingual = () => {
           <div className={`p-6 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
             <h2 className="text-lg font-semibold mb-4">Language Support Information</h2>
             <ul className={`space-y-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
-              <li>• Translations are provided through Google Translate service</li>
+              <li>• Translations are provided through our backend translation service</li>
               <li>• Some technical terms may remain in English</li>
               <li>• Your language preference will be saved for future visits</li>
               <li>• For best results, ensure your browser is up to date</li>

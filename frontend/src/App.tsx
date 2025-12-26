@@ -6,25 +6,38 @@ import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import AdminHome from './pages/AdminHome';
 import Login from './pages/Login'; 
+import AdminLogin from './pages/AdminLogin';
+import StaffLogin from './pages/StaffLogin';
+import PassengerLogin from './pages/PassengerLogin';
+import LoginPortal from './pages/LoginPortal';
 import LandingPage from './pages/LandingPage';
 import SmartClassification from './pages/SmartClassification';
 import QuickResolution from './pages/QuickResolution';
 import Staff from './pages/Staff';
+import StaffDashboard from './pages/StaffDashboard';
 import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import AdminCreator from './pages/AdminCreator';
 import ResetPassword from './pages/ResetPassword';
+import RailMadadAnimation from './pages/RailMadadAnimation';
+import SimpleRailAnimation from './pages/SimpleRailAnimation';
+import CustomRailAnimation from './pages/CustomRailAnimation';
+import RealisticRailAnimation from './pages/RealisticRailAnimation';
+import PureCSSRailAnimation from './pages/PureCSSRailAnimation';
 import SentimentAnalysisPage from './pages/SentimentAnalysisPage';
+import TranslationTest from './pages/TranslationTest';
 
 // User routes components
 import AIAssistance from './pages/AIAssistance';
-import FileComplaint from './pages/FileComplaint';  
+import FileComplaint from './pages/FileComplaint';
+import FileComplaintWithAI from './pages/FileComplaintWithAI';  
 import MultiLingual from './pages/MultiLingual';
 import TrackStatus from './pages/TrackStatus';
 import Help from './pages/Help';
 import FeedbackForm from './pages/FeedbackForm';
 import ContactStaff from './pages/ContactStaff';
 import RealTimeSupport from './pages/RealTimeSupport';
+import { initializeErrorHandling } from './utils/errorHandling';
 
 import './styles/translate.css';
 import './index.css';
@@ -111,6 +124,9 @@ const App = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Initialize error handling for browser extensions
+    initializeErrorHandling();
+    
     // Check user type on app initialization
     const checkUserType = () => {
       const type = getUserType();
@@ -156,25 +172,30 @@ const App = () => {
           <Routes>
             {/* Public Routes */}
             <Route path="/landing" element={<LandingPage />} />
+            <Route path="/login-portal" element={<LoginPortal />} />
+            <Route path="/animation" element={<RailMadadAnimation />} />
+            <Route path="/simple-animation" element={<SimpleRailAnimation />} />
+            <Route path="/custom-animation" element={<CustomRailAnimation />} />
+            <Route path="/realistic-animation" element={<RealisticRailAnimation />} />
+            <Route path="/pure-css-animation" element={<PureCSSRailAnimation />} />
             <Route path="/track-status" element={<TrackStatus />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Login />} />
+            <Route path="/admin-login" element={<AdminLogin />} />
+            <Route path="/staff-login" element={<StaffLogin />} />
+            <Route path="/passenger-login" element={<PassengerLogin />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/translation-test" element={<TranslationTest />} />
             
             {/* Admin creator route - only available in development */}
             {import.meta.env.DEV && (
               <Route path="/admin-creator" element={<AdminCreator />} />
             )}
 
-            {/* Root route - show landing page for non-authenticated, redirect based on user type if authenticated */}
+            {/* Root route - show landing page for everyone */}
             <Route 
               path="/" 
-              element={
-                userType ? (
-                  userType === 'admin' ? <Navigate to="/admin-dashboard" /> : <Navigate to="/user-dashboard" />
-                ) : (
-                  <LandingPage />
-                )
-              } 
+              element={<LandingPage />} 
             />
 
             {/* Admin Routes */}
@@ -192,6 +213,7 @@ const App = () => {
               <Route path="quick-resolution" element={<QuickResolution />} />
               <Route path="multi-lingual" element={<MultiLingual />} />
               <Route path="staff" element={<Staff />} />
+              <Route path="staff-dashboard" element={<StaffDashboard />} />
               <Route path="settings" element={<Settings />} />
               <Route path="profile" element={<Profile />} />
               <Route path="sentiment-analysis" element={<SentimentAnalysisPage />} />
@@ -207,7 +229,8 @@ const App = () => {
               }
             >
               <Route index element={<Home />} />
-              <Route path="file-complaint" element={<FileComplaint />} />
+              <Route path="file-complaint" element={<FileComplaintWithAI />} />
+              <Route path="file-complaint-basic" element={<FileComplaint />} />
               <Route path="track-status" element={<TrackStatus />} />
               <Route path="ai-assistance" element={<AIAssistance />} />
               <Route path="real-time-support" element={<RealTimeSupport />} />

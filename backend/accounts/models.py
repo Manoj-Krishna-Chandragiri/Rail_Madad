@@ -23,12 +23,6 @@ class FirebaseUserManager(BaseUserManager):
         return self.create_user(email, firebase_uid, password, **extra_fields)
 
 class FirebaseUser(AbstractBaseUser, PermissionsMixin):
-    USER_TYPES = (
-        ('passenger', 'Passenger'),
-        ('admin', 'Admin'),
-        ('staff', 'Staff'),
-    )
-    
     email = models.EmailField(unique=True)
     firebase_uid = models.CharField(max_length=128, unique=True)
     full_name = models.CharField(max_length=255, blank=True, null=True)
@@ -36,14 +30,13 @@ class FirebaseUser(AbstractBaseUser, PermissionsMixin):
     gender = models.CharField(max_length=10, blank=True, null=True)
     address = models.CharField(max_length=255, blank=True, null=True)
     
-    user_type = models.CharField(max_length=10, choices=USER_TYPES, default='passenger')
-    
-    # Django specific fields
+    # User role fields (boolean flags for flexible role assignment)
     date_joined = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     is_admin = models.BooleanField(default=False)
     is_super_admin = models.BooleanField(default=False)
+    is_passenger = models.BooleanField(default=True)  # Default to passenger
 
     objects = FirebaseUserManager()
 
@@ -54,9 +47,28 @@ class FirebaseUser(AbstractBaseUser, PermissionsMixin):
         return self.email
     
     @property
+    def user_type(self):
+        """
+        Dynamic user_type property based on boolean flags for backward compatibility
+        Priority: super_admin > admin > staff > passenger
+        """
+        if self.is_super_admin:
+            return 'super_admin'
+        elif self.is_admin:
+            return 'admin'
+        elif self.is_staff:
+            return 'staff'
+        else:
+            return 'passenger'
+    
+    @property
     def is_user_admin(self):
-        return self.user_type == 'admin' or self.is_admin
+        return self.is_admin or self.is_super_admin
     
     @property
     def is_user_staff(self):
-        return self.user_type == 'staff' or self.is_staff
+        return self.is_staff or self.is_admin or self.is_super_admin
+    
+    @property
+    def is_user_passenger(self):
+        return self.is_passenger

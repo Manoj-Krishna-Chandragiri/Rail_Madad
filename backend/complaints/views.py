@@ -18,27 +18,123 @@ from .models import Feedback
 from .serializers import FeedbackSerializer
 from django.db.models import Count, Q, Avg
 from django.utils import timezone
+# Import AI views
+from .ai_views import *
 from datetime import timedelta
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Global classifier instance (singleton pattern)
+_classifier_instance = None
+
+def get_ai_classifier():
+    """
+    Get or create the Enhanced AI Classifier singleton instance
+    Uses hybrid intelligence for 95%+ accuracy
+    """
+    global _classifier_instance
+    if _classifier_instance is None:
+        try:
+            from ai_models.enhanced_classification_service import EnhancedClassificationService
+            _classifier_instance = EnhancedClassificationService(
+                model_dir='ai_models/models/enhanced',
+                use_hybrid=True  # Enable hybrid classifier for 95%+ accuracy
+            )
+            logger.info("✅ Enhanced AI Classifier initialized with hybrid intelligence")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize AI classifier: {e}")
+            _classifier_instance = None
+    return _classifier_instance
+
+def send_urgent_notification(complaint):
+    """
+    Send urgent notifications for critical complaints (99% confidence detection)
+    Includes email alerts and logging for immediate action
+    """
+    try:
+        from django.core.mail import send_mail
+        from django.conf import settings
+        
+        # Prepare notification
+        subject = f"🚨 URGENT: {complaint.type} - Severity: {complaint.severity}"
+        message = f"""
+URGENT COMPLAINT DETECTED
+
+Complaint ID: {complaint.id}
+Category: {complaint.type}
+Priority: {complaint.priority}
+Severity: {complaint.severity}
+
+Description:
+{complaint.description[:500]}...
+
+Train: {complaint.train_number}
+PNR: {complaint.pnr_number}
+Location: {complaint.location}
+Date: {complaint.date_of_incident}
+
+AI Confidence: {getattr(complaint, 'ai_confidence', {})}
+
+Action Required: IMMEDIATE ATTENTION NEEDED
+Login to system: {settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else 'http://localhost:5173'}
+        """
+        
+        # Get recipient emails (admin users)
+        admin_emails = list(User.objects.filter(is_staff=True, is_active=True).values_list('email', flat=True))
+        admin_emails = [email for email in admin_emails if email]  # Filter out empty emails
+        
+        if admin_emails:
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL if hasattr(settings, 'DEFAULT_FROM_EMAIL') else 'noreply@railmadad.in',
+                admin_emails,
+                fail_silently=True,  # Don't break complaint submission if email fails
+            )
+            logger.info(f"✅ Urgent notification sent for complaint #{complaint.id} to {len(admin_emails)} admins")
+        else:
+            logger.warning(f"⚠️ No admin emails found for urgent notification (complaint #{complaint.id})")
+            
+    except Exception as e:
+        logger.error(f"❌ Failed to send urgent notification: {e}")
+        # Don't raise exception - notification failure shouldn't block complaint submission
+
  
 @api_view(["POST"])
 def file_complaint(request):
     try:
+        # Create data dict manually to avoid copying file objects
+        data = {}
+        
+        # Copy non-file data only
+        for key, value in request.data.items():
+            if key != 'photos':  # Skip file fields
+                data[key] = value
+        
         photo = request.FILES.get('photos')
-        data = request.data.copy()
  
-        # Handle photo upload
+        # Handle photo upload first, before any other processing
         if photo:
-            filename = os.path.basename(photo.name)
-            save_path = os.path.join('backend', 'media', 'complaints', filename)
-            full_path = os.path.join(settings.BASE_DIR, 'media', 'complaints', filename)
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            with open(full_path, 'wb+') as destination:
-                for chunk in photo.chunks():
-                    destination.write(chunk)
-            data['photos'] = save_path.replace('\\', '/')
+            try:
+                filename = os.path.basename(photo.name)
+                save_path = os.path.join('backend', 'media', 'complaints', filename)
+                full_path = os.path.join(settings.BASE_DIR, 'media', 'complaints', filename)
+                os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                
+                # Write file content immediately and close the file
+                with open(full_path, 'wb+') as destination:
+                    for chunk in photo.chunks():
+                        destination.write(chunk)
+                
+                # Store only the path string, not the file object
+                data['photos'] = save_path.replace('\\', '/')
+                    
+            except Exception as e:
+                print(f"File upload error: {str(e)}")
+                return JsonResponse({
+                    "error": f"File upload failed: {str(e)}"
+                }, status=400)
 
         # Set default priority if not provided
         if 'priority' not in data or not data['priority']:
@@ -61,9 +157,102 @@ def file_complaint(request):
         if user_id:
             data['user'] = user_id
         
-        # Validate required fields
-        required_fields = ['type', 'description', 'train_number', 'pnr_number', 'location', 'date_of_incident']
+        # Use Enhanced AI Classifier (Hybrid Intelligence) for all complaints
+        if data.get('description'):
+            try:
+                # Get the enhanced classifier
+                classifier = get_ai_classifier()
+                
+                if classifier:
+                    # Get AI classification with hybrid intelligence
+                    ai_result = classifier.classify_complaint(
+                        data['description'], 
+                        return_details=True
+                    )
+                    
+                    # Map AI category to form category
+                    category_mapping = {
+                        'Cleanliness': 'coach-cleanliness',
+                        'Catering': 'catering',
+                        'Food Quality': 'catering',
+                        'Staff Behavior': 'staff-behaviour',
+                        'Ticketing': 'ticketing',
+                        'Electrical Issues': 'electrical',
+                        'Coach Maintenance': 'coach-maintenance',
+                        'Coach Issues': 'coach-maintenance',
+                        'Security': 'security',
+                        'Medical Emergency': 'medical',
+                        'Punctuality': 'punctuality',
+                        'Delay': 'punctuality',
+                        'Water Supply': 'amenities',
+                        'Theft': 'security',
+                        'Corruption': 'staff-behaviour',
+                        'Harassment': 'security',
+                        'Accessibility': 'amenities',
+                        'Infrastructure': 'infrastructure'
+                    }
+                    
+                    ai_category = ai_result.get('category', 'Miscellaneous')
+                    mapped_category = category_mapping.get(ai_category, 'miscellaneous')
+                    
+                    # Only override if user didn't provide a category
+                    if not data.get('type'):
+                        data['type'] = mapped_category
+                    
+                    # Set priority and severity from AI (hybrid classifier)
+                    data['priority'] = ai_result.get('priority', 'Medium')
+                    data['severity'] = ai_result.get('severity', 'Medium')
+                    
+                    # Get staff assignment from AI
+                    staff_dept = ai_result.get('staff', 'Customer Service')
+                    if not data.get('staff'):
+                        data['staff'] = staff_dept
+                    
+                    # Store AI metadata for tracking and transparency
+                    data['ai_categorized'] = True
+                    data['ai_confidence'] = ai_result.get('confidences', {})
+                    data['ai_category'] = ai_category
+                    data['ai_staff'] = staff_dept
+                    
+                    # Check if this is a CRITICAL emergency (99% confidence detection)
+                    is_critical = (
+                        ai_result.get('priority') == 'High' and 
+                        ai_result.get('severity') in ['Critical', 'High'] and
+                        (ai_result.get('confidences', {}).get('priority', 0) > 0.95 or
+                         ai_result.get('confidences', {}).get('severity', 0) > 0.95)
+                    )
+                    
+                    if is_critical:
+                        data['is_urgent'] = True
+                        logger.warning(f"🚨 CRITICAL COMPLAINT DETECTED: {ai_category} - Priority: {ai_result.get('priority')}, Severity: {ai_result.get('severity')}")
+                    
+                    logger.info(
+                        f"✅ AI Classification: '{data['description'][:50]}...' -> "
+                        f"Category: {ai_category} ({ai_result.get('confidences', {}).get('category', 0):.1%}), "
+                        f"Priority: {ai_result.get('priority')} ({ai_result.get('confidences', {}).get('priority', 0):.1%}), "
+                        f"Severity: {ai_result.get('severity')} ({ai_result.get('confidences', {}).get('severity', 0):.1%}), "
+                        f"Staff: {staff_dept}, "
+                        f"Source: {ai_result.get('decision_details', {}).get('priority_source', 'ml')}"
+                    )
+                else:
+                    logger.warning("AI classifier not available, using fallback")
+                    if not data.get('type'):
+                        data['type'] = 'miscellaneous'
+                    
+            except Exception as ai_error:
+                logger.error(f"❌ AI classification failed: {str(ai_error)}. Using fallback.")
+                if not data.get('type'):
+                    data['type'] = 'miscellaneous'
+                if not data.get('priority'):
+                    data['priority'] = 'Medium'
+        
+        # Validate required fields (type is now optional since AI can provide it)
+        required_fields = ['description', 'train_number', 'pnr_number', 'location', 'date_of_incident']
         missing_fields = [field for field in required_fields if not data.get(field)]
+        
+        # Ensure type is set (either provided by user or by AI)
+        if not data.get('type'):
+            data['type'] = 'miscellaneous'  # Final fallback
         
         if missing_fields:
             return JsonResponse({
@@ -73,10 +262,29 @@ def file_complaint(request):
         serializer = ComplaintSerializer(data=data)
         if serializer.is_valid():
             complaint = serializer.save()
-            return JsonResponse({
+            
+            # 🚨 Send urgent notification if critical case detected
+            if data.get('is_urgent'):
+                try:
+                    send_urgent_notification(complaint)
+                except Exception as notif_error:
+                    logger.error(f"Failed to send urgent notification: {notif_error}")
+            
+            # Prepare response with AI insights
+            response_data = {
                 "message": "Complaint filed successfully", 
-                "complaint_id": complaint.id
-            }, status=201)
+                "complaint_id": complaint.id,
+                "ai_classification": {
+                    "category": data.get('ai_category'),
+                    "priority": data.get('priority'),
+                    "severity": data.get('severity'),
+                    "staff_assigned": data.get('staff'),
+                    "confidence": data.get('ai_confidence'),
+                    "is_urgent": data.get('is_urgent', False)
+                }
+            }
+            
+            return JsonResponse(response_data, status=201)
         
         return JsonResponse({
             "error": "Validation failed",
@@ -1636,6 +1844,218 @@ def feedback_view(request):
             feedbacks = Feedback.objects.filter(complaint_id=complaint_id).order_by('-submitted_at')
             serializer = FeedbackSerializer(feedbacks, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
+    
     except Exception as e:
         logger.error(f"Error in feedback_view: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+def translate_text(request):
+    """
+    Translate text using GoogleTrans service
+    """
+    try:
+        from .translation_service import translation_service
+        
+        text = request.data.get('text', '')
+        target_language = request.data.get('target_language', 'en')
+        source_language = request.data.get('source_language', 'auto')
+        
+        if not text:
+            return Response({'error': 'Text is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate target language
+        supported_languages = translation_service.get_supported_languages()
+        if target_language not in supported_languages and target_language != 'auto':
+            return Response({
+                'error': f'Unsupported language: {target_language}',
+                'supported_languages': list(supported_languages.keys())
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Perform translation
+        result = translation_service.translate_text(
+            text=text,
+            target_language=target_language,
+            source_language=source_language
+        )
+        
+        return Response(result, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error in translate_text: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])  
+def detect_language(request):
+    """
+    Detect language of given text
+    """
+    try:
+        from .translation_service import translation_service
+        
+        text = request.data.get('text', '')
+        
+        if not text:
+            return Response({'error': 'Text is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Perform language detection
+        result = translation_service.detect_language(text)
+        
+        return Response(result, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error in detect_language: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+def supported_languages(request):
+    """
+    Get list of supported languages for translation
+    """
+    try:
+        from .translation_service import translation_service
+        
+        languages = translation_service.get_supported_languages()
+        
+        return Response({
+            'supported_languages': languages,
+            'total_count': len(languages)
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error in supported_languages: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        logger.error(f"Error in feedback_view: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# Staff Dashboard Views
+@api_view(['GET'])
+def staff_dashboard(request):
+    """
+    Staff dashboard to view assigned complaints
+    """
+    try:
+        # Check authentication using custom middleware attributes
+        if not hasattr(request, 'is_authenticated') or not request.is_authenticated:
+            return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Check if user is staff or admin
+        if not (getattr(request, 'is_staff', False) or getattr(request, 'is_admin', False)):
+            return Response({'error': 'Staff access required'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # For development mode, we'll show all complaints for now
+        # In production, you would filter by the specific staff member
+        staff_email = getattr(request, 'firebase_email', 'unknown')
+        
+        # Try to find staff member by email or show all if admin
+        try:
+            staff_member = Staff.objects.filter(email=staff_email).first()
+            if staff_member:
+                # Filter complaints assigned to this specific staff member
+                assigned_complaints = Complaint.objects.filter(
+                    staff=staff_member.name
+                ).order_by('-created_at')
+            else:
+                # If no specific staff found (e.g., admin), show all complaints
+                assigned_complaints = Complaint.objects.all().order_by('-created_at')
+        except:
+            # Fallback to showing all complaints
+            assigned_complaints = Complaint.objects.all().order_by('-created_at')
+        
+        # Get statistics for the staff dashboard
+        total_assigned = assigned_complaints.count()
+        open_complaints = assigned_complaints.filter(status='Open').count()
+        in_progress_complaints = assigned_complaints.filter(status='In Progress').count()
+        closed_complaints = assigned_complaints.filter(status='Closed').count()
+        
+        # Today's statistics
+        today = timezone.now().date()
+        today_assigned = assigned_complaints.filter(created_at__date=today).count()
+        today_resolved = assigned_complaints.filter(
+            status='Closed',
+            resolved_at__date=today
+        ).count()
+        
+        # Serialize complaint data
+        serializer = ComplaintSerializer(assigned_complaints, many=True)
+        
+        response_data = {
+            'complaints': serializer.data,
+            'statistics': {
+                'total_assigned': total_assigned,
+                'open_complaints': open_complaints,
+                'in_progress_complaints': in_progress_complaints,
+                'closed_complaints': closed_complaints,
+                'today_assigned': today_assigned,
+                'today_resolved': today_resolved,
+                'staff_email': staff_email,
+                'staff_name': staff_member.name if staff_member else 'Admin User'
+            }
+        }
+        
+        return Response(response_data)
+        
+    except Exception as e:
+        logger.error(f"Error in staff_dashboard: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['PUT'])
+def resolve_complaint(request, complaint_id):
+    """
+    Staff endpoint to resolve/update a complaint
+    """
+    try:
+        # Check authentication using custom middleware attributes
+        if not hasattr(request, 'is_authenticated') or not request.is_authenticated:
+            return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Check if user is staff or admin
+        if not (getattr(request, 'is_staff', False) or getattr(request, 'is_admin', False)):
+            return Response({'error': 'Staff access required'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Get the complaint
+        try:
+            complaint = Complaint.objects.get(id=complaint_id)
+        except Complaint.DoesNotExist:
+            return Response({'error': 'Complaint not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get the new status and resolution details from request
+        new_status = request.data.get('status')
+        resolution_notes = request.data.get('resolution_notes', '')
+        
+        if not new_status:
+            return Response({'error': 'Status is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update complaint status
+        complaint.status = new_status
+        
+        # If status is closed, add resolution details
+        if new_status == 'Closed':
+            complaint.resolved_at = timezone.now()
+            if hasattr(request, 'firebase_email'):
+                complaint.resolved_by = request.firebase_email
+            if resolution_notes:
+                # Add resolution notes to description or create a separate field
+                if complaint.resolution_notes:
+                    complaint.resolution_notes += f"\n\n[{timezone.now().strftime('%Y-%m-%d %H:%M')}] {resolution_notes}"
+                else:
+                    complaint.resolution_notes = f"[{timezone.now().strftime('%Y-%m-%d %H:%M')}] {resolution_notes}"
+        
+        complaint.save()
+        
+        # Return updated complaint data
+        serializer = ComplaintSerializer(complaint)
+        return Response({
+            'message': f'Complaint {complaint_id} status updated to {new_status}',
+            'complaint': serializer.data
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in resolve_complaint: {str(e)}")
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -1,13 +1,16 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
-import { 
-  Train, 
-  MessageSquare, 
-  BarChart2, 
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, useGLTF, useAnimations } from '@react-three/drei';
+import {
+  Train,
+  MessageSquare,
+  BarChart2,
   Star,
   CheckCircle,
   ArrowRight,
+  ArrowDown,
   Phone,
   Mail,
   MapPin,
@@ -29,6 +32,64 @@ import {
   Globe
 } from 'lucide-react';
 
+// 3D Railway Station Model Component
+const RailwayStationModel = () => {
+  const { scene, animations } = useGLTF('/indian_railway_station_game-ready.glb');
+  const { actions } = useAnimations(animations, scene);
+
+  useEffect(() => {
+    console.log('Available animations:', animations);
+    console.log('Animation actions:', actions);
+
+    // Ensure materials are properly set up for visibility
+    scene.traverse((child: any) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (child.material) {
+          // Ensure materials are visible
+          child.material.needsUpdate = true;
+          if (child.material.map) {
+            child.material.map.needsUpdate = true;
+          }
+        }
+      }
+    });
+
+    // Play all available animations
+    if (animations && animations.length > 0 && actions) {
+      animations.forEach((clip) => {
+        const action = actions[clip.name];
+        if (action) {
+          console.log(`Playing animation: ${clip.name}`);
+          action.reset().play();
+          action.setLoop(2201, Infinity); // Loop infinitely
+        }
+      });
+    }
+  }, [actions, animations, scene]);
+
+  return (
+    <primitive
+      object={scene}
+      scale={[1.2, 1.2, 1.2]}
+      position={[0, -3, 0]}
+      rotation={[0, 0, 0]}
+    />
+  );
+};
+
+// Loading fallback component
+const ModelFallback = () => (
+  <div className="flex items-center justify-center h-full">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+      <p className="text-white text-lg font-medium">Loading Indian Railway Station Model...</p>
+      <p className="text-white/70 text-sm mt-2">Please wait while we load your 3D experience</p>
+    </div>
+  </div>
+);
+
 const LandingPage = () => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -41,6 +102,7 @@ const LandingPage = () => {
   const carouselRef = useRef<HTMLDivElement>(null);
   const [isCarouselPaused, setIsCarouselPaused] = useState(false);
   const totalCarouselSlides = 19; // Total number of images in the carousel
+  const canvasRef = useRef<HTMLDivElement>(null);
   
   // Railway image gallery
   const railwayImages = [
@@ -257,6 +319,28 @@ const LandingPage = () => {
       carousel.removeEventListener('mouseleave', handleMouseLeave);
     };
   }, [carouselRef.current]); // Only re-run if the carousel ref changes
+
+  // Handle 3D canvas scroll interference
+  useEffect(() => {
+    const handleScroll = (e: WheelEvent) => {
+      const canvas3D = canvasRef.current;
+      if (canvas3D && canvas3D.contains(e.target as Node)) {
+        // Check if we're scrolling over text overlay
+        const target = e.target as HTMLElement;
+        if (target.closest('.select-none')) {
+          // Allow normal page scroll when over text
+          return;
+        }
+        // Prevent page scroll when interacting with 3D model
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('wheel', handleScroll, { passive: false });
+    return () => {
+      window.removeEventListener('wheel', handleScroll);
+    };
+  }, []);
 
   // Smooth scroll function
   const scrollToSection = (sectionId: string) => {
@@ -531,13 +615,13 @@ const LandingPage = () => {
             {/* Desktop Auth Buttons */}
             <div className="hidden md:flex space-x-4">
               <Link 
-                to="/login" 
+                to="/login-portal" 
                 className={`px-4 py-2 rounded-lg transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 ${isDark ? 'text-gray-300 hover:text-white hover:bg-gray-800' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`}
               >
                 Login
               </Link>
               <Link 
-                to="/login" 
+                to="/login-portal" 
                 className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"
               >
                 Get Started
@@ -573,14 +657,14 @@ const LandingPage = () => {
                 ))}
                 <div className="flex flex-col space-y-2 px-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                   <Link 
-                    to="/login" 
+                    to="/login-portal" 
                     className={`text-center py-2 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 ${isDark ? 'text-gray-300 hover:text-white hover:bg-gray-800' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`}
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Login
                   </Link>
                   <Link 
-                    to="/login" 
+                    to="/login-portal" 
                     className="text-center py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
@@ -593,8 +677,115 @@ const LandingPage = () => {
         </div>
       </header>
 
-      {/* Enhanced Hero Section */}
-      <section className={`pt-16 pb-16 relative ${isDark ? 'bg-gradient-to-br from-gray-900/50 via-indigo-900/30 to-gray-900/50' : 'bg-gradient-to-br from-indigo-100/60 via-white/50 to-purple-100/60'}`} style={{ marginTop: '64px' }}>
+      {/* 3D Railway Station Model Section */}
+      <section className="relative w-full h-screen pt-16 bg-gradient-to-b from-blue-900 to-indigo-900">
+        <div
+          ref={canvasRef}
+          className="w-full h-full"
+          onWheel={(e) => {
+            // Only allow 3D controls when mouse is over the canvas area
+            // and not over the overlay text
+            const target = e.target as HTMLElement;
+            if (!target.closest('.select-none')) {
+              e.stopPropagation();
+            }
+          }}
+        >
+          <Canvas
+            camera={{ position: [8, 6, 8], fov: 60 }}
+            className="w-full h-full"
+            onError={(error) => console.error('Canvas error:', error)}
+          >
+            {/* Enhanced Lighting Setup for Better Color Visibility */}
+            <ambientLight intensity={0.6} />
+            <directionalLight
+              position={[10, 10, 5]}
+              intensity={1.2}
+              castShadow
+              shadow-mapSize-width={2048}
+              shadow-mapSize-height={2048}
+              shadow-camera-far={50}
+              shadow-camera-left={-10}
+              shadow-camera-right={10}
+              shadow-camera-top={10}
+              shadow-camera-bottom={-10}
+            />
+            <directionalLight
+              position={[-10, 10, -5]}
+              intensity={0.5}
+              color="#ffffff"
+            />
+            <pointLight position={[-10, 5, -10]} intensity={0.4} color="#ffffff" />
+            <pointLight position={[10, 5, 10]} intensity={0.3} color="#ffffff" />
+            <hemisphereLight
+              args={["#ffffff", "#444444", 0.3]}
+            />
+
+            {/* 3D Model with Suspense */}
+            <Suspense fallback={null}>
+              <RailwayStationModel />
+            </Suspense>
+
+            {/* Camera Controls - Smooth and Responsive */}
+            <OrbitControls
+              enablePan={true}
+              enableZoom={true}
+              enableRotate={true}
+              autoRotate={true}
+              autoRotateSpeed={0.8}
+              maxPolarAngle={Math.PI / 1.8}
+              minDistance={3}
+              maxDistance={100}
+              target={[0, 0, 0]}
+              enableDamping={false}
+              screenSpacePanning={false}
+              zoomToCursor={true}
+              rotateSpeed={1.2}
+              zoomSpeed={1.5}
+              panSpeed={1.0}
+            />
+          </Canvas>
+        </div>
+
+        {/* Overlay Content - Non-selectable */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+          <div className="text-center max-w-4xl mx-auto px-4 select-none">
+            <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 text-white drop-shadow-2xl select-none user-select-none">
+              <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent select-none">
+                Experience Rail Madad
+              </span>
+            </h1>
+            <p className="text-xl md:text-2xl text-white/90 mb-8 drop-shadow-lg select-none user-select-none">
+              Interactive 3D Railway Station Experience
+            </p>
+            <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-6 pointer-events-auto">
+              <Link
+                to="/login-portal"
+                className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-xl hover:shadow-2xl select-none"
+              >
+                Explore Platform
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Scroll Down Button */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10">
+          <button
+            onClick={() => scrollToSection('hero-section')}
+            className="group bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 rounded-full p-4 transition-all duration-300 hover:scale-110 animate-bounce"
+            aria-label="Scroll to content"
+          >
+            <ArrowDown className="h-6 w-6 text-white group-hover:text-indigo-200 transition-colors" />
+          </button>
+          <p className="text-white/80 text-sm mt-2 text-center font-medium">
+            Explore More
+          </p>
+        </div>
+      </section>
+
+      {/* Smart Railway Content Section */}
+      <section className={`pt-8 pb-16 relative ${isDark ? 'bg-gradient-to-br from-gray-900/50 via-indigo-900/30 to-gray-900/50' : 'bg-gradient-to-br from-indigo-100/60 via-white/50 to-purple-100/60'}`}>
         {/* Animated Background */}
         <div className="absolute inset-0 opacity-5">
           <div className="absolute top-20 left-4 md:left-10 w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
@@ -605,91 +796,6 @@ const LandingPage = () => {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="text-center">
-            <div className="mb-6 md:mb-8">
-              {/* Image Carousel */}
-              <div 
-                className="relative mx-auto w-full max-w-4xl h-64 md:h-96 lg:h-[500px] overflow-hidden rounded-xl shadow-xl carousel-container"
-                ref={carouselRef}
-                onMouseEnter={() => {
-                  console.log("Mouse enter carousel");
-                  setIsCarouselPaused(true);
-                }}
-                onMouseOver={() => {
-                  console.log("Mouse over carousel");
-                  setIsCarouselPaused(true);
-                }}
-                onMouseLeave={() => {
-                  console.log("Mouse leave carousel");
-                  setIsCarouselPaused(false);
-                }}
-                onMouseOut={() => {
-                  console.log("Mouse out of carousel");
-                  setIsCarouselPaused(false);
-                }}
-              >
-                {/* Carousel Container */}
-                <div className="absolute inset-0 bg-gray-900/10"></div>
-                
-                {/* Carousel Images */}
-                <div 
-                  className="flex w-full h-full transition-transform duration-500 ease-out"
-                  style={{ transform: `translateX(-${currentCarouselSlide * 100}%)` }}
-                >
-                  {/* Real railway system images */}
-                  {railwayImages.map((imageUrl, index) => (
-                    <div key={index} className="w-full h-full flex-shrink-0 relative">
-                      <div className="absolute inset-0">
-                        <img 
-                          src={imageUrl} 
-                          alt={`Rail Madad ${index + 1}`}
-                          className="w-full h-full object-fill"
-                          loading="lazy"
-                        />
-                      </div>
-                      <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-sm text-white px-3 py-1 rounded-lg">
-                        <p className="font-bold text-sm md:text-base">{index + 1}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Navigation Arrows */}
-                <button 
-                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 dark:bg-gray-800/80 p-2 rounded-full shadow-lg hover:bg-indigo-500 hover:text-white dark:hover:bg-indigo-600 backdrop-blur-sm z-10 transition-colors duration-300"
-                  onClick={() => setCurrentCarouselSlide(prev => (prev === 0 ? totalCarouselSlides - 1 : prev - 1))}
-                  aria-label="Previous slide"
-                >
-                  <ArrowRight className="h-6 w-6 transform rotate-180" />
-                </button>
-                <button 
-                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 dark:bg-gray-800/80 p-2 rounded-full shadow-lg hover:bg-indigo-500 hover:text-white dark:hover:bg-indigo-600 backdrop-blur-sm z-10 transition-colors duration-300"
-                  onClick={() => setCurrentCarouselSlide(prev => (prev === totalCarouselSlides - 1 ? 0 : prev + 1))}
-                  aria-label="Next slide"
-                >
-                  <ArrowRight className="h-6 w-6" />
-                </button>
-
-                {/* Indicators */}
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex space-x-2 z-10">
-                  {Array.from({ length: Math.min(10, totalCarouselSlides) }).map((_, index) => (
-                    <button
-                      key={index}
-                      className={`h-2 rounded-full transition-all ${
-                        currentCarouselSlide === index 
-                          ? 'w-6 bg-indigo-500' 
-                          : 'w-2 bg-white/50 hover:bg-white/80'
-                      }`}
-                      onClick={() => setCurrentCarouselSlide(index)}
-                      aria-label={`Go to slide ${index + 1}`}
-                    />
-                  ))}
-                  {totalCarouselSlides > 10 && (
-                    <span className="text-white text-xs bg-black/30 px-2 rounded-full">+{totalCarouselSlides - 10}</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
             <h1 className={`text-3xl md:text-4xl lg:text-5xl font-bold mb-4 md:mb-6 ${isVisible ? 'animate-fade-in' : 'opacity-0'}`}>
               <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent px-2 py-1" style={{
                 backgroundColor: isDark ? 'rgba(17, 24, 39, 0.75)' : 'rgba(255, 255, 255, 0.85)',
@@ -729,14 +835,14 @@ const LandingPage = () => {
 
             <div className={`flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-6 mb-8 md:mb-12 px-4 ${isVisible ? 'animate-fade-in-delay-2' : 'opacity-0'}`}>
               <Link 
-                to="/login" 
+                to="/login-portal" 
                 className="px-6 md:px-8 py-3 md:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2 shadow-xl hover:shadow-2xl group focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"
               >
                 <span>File a Complaint</span>
                 <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link 
-                to="/login" 
+                to="/login-portal" 
                 className={`px-6 md:px-8 py-3 md:py-4 border-2 border-indigo-600 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2 group focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50`}
               >
                 <span>Track Your Complaint</span>
@@ -755,6 +861,108 @@ const LandingPage = () => {
                   <span className="text-sm md:text-base">{item.text}</span>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Platform Preview Header with Image Carousel */}
+      <section className={`py-8 pb-16 ${isDark ? 'bg-gray-800/50' : 'bg-white/50'} backdrop-blur-sm`}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className={`text-3xl md:text-4xl font-bold mb-8 ${isDark ? 'text-white' : 'text-gray-900'}`} style={{
+            textShadow: isDark ? '0 2px 4px rgba(0,0,0,0.7)' : '0 2px 4px rgba(0,0,0,0.3)',
+            backgroundColor: isDark ? 'rgba(31, 41, 55, 0.7)' : 'rgba(255, 255, 255, 0.8)',
+            padding: '0.5rem 1.5rem',
+            borderRadius: '0.75rem',
+            display: 'inline-block',
+            border: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.1)',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+          }}>
+            Platform Preview
+          </h2>
+          
+          {/* Image Carousel */}
+          <div className="mb-6 md:mb-8">
+            <div
+              className="relative mx-auto w-full max-w-6xl h-80 md:h-[500px] lg:h-[600px] overflow-hidden rounded-xl shadow-xl carousel-container"
+              ref={carouselRef}
+              onMouseEnter={() => {
+                console.log("Mouse enter carousel");
+                setIsCarouselPaused(true);
+              }}
+              onMouseOver={() => {
+                console.log("Mouse over carousel");
+                setIsCarouselPaused(true);
+              }}
+              onMouseLeave={() => {
+                console.log("Mouse leave carousel");
+                setIsCarouselPaused(false);
+              }}
+              onMouseOut={() => {
+                console.log("Mouse out of carousel");
+                setIsCarouselPaused(false);
+              }}
+            >
+              {/* Carousel Container */}
+              <div className="absolute inset-0 bg-gray-900/10"></div>
+              
+              {/* Carousel Images */}
+              <div 
+                className="flex w-full h-full transition-transform duration-500 ease-out"
+                style={{ transform: `translateX(-${currentCarouselSlide * 100}%)` }}
+              >
+                {/* Real railway system images */}
+                {railwayImages.map((imageUrl, index) => (
+                  <div key={index} className="w-full h-full flex-shrink-0 relative">
+                    <div className="absolute inset-0">
+                      <img 
+                        src={imageUrl} 
+                        alt={`Rail Madad ${index + 1}`}
+                        className="w-full h-full object-fill"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-sm text-white px-3 py-1 rounded-lg">
+                      <p className="font-bold text-sm md:text-base">{index + 1}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Navigation Arrows */}
+              <button 
+                className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 dark:bg-gray-800/80 p-2 rounded-full shadow-lg hover:bg-indigo-500 hover:text-white dark:hover:bg-indigo-600 backdrop-blur-sm z-10 transition-colors duration-300"
+                onClick={() => setCurrentCarouselSlide(prev => (prev === 0 ? totalCarouselSlides - 1 : prev - 1))}
+                aria-label="Previous slide"
+              >
+                <ArrowRight className="h-6 w-6 transform rotate-180" />
+              </button>
+              <button 
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 dark:bg-gray-800/80 p-2 rounded-full shadow-lg hover:bg-indigo-500 hover:text-white dark:hover:bg-indigo-600 backdrop-blur-sm z-10 transition-colors duration-300"
+                onClick={() => setCurrentCarouselSlide(prev => (prev === totalCarouselSlides - 1 ? 0 : prev + 1))}
+                aria-label="Next slide"
+              >
+                <ArrowRight className="h-6 w-6" />
+              </button>
+
+              {/* Indicators */}
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex space-x-2 z-10">
+                {Array.from({ length: Math.min(10, totalCarouselSlides) }).map((_, index) => (
+                  <button
+                    key={index}
+                    className={`h-2 rounded-full transition-all ${
+                      currentCarouselSlide === index 
+                        ? 'w-6 bg-indigo-500' 
+                        : 'w-2 bg-white/50 hover:bg-white/80'
+                    }`}
+                    onClick={() => setCurrentCarouselSlide(index)}
+                    aria-label={`Go to slide ${index + 1}`}
+                  />
+                ))}
+                {totalCarouselSlides > 10 && (
+                  <span className="text-white text-xs bg-black/30 px-2 rounded-full">+{totalCarouselSlides - 10}</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1043,7 +1251,7 @@ const LandingPage = () => {
           {/* Call-to-Action */}
           <div className="text-center mt-12 md:mt-16">
             <Link
-              to="/login"
+              to="/login-portal"
               className="inline-flex items-center space-x-3 px-8 py-4 bg-white/80 text-indigo-600 rounded-lg font-semibold hover:bg-white/90 transition-all duration-300 transform hover:scale-105 shadow-xl hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 backdrop-blur-sm"
             >
               <span>Join Our Success Story</span>
@@ -1122,8 +1330,8 @@ const LandingPage = () => {
               <h3 className="text-lg font-semibold mb-4 text-indigo-400">Quick Links</h3>
               <ul className="space-y-2">
                 {[
-                  { text: "File Complaint", link: "/login" },
-                  { text: "Track Status", link: "/login" },
+                  { text: "File Complaint", link: "/login-portal" },
+                  { text: "Track Status", link: "/login-portal" },
                   { text: "AI Assistant", link: "/ai-assistance" },
                   { text: "Voice Support", link: "/real-time-support" }
                 ].map((item, index) => (
@@ -1325,7 +1533,6 @@ const LandingPage = () => {
 };
 
 export default LandingPage;
-
 
 
 

@@ -18,6 +18,18 @@ def get_or_create_user(request):
     Handles both email/password and Google auth scenarios with improved logging.
     Returns both the user object and a boolean indicating whether the user was created.
     """
+    from django.conf import settings
+    
+    # In development mode, use the user set by middleware
+    if hasattr(settings, 'DEVELOPMENT_MODE') and settings.DEVELOPMENT_MODE:
+        if hasattr(request, 'user') and request.user is not None and not isinstance(request.user, type(None)):
+            # Check if it's not an AnonymousUser by checking for email attribute
+            if hasattr(request.user, 'email') and request.user.email:
+                logger.info(f"Development mode: Using middleware user {request.user.email}, user_id: {request.user.id}")
+                return request.user, False
+        logger.error("Development mode: No user set by middleware")
+        return None, False
+    
     # Ensure we have the necessary Firebase authentication details
     if not hasattr(request, 'firebase_email') or not request.firebase_email:
         logger.error("No Firebase email found during user creation attempt")
@@ -29,39 +41,156 @@ def get_or_create_user(request):
             try:
                 user = User.objects.get(firebase_uid=request.firebase_uid)
                 logger.info(f"User found by Firebase UID: {user.email}, user_id: {user.id}")
-                
-                # Ensure request has user_id set
-                request.user_id = user.id
-                
-                return user, False  # Existing user
+                return user, False
             except User.DoesNotExist:
                 pass
 
-        # Try to find by email 
+        # Try to find user by email
         try:
             user = User.objects.get(email=request.firebase_email)
+            logger.info(f"User found by email: {user.email}")
             
-            # Update the firebase_uid if it's different
-            if hasattr(request, 'firebase_uid') and request.firebase_uid:
-                if user.firebase_uid != request.firebase_uid:
-                    user.firebase_uid = request.firebase_uid
-                    user.save()
+            # Update Firebase UID if it wasn't set
+            if hasattr(request, 'firebase_uid') and request.firebase_uid and not user.firebase_uid:
+                user.firebase_uid = request.firebase_uid
+                user.save()
+                logger.info(f"Updated Firebase UID for user: {user.email}")
             
-            # Ensure request has user_id set
-            request.user_id = user.id
-            
-            logger.info(f"User found by email: {user.email}, user_id: {user.id}")
             return user, False
         except User.DoesNotExist:
-            # ❌ IMPORTANT: DO NOT CREATE USERS HERE DURING LOGIN
-            # Users should only be created through explicit signup endpoints
-            logger.warning(f"User {request.firebase_email} not found in database - this should not happen during normal login")
-            logger.warning("User should be created through signup/registration flow, not during login")
-            return None, False
+            pass
+
+        # User doesn't exist - this means they haven't registered through our system
+        logger.warning(f"User {request.firebase_email} authenticated with Firebase but not found in database")
+        return None, False
 
     except Exception as e:
-        logger.error(f"Unexpected error in get_or_create_user: {str(e)}")
+        logger.error(f"Error in get_or_create_user: {str(e)}")
         return None, False
+
+# Development-only endpoints for user switching
+@api_view(['POST'])
+def dev_switch_user(request):
+    """Development only: Switch to a different user for testing"""
+    from django.conf import settings
+    
+    # Only allow in development mode
+    if not (hasattr(settings, 'DEVELOPMENT_MODE') and settings.DEVELOPMENT_MODE):
+        return Response({'error': 'Not available in production'}, status=403)
+    
+    try:
+        email = request.data.get('email')
+        if not email:
+            return Response({'error': 'Email is required'}, status=400)
+        
+        # Find the user
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
+        
+        return Response({
+            'message': f'Development mode: Switched to user {user.email}',
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'user_type': user.user_type,
+                'is_admin': user.is_admin,
+                'is_staff': user.is_staff
+            },
+            'instruction': 'Set X-Dev-User-Email header to this email in subsequent requests'
+        })
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+@api_view(['GET'])
+def dev_list_users(request):
+    """Development only: List all users for switching"""
+    from django.conf import settings
+    
+    # Only allow in development mode
+    if not (hasattr(settings, 'DEVELOPMENT_MODE') and settings.DEVELOPMENT_MODE):
+        return Response({'error': 'Not available in production'}, status=403)
+    
+    users = User.objects.all()
+    user_list = []
+    for user in users:
+        user_list.append({
+            'id': user.id,
+            'email': user.email,
+            'user_type': user.user_type,
+            'is_admin': user.is_admin,
+            'is_staff': user.is_staff,
+            'full_name': user.full_name
+        })
+    
+    return Response({
+        'users': user_list,
+        'instruction': 'Use /api/accounts/dev/switch-user/ to switch to any user'
+    })
+
+# Development-only endpoint for switching users
+@api_view(['POST'])
+def dev_switch_user(request):
+    """Development only: Switch to a different user for testing"""
+    from django.conf import settings
+    
+    # Only allow in development mode
+    if not (hasattr(settings, 'DEVELOPMENT_MODE') and settings.DEVELOPMENT_MODE):
+        return Response({'error': 'Not available in production'}, status=403)
+    
+    try:
+        email = request.data.get('email')
+        if not email:
+            return Response({'error': 'Email is required'}, status=400)
+        
+        # Find the user
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
+        
+        return Response({
+            'message': f'Development mode: Switched to user {user.email}',
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'user_type': user.user_type,
+                'is_admin': user.is_admin,
+                'is_staff': user.is_staff
+            },
+            'instruction': 'Set X-Dev-User-Email header to this email in subsequent requests'
+        })
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+@api_view(['GET'])
+def dev_list_users(request):
+    """Development only: List all users for switching"""
+    from django.conf import settings
+    
+    # Only allow in development mode
+    if not (hasattr(settings, 'DEVELOPMENT_MODE') and settings.DEVELOPMENT_MODE):
+        return Response({'error': 'Not available in production'}, status=403)
+    
+    users = User.objects.all()
+    user_list = []
+    for user in users:
+        user_list.append({
+            'id': user.id,
+            'email': user.email,
+            'user_type': user.user_type,
+            'is_admin': user.is_admin,
+            'is_staff': user.is_staff,
+            'full_name': user.full_name
+        })
+    
+    return Response({
+        'users': user_list,
+        'instruction': 'Use /api/accounts/dev/switch-user/ to switch to any user'
+    })
 
 # Decorator to require admin access
 def admin_required(view_func):
@@ -93,7 +222,44 @@ def staff_required(view_func):
 def login_required(view_func):
     @wraps(view_func)
     def _wrapped_view(request, *args, **kwargs):
+        # Check if we're in development mode and bypass authentication
+        from django.conf import settings
+        import firebase_admin
+        
+        # Use same condition as middleware
+        is_development = hasattr(settings, 'DEBUG') and settings.DEBUG and not firebase_admin._apps
+        
+        if is_development:
+            logger.info("Development mode: bypassing authentication requirement")
+            logger.info(f"Development mode active: {is_development}")
+            
+            # Log current attribute values from middleware
+            logger.info(f"Current request attributes - is_admin: {getattr(request, 'is_admin', 'Not set')}, is_staff: {getattr(request, 'is_staff', 'Not set')}")
+            
+            # Set some default attributes for development only if middleware hasn't set them properly
+            if not hasattr(request, 'firebase_email'):
+                request.firebase_email = 'dev@test.com'
+            if not hasattr(request, 'firebase_uid'):
+                request.firebase_uid = 'dev-uid-12345'
+            if not hasattr(request, 'is_authenticated'):
+                request.is_authenticated = True
+            if not hasattr(request, 'user_type'):
+                request.user_type = 'passenger'
+            
+            # DO NOT override is_admin and is_staff - let middleware handle these
+            # Only set defaults if middleware hasn't set them at all
+            if not hasattr(request, 'is_admin'):
+                request.is_admin = False
+                logger.info("Set default is_admin=False")
+            if not hasattr(request, 'is_staff'):
+                request.is_staff = False  
+                logger.info("Set default is_staff=False")
+                
+            logger.info(f"Final request attributes - is_admin: {request.is_admin}, is_staff: {request.is_staff}")
+            return view_func(request, *args, **kwargs)
+        
         if not hasattr(request, 'is_authenticated') or not request.is_authenticated:
+            logger.info("Authentication failed - not authenticated")
             return JsonResponse({'error': 'Authentication required'}, status=401)
         
         return view_func(request, *args, **kwargs)
@@ -104,8 +270,14 @@ def login_required(view_func):
 def user_profile(request):
     """Get the profile of the current logged-in user"""
     try:
+        # Debug: Check if we're in development mode
+        from django.conf import settings
+        if hasattr(settings, 'DEVELOPMENT_MODE'):
+            logger.info(f"Development mode active: {settings.DEVELOPMENT_MODE}")
+        
         # ✅ Add debugging
         logger.info(f"user_profile called for email: {getattr(request, 'firebase_email', 'unknown')}")
+        logger.info(f"Request attributes: authenticated={getattr(request, 'is_authenticated', 'not set')}")
         
         # Get or create the user in the database if needed
         user, created = get_or_create_user(request)
@@ -117,24 +289,15 @@ def user_profile(request):
         
         if user:
             # ✅ Add debugging for user data
-            logger.info(f"User data - user_type: {user.user_type}, is_admin: {user.is_admin}, is_staff: {user.is_staff}")
+            logger.info(f"User data - user_type: {user.user_type}, is_admin: {user.is_admin}, is_staff: {user.is_staff}, is_passenger: {user.is_passenger}")
             
-            # Determine admin status properly
-            is_admin = (
-                user.user_type == 'admin' or 
-                user.is_admin or 
-                user.email == 'adm.railmadad@gmail.com' or
-                user.email == 'admin@railmadad.in'
-            )
+            # Use the boolean fields directly (they now control user permissions)
+            is_admin = user.is_admin or user.is_super_admin
+            is_staff = user.is_staff or user.is_admin or user.is_super_admin
+            is_passenger = user.is_passenger
+            is_super_admin = user.is_super_admin
             
-            # Determine staff status
-            is_staff = (
-                user.user_type in ['admin', 'staff'] or 
-                user.is_staff or 
-                is_admin
-            )
-            
-            logger.info(f"Final computed values - is_admin: {is_admin}, is_staff: {is_staff}")
+            logger.info(f"Final computed values - is_admin: {is_admin}, is_staff: {is_staff}, is_passenger: {is_passenger}, is_super_admin: {is_super_admin}")
             
             data = {
                 'full_name': user.full_name or "",
@@ -142,9 +305,11 @@ def user_profile(request):
                 'phone_number': user.phone_number or "",
                 'gender': user.gender or "",
                 'address': user.address or "",
-                'user_type': user.user_type,
+                'user_type': user.user_type,  # This is now a computed property
                 'is_admin': is_admin,
                 'is_staff': is_staff,
+                'is_passenger': is_passenger,
+                'is_super_admin': is_super_admin,
                 'date_joined': user.date_joined.isoformat(),  # Include date_joined in ISO format
                 'created_now': created  # Indicate if this is a newly created user
             }
@@ -182,9 +347,10 @@ def create_profile(request):
         
         # ✅ Determine admin and staff status based on user_type
         is_admin = user_type == 'admin'
-        is_staff = user_type in ['admin', 'staff']
+        is_staff = user_type == 'staff'
+        is_passenger = user_type == 'passenger'
         
-        logger.info(f"Setting is_admin: {is_admin}, is_staff: {is_staff}")
+        logger.info(f"Setting is_admin: {is_admin}, is_staff: {is_staff}, is_passenger: {is_passenger}")
         
         # Create or update profile
         profile, created = User.objects.update_or_create(
@@ -195,9 +361,9 @@ def create_profile(request):
                 'phone_number': user_data.get('phone_number', ''),
                 'gender': user_data.get('gender', ''),
                 'address': user_data.get('address', ''),
-                'user_type': user_type,  # ✅ Use the provided user_type
-                'is_admin': is_admin,    # ✅ Set admin status
-                'is_staff': is_staff,    # ✅ Set staff status
+                'is_admin': is_admin,      # ✅ Set admin status
+                'is_staff': is_staff,      # ✅ Set staff status  
+                'is_passenger': is_passenger,  # ✅ Set passenger status
             }
         )
         

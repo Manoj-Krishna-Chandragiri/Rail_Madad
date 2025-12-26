@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#4338ca" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:5174 https://accounts.google.com https://www.gstatic.com https://*.googleapis.com https://apis.google.com https://*.firebaseio.com https://*.firebasedatabase.app https://*.firebase.com https://*.firebaseapp.com https://translate.google.com https://translate.googleapis.com https://*.google.com https://*.googleusercontent.com; connect-src * 'unsafe-inline'; img-src * data: blob:; frame-src * data: blob: https://translate.google.com https://*.google.com; style-src * 'unsafe-inline';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' 'inline-speculation-rules' http://localhost:5174 http://localhost:5175 https://accounts.google.com https://www.gstatic.com https://*.googleapis.com https://apis.google.com https://*.firebaseio.com https://*.firebasedatabase.app https://*.firebase.com https://*.firebaseapp.com https://translate.google.com https://translate.googleapis.com https://*.google.com https://*.googleusercontent.com chrome-extension: chrome-extension://0c222d31-86a9-457e-bdf3-b15d37036a0a data: blob:; script-src-elem 'self' 'unsafe-inline' chrome-extension: chrome-extension://0c222d31-86a9-457e-bdf3-b15d37036a0a data: blob: https://www.gstatic.com https://*.googleapis.com https://translate.google.com https://translate.googleapis.com https://*.google.com https://*.firebaseio.com https://*.firebaseapp.com; worker-src 'self' blob:; font-src 'self' data: https://fonts.gstatic.com https://*.googleapis.com; connect-src * 'unsafe-inline' blob: data:; img-src * data: blob:; media-src 'self' data: blob: *; frame-src * data: blob: https://translate.google.com https://*.google.com; style-src * 'unsafe-inline'; object-src 'none';">
     <link rel="apple-touch-icon" href="https://railmadad-dashboard.web.app/assets/logo-railmadad-B9R2Xeqc.png" />
     <link rel="manifest" href="/manifest.json" />
     <title>Rail Madad - Complaint Management System</title>
@@ -27,6 +27,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" href="/indian_railway_station_game-ready.glb" as="fetch" crossorigin="anonymous" />
     
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -99,6 +100,29 @@
         background-color: #4338ca;
         color: white;
       }
+
+      /* Prevent text selection on 3D canvas overlay */
+      .select-none {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+      }
+
+      .user-select-none {
+        -webkit-user-select: none !important;
+        -moz-user-select: none !important;
+        -ms-user-select: none !important;
+        user-select: none !important;
+      }
+
+      /* Prevent text selection on canvas section */
+      canvas {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+      }
     </style>
   </head>
   <body>
@@ -110,6 +134,65 @@
         <p>Please enable JavaScript to use the Rail Madad Complaint Management System.</p>
       </div>
     </noscript>
+    
+    <!-- Error suppression for browser extensions -->
+    <script>
+      // Suppress browser extension errors that don't affect our app
+      window.addEventListener('error', function(e) {
+        // Suppress common browser extension errors
+        if (e.message && (
+          e.message.includes('Cannot find menu item with id translate-page') ||
+          e.message.includes('Cannot find menu item with id save-page') ||
+          e.message.includes('message channel closed before a response was received') ||
+          e.message.includes('Extension context invalidated') ||
+          e.message.includes('chrome-extension://') ||
+          e.message.includes('moz-extension://') ||
+          e.message.includes('Grammarly') ||
+          e.message.includes('The operation was aborted') ||
+          e.message.includes('Refused to load the script') ||
+          e.message.includes('violates the following Content Security Policy directive') ||
+          (e.filename && (e.filename.includes('content-all.js') || e.filename.includes('chrome-extension://')))
+        )) {
+          e.preventDefault();
+          return false;
+        }
+      });
+      
+      // Suppress unhandled promise rejections from extensions
+      window.addEventListener('unhandledrejection', function(e) {
+        if (e.reason && (
+          (e.reason.message && (
+            e.reason.message.includes('Cannot find menu item') ||
+            e.reason.message.includes('message channel closed') ||
+            e.reason.message.includes('Extension context invalidated') ||
+            e.reason.message.includes('chrome-extension://') ||
+            e.reason.message.includes('moz-extension://') ||
+            e.reason.message.includes('A listener indicated an asynchronous response by returning true, but the message channel closed')
+          )) ||
+          (typeof e.reason === 'string' && (
+            e.reason.includes('Cannot find menu item') ||
+            e.reason.includes('message channel closed') ||
+            e.reason.includes('A listener indicated an asynchronous response by returning true')
+          ))
+        )) {
+          e.preventDefault();
+          return false;
+        }
+      });
+
+      // Suppress CSP violations from browser extensions
+      document.addEventListener('securitypolicyviolation', function(e) {
+        if (e.blockedURI && (
+          e.blockedURI.includes('chrome-extension://') ||
+          e.blockedURI.includes('moz-extension://') ||
+          e.blockedURI.includes('grammarly') ||
+          e.blockedURI.includes('translate')
+        )) {
+          e.preventDefault();
+          return false;
+        }
+      });
+    </script>
     
     <script type="module" src="/src/main.tsx"></script>
   </body>
