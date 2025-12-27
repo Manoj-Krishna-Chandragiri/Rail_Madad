@@ -20,6 +20,13 @@ interface SignUpData {
   gender: 'male' | 'female' | '';
   address: string;
   userType: 'staff';
+  employeeId: string;
+  department: string;
+  role: string;
+  location: string;
+  expertise: string[];
+  languages: string[];
+  communicationChannels: string[];
 }
 
 interface PasswordInputProps {
@@ -90,7 +97,14 @@ const StaffLogin = () => {
     phoneNumber: '',
     gender: '',
     address: '',
-    userType: 'staff'
+    userType: 'staff',
+    employeeId: '',
+    department: '',
+    role: '',
+    location: '',
+    expertise: [],
+    languages: [],
+    communicationChannels: []
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -242,6 +256,13 @@ const StaffLogin = () => {
         gender: signUpData.gender,
         address: signUpData.address,
         userType: 'staff',
+        employeeId: signUpData.employeeId,
+        department: signUpData.department,
+        role: signUpData.role,
+        location: signUpData.location,
+        expertise: signUpData.expertise,
+        languages: signUpData.languages,
+        communicationChannels: signUpData.communicationChannels,
         profileImage: signUpData.gender === 'male' ? MALE_DEFAULT_AVATAR : FEMALE_DEFAULT_AVATAR,
         emailVerified: false,
         createdAt: new Date().toISOString()
@@ -250,19 +271,33 @@ const StaffLogin = () => {
       // Save to Firestore
       await setDoc(doc(db, "users", user.uid), userData);
       
-      // Register in Django backend
+      // Register in Django backend using the new staff registration endpoint
       try {
-        await apiClient.post('/api/accounts/profile/create/', {
+        console.log('Attempting to register staff in backend...');
+        const response = await apiClient.post('/api/accounts/staff/register/', {
           email: signUpData.email,
           name: signUpData.name,
           phone_number: signUpData.phoneNumber,
           gender: signUpData.gender,
           address: signUpData.address,
-          user_type: 'staff',
-          profile_image: signUpData.gender === 'male' ? MALE_DEFAULT_AVATAR : FEMALE_DEFAULT_AVATAR
+          employee_id: signUpData.employeeId,
+          department: signUpData.department,
+          role: signUpData.role,
+          location: signUpData.location,
+          expertise: signUpData.expertise,
+          languages: signUpData.languages,
+          communication_channels: signUpData.communicationChannels,
         });
-      } catch (backendError) {
-        console.error('Backend registration failed:', backendError);
+        console.log('✅ Staff registered successfully in backend:', response.data);
+      } catch (backendError: any) {
+        console.error('❌ Backend registration failed:', backendError);
+        console.error('Error details:', backendError.response?.data);
+        
+        // Show the actual error to the user
+        if (backendError.response?.data?.error) {
+          throw new Error(`Backend registration failed: ${backendError.response.data.error}`);
+        }
+        throw new Error('Failed to register staff profile in database. Please contact administrator.');
       }
       
       // Set localStorage for staff
@@ -281,7 +316,14 @@ const StaffLogin = () => {
         phoneNumber: '',
         gender: '',
         address: '',
-        userType: 'staff'
+        userType: 'staff',
+        employeeId: '',
+        department: '',
+        role: '',
+        location: '',
+        expertise: [],
+        languages: [],
+        communicationChannels: []
       });
       setAcceptedTerms(false);
     } catch (error: any) {
@@ -522,6 +564,170 @@ const StaffLogin = () => {
                     rows={3}
                   />
                 </div>
+
+                {/* Staff-specific fields */}
+                <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                  <h3 className={`text-sm font-semibold mb-3 ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>
+                    Staff Information
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'} mb-1`}>
+                        Employee ID *
+                      </label>
+                      <input
+                        type="text"
+                        value={signUpData.employeeId}
+                        onChange={(e) => setSignUpData({ ...signUpData, employeeId: e.target.value })}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 
+                          ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
+                        required
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'} mb-1`}>
+                          Department *
+                        </label>
+                        <select
+                          value={signUpData.department}
+                          onChange={(e) => setSignUpData({ ...signUpData, department: e.target.value })}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 
+                            ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
+                          required
+                        >
+                          <option value="">Select Department</option>
+                          <option value="Customer Service">Customer Service</option>
+                          <option value="Technical">Technical</option>
+                          <option value="Operations">Operations</option>
+                          <option value="Maintenance">Maintenance</option>
+                          <option value="Security">Security</option>
+                          <option value="Medical">Medical</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'} mb-1`}>
+                          Role *
+                        </label>
+                        <select
+                          value={signUpData.role}
+                          onChange={(e) => setSignUpData({ ...signUpData, role: e.target.value })}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 
+                            ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
+                          required
+                        >
+                          <option value="">Select Role</option>
+                          <option value="Staff">Staff</option>
+                          <option value="Senior Staff">Senior Staff</option>
+                          <option value="Supervisor">Supervisor</option>
+                          <option value="Manager">Manager</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'} mb-1`}>
+                        Location *
+                      </label>
+                      <input
+                        type="text"
+                        value={signUpData.location}
+                        onChange={(e) => setSignUpData({ ...signUpData, location: e.target.value })}
+                        placeholder="e.g., Mumbai Central Station"
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 
+                          ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'} mb-1`}>
+                        Areas of Expertise (Select multiple)
+                      </label>
+                      <select
+                        multiple
+                        value={signUpData.expertise}
+                        onChange={(e) => {
+                          const selected = Array.from(e.target.selectedOptions, option => option.value);
+                          setSignUpData({ ...signUpData, expertise: selected });
+                        }}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 
+                          ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
+                        size={4}
+                      >
+                        <option value="Ticketing">Ticketing</option>
+                        <option value="Refunds">Refunds</option>
+                        <option value="Train Delays">Train Delays</option>
+                        <option value="Cleanliness">Cleanliness</option>
+                        <option value="Safety">Safety</option>
+                        <option value="Lost & Found">Lost & Found</option>
+                        <option value="Medical">Medical</option>
+                        <option value="Food Quality">Food Quality</option>
+                      </select>
+                      <p className={`text-xs mt-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Hold Ctrl/Cmd to select multiple
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'} mb-1`}>
+                        Languages Spoken (Select multiple)
+                      </label>
+                      <select
+                        multiple
+                        value={signUpData.languages}
+                        onChange={(e) => {
+                          const selected = Array.from(e.target.selectedOptions, option => option.value);
+                          setSignUpData({ ...signUpData, languages: selected });
+                        }}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 
+                          ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
+                        size={4}
+                      >
+                        <option value="English">English</option>
+                        <option value="Hindi">Hindi</option>
+                        <option value="Bengali">Bengali</option>
+                        <option value="Tamil">Tamil</option>
+                        <option value="Telugu">Telugu</option>
+                        <option value="Marathi">Marathi</option>
+                        <option value="Gujarati">Gujarati</option>
+                        <option value="Kannada">Kannada</option>
+                      </select>
+                      <p className={`text-xs mt-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Hold Ctrl/Cmd to select multiple
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'} mb-1`}>
+                        Preferred Communication Channels (Select multiple)
+                      </label>
+                      <select
+                        multiple
+                        value={signUpData.communicationChannels}
+                        onChange={(e) => {
+                          const selected = Array.from(e.target.selectedOptions, option => option.value);
+                          setSignUpData({ ...signUpData, communicationChannels: selected });
+                        }}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 
+                          ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
+                        size={3}
+                      >
+                        <option value="Email">Email</option>
+                        <option value="Phone">Phone</option>
+                        <option value="SMS">SMS</option>
+                        <option value="WhatsApp">WhatsApp</option>
+                      </select>
+                      <p className={`text-xs mt-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Hold Ctrl/Cmd to select multiple
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <PasswordInput
                   value={signUpData.password}
                   onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}

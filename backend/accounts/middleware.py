@@ -17,9 +17,13 @@ class FirebaseAuthMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        # Check if we're in development mode without Firebase
-        if hasattr(settings, 'DEVELOPMENT_MODE') and settings.DEVELOPMENT_MODE:
-            logger.info("Running in development mode - Firebase authentication bypassed")
+        # Extract the token from Authorization header first
+        auth_header = request.META.get('HTTP_AUTHORIZATION')
+        has_real_token = auth_header and auth_header.startswith('Bearer ') and len(auth_header.split(' ')[1]) > 100
+        
+        # Check if we're in development mode without Firebase AND no real token is provided
+        if hasattr(settings, 'DEVELOPMENT_MODE') and settings.DEVELOPMENT_MODE and not has_real_token:
+            logger.info("Running in development mode - Firebase authentication bypassed (no real token)")
             
             # Check if there's a specific user email in the request headers or session
             # This allows the frontend to specify which user to simulate
@@ -84,7 +88,54 @@ class FirebaseAuthMiddleware:
         
         # Check if Firebase is properly initialized
         if not firebase_admin._apps:
-            logger.warning("Firebase not initialized - skipping authentication")
+            logger.warning("Firebase not initialized")
+            
+            # In development, try to decode the Firebase token without verification
+            if auth_header and auth_header.startswith('Bearer '):
+                token = auth_header.split(' ')[1]
+                if len(token) > 100:  # Real Firebase token
+                    try:
+                        # Decode JWT without verification (development only!)
+                        import jwt
+                        decoded = jwt.decode(token, options={"verify_signature": False})
+                        
+                        request.firebase_user = decoded
+                        request.firebase_email = decoded.get('email')
+                        request.firebase_uid = decoded.get('uid') or decoded.get('user_id')
+                        request.is_authenticated = True
+                        
+                        logger.info(f"🔍 Firebase token decoded - Email: {request.firebase_email}, UID: {request.firebase_uid}")
+                        
+                        # Try to find user in database
+                        User = get_user_model()
+                        try:
+                            # Try exact match first
+                            user = User.objects.get(email=request.firebase_email)
+                            request.user = user
+                            request.user_id = user.id
+                            request.user_type = user.user_type
+                            request.is_admin = user.is_admin
+                            request.is_staff = user.is_staff
+                            logger.info(f"✅ User found in DB: {user.email} (ID: {user.id})")
+                            return self.get_response(request)
+                        except User.DoesNotExist:
+                            # Try case-insensitive search
+                            user = User.objects.filter(email__iexact=request.firebase_email).first()
+                            if user:
+                                request.user = user
+                                request.user_id = user.id
+                                request.user_type = user.user_type
+                                request.is_admin = user.is_admin
+                                request.is_staff = user.is_staff
+                                logger.info(f"✅ User found with case-insensitive search: {user.email} (ID: {user.id})")
+                                return self.get_response(request)
+                            else:
+                                logger.error(f"❌ User NOT FOUND in database: {request.firebase_email}")
+                                logger.error(f"   All users in DB: {[u.email for u in User.objects.all()[:5]]}")
+                                # Don't return here - let it continue to set default values
+                    except Exception as e:
+                        logger.error(f"Failed to decode Firebase token in development: {e}")
+            
             # Set default values for unauthenticated request
             request.firebase_user = None
             request.firebase_email = None
@@ -161,6 +212,11 @@ class FirebaseAuthMiddleware:
                     
                     # Authenticate the request with this user
                     request.user = user
+                    
+                    # Log successful authentication
+                    logger.info(f"✅ User authenticated: {user.email}")
+                    logger.info(f"   User flags - is_admin: {user.is_admin}, is_staff: {user.is_staff}, is_passenger: {user.is_passenger}")
+                    logger.info(f"   Request flags set - is_authenticated: {request.is_authenticated}, is_admin: {request.is_admin}, is_staff: {request.is_staff}")
                     
                 except User.DoesNotExist:
                     # Try to find by email

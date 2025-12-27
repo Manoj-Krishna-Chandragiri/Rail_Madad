@@ -10,7 +10,7 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   const { user, userRole } = useAuth();
 
   if (!user) {
-    return <Navigate to="/login" />;
+    return <Navigate to="/login-portal" />;
   }
 
   if (requiredRole && userRole !== requiredRole) {

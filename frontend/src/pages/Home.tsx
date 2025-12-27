@@ -132,7 +132,7 @@ const Home = () => {
     { icon: <BarChart2 className="h-5 w-5" />, text: "Track Status", path: "/user-dashboard/track-status" },
     { icon: <Headphones className="h-5 w-5" />, text: "Real-Time Support", path: "/user-dashboard/real-time-support" },
     { icon: <Globe className="h-5 w-5" />, text: "Change Language", path: "/user-dashboard/multi-lingual" },
-    { icon: <Bell className="h-5 w-5" />, text: "Notifications", path: "/user-dashboard/settings" },
+    { icon: <Bell className="h-5 w-5" />, text: "Notifications", path: "/user-dashboard/notifications" },
     { icon: <HelpCircle className="h-5 w-5" />, text: "Help & FAQs", path: "/user-dashboard/help" },
   ];
 

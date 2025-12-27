@@ -108,7 +108,7 @@ const ResetPassword: React.FC = () => {
 
             <div className="mt-6 flex justify-center">
               <Link 
-                to="/login" 
+                to="/login-portal" 
                 className="flex items-center text-indigo-500 hover:text-indigo-600 gap-1"
               >
                 <ArrowLeft className="h-4 w-4" />

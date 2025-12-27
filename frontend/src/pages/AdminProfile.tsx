@@ -27,7 +27,7 @@ const AdminProfile = () => {
 
         if (!token) {
           setError('Not authenticated');
-          navigate('/login');
+          navigate('/login-portal');
           return;
         }
 
@@ -52,7 +52,7 @@ const AdminProfile = () => {
         console.error('Error fetching admin data:', error);
         if (axios.isAxiosError(error) && error.response?.status === 401) {
           localStorage.removeItem('token');
-          navigate('/login');
+          navigate('/login-portal');
         }
         setError('Failed to load profile');
         setLoading(false);

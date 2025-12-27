@@ -15,7 +15,7 @@ const AdminCreator: React.FC = () => {
   // Protect this page from being accessed in production
   useEffect(() => {
     if (import.meta.env.PROD) {
-      navigate('/login');
+      navigate('/login-portal');
     }
   }, [navigate]);
 
@@ -67,7 +67,7 @@ const AdminCreator: React.FC = () => {
                 <h1 className="text-xl font-semibold">Admin Account Creator</h1>
               </div>
               <button
-                onClick={() => navigate('/login')}
+                onClick={() => navigate('/login-portal')}
                 className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -122,7 +122,7 @@ const AdminCreator: React.FC = () => {
               
               {adminInfo && (
                 <button
-                  onClick={() => navigate('/login')}
+                  onClick={() => navigate('/login-portal')}
                   className="py-2 px-4 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
                 >
                   Go to Login

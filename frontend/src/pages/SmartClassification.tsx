@@ -1,6 +1,7 @@
 import { Brain, Search, Filter, BarChart2, RefreshCw, AlertTriangle, TrendingUp, CheckCircle, Clock, PieChart } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '../context/ThemeContext';
+import apiClient from '../utils/api';
 import axios from 'axios';
 import ApexCharts from 'apexcharts';
 
@@ -65,19 +66,12 @@ const SmartClassification = () => {
     try {
       setLoading(true);
       setError(null);
-      const token = localStorage.getItem('authToken');
-      
-      if (!token) {
-        setError('Authentication required');
-        return;
-      }
 
-      const headers = { Authorization: `Bearer ${token}` };
-
+      // apiClient automatically includes the token from interceptor
       // Fetch stats and complaints in parallel
       const [statsResponse, complaintsResponse] = await Promise.all([
-        axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/complaints/admin/smart-classification/stats/`, { headers }),
-        axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/complaints/admin/smart-classification/complaints/`, { headers })
+        apiClient.get('/api/complaints/admin/smart-classification/stats/'),
+        apiClient.get('/api/complaints/admin/smart-classification/complaints/')
       ]);
 
       setStats(statsResponse.data);

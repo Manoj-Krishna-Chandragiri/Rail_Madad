@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Settings, HelpCircle, Bot, FileUp, Globe, Clock, MessageSquare, Headphones } from 'lucide-react';
+import { Home, Settings, HelpCircle, Bot, FileUp, Globe, Clock, MessageSquare, Headphones, Users, BarChart2, Bell, UserCog, TrendingUp, ClipboardList, User } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
 interface SidebarProps {
@@ -11,11 +11,47 @@ interface SidebarProps {
 const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
   const location = useLocation();
   const { theme } = useTheme();
+  const [userRole, setUserRole] = useState<string>('passenger');
   
-  // Get the base path (either /user-dashboard or /admin-dashboard)
-  const basePath = location.pathname.includes('/admin-dashboard') ? '/admin-dashboard' : '/user-dashboard';
+  useEffect(() => {
+    const role = localStorage.getItem('userRole') || 'passenger';
+    setUserRole(role);
+  }, [location]);
   
-  const menuItems = [
+  // Get the base path (either /user-dashboard, /admin-dashboard, or /staff-dashboard)
+  const basePath = location.pathname.includes('/admin-dashboard') 
+    ? '/admin-dashboard' 
+    : location.pathname.includes('/staff-dashboard')
+    ? '/staff-dashboard'
+    : '/user-dashboard';
+  
+  // Admin menu items
+  const adminMenuItems = [
+    { path: '', icon: Home, label: 'Home' },
+    { path: '/dashboard', icon: BarChart2, label: 'Dashboard' },
+    { path: '/smart-classification', icon: MessageSquare, label: 'Smart Classification' },
+    { path: '/quick-resolution', icon: TrendingUp, label: 'Quick Resolution' },
+    { path: '/staff-management', icon: UserCog, label: 'Staff Management' },
+    { path: '/staff-performance', icon: ClipboardList, label: 'Staff Performance' },
+    { path: '/analytics', icon: BarChart2, label: 'Analytics' },
+    { path: '/user-management', icon: Users, label: 'User Management' },
+    { path: '/sentiment-analysis', icon: MessageSquare, label: 'Sentiment Analysis' },
+    { path: '/notifications', icon: Bell, label: 'Notifications' },
+    { path: '/settings', icon: Settings, label: 'Settings' },
+  ];
+
+  // Staff menu items
+  const staffMenuItems = [
+    { path: '/home', icon: Home, label: 'Home' },
+    { path: '/assigned-complaints', icon: ClipboardList, label: 'My Complaints' },
+    { path: '/analytics', icon: BarChart2, label: 'My Analytics' },
+    { path: '/profile', icon: User, label: 'My Profile' },
+    { path: '/notifications', icon: Bell, label: 'Notifications' },
+    { path: '/settings', icon: Settings, label: 'Settings' },
+  ];
+
+  // Passenger menu items
+  const passengerMenuItems = [
     { path: '', icon: Home, label: 'Home' },
     { path: '/file-complaint', icon: FileUp, label: 'File Complaint' },
     { path: '/track-status', icon: Clock, label: 'Track Status' },
@@ -23,9 +59,17 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
     { path: '/real-time-support', icon: Headphones, label: 'Real-time Support' },
     { path: '/multi-lingual', icon: Globe, label: 'Multi-lingual' },
     { path: '/feedback-form', icon: MessageSquare, label: 'Feedback Form' },
+    { path: '/notifications', icon: Bell, label: 'Notifications' },
     { path: '/help', icon: HelpCircle, label: 'Help' },
     { path: '/settings', icon: Settings, label: 'Settings' }
   ];
+
+  // Select appropriate menu items based on user role
+  const menuItems = userRole === 'admin' 
+    ? adminMenuItems 
+    : userRole === 'staff'
+    ? staffMenuItems
+    : passengerMenuItems;
 
   const handleMenuItemClick = () => {
     // Close sidebar on mobile when menu item is clicked

@@ -202,40 +202,44 @@ if not firebase_admin._apps:
             # Check if these are placeholder values
             if (firebase_private_key_id == 'placeholder_key_id' or 
                 'placeholder' in firebase_private_key):
-                print("⚠️  Firebase using placeholder credentials - some features may not work")
+                print("⚠️  Firebase using placeholder credentials - skipping initialization")
                 print("💡 Generate real Firebase credentials for full functionality")
                 print("🔗 Visit: https://console.cloud.google.com/iam-admin/serviceaccounts")
             else:
-                # Use real environment variables (RECOMMENDED for production)
-                firebase_credentials = {
-                    'type': firebase_type,
-                    'project_id': firebase_project_id,
-                    'private_key_id': firebase_private_key_id,
-                    'private_key': firebase_private_key.replace('\\n', '\n'),
-                    'client_email': firebase_client_email,
-                    'client_id': os.environ.get('FIREBASE_CLIENT_ID'),
-                    'auth_uri': os.environ.get('FIREBASE_AUTH_URI', 'https://accounts.google.com/o/oauth2/auth'),
-                    'token_uri': os.environ.get('FIREBASE_TOKEN_URI', 'https://oauth2.googleapis.com/token'),
-                    'auth_provider_x509_cert_url': os.environ.get('FIREBASE_AUTH_PROVIDER_X509_CERT_URL', 'https://www.googleapis.com/oauth2/v1/certs'),
-                    'client_x509_cert_url': os.environ.get('FIREBASE_CLIENT_X509_CERT_URL'),
-                    'universe_domain': os.environ.get('FIREBASE_UNIVERSE_DOMAIN', 'googleapis.com')
-                }
-                cred = credentials.Certificate(firebase_credentials)
-                firebase_admin.initialize_app(cred)
-                print("✅ Firebase initialized successfully from environment variables")
+                try:
+                    # Use real environment variables (RECOMMENDED for production)
+                    firebase_credentials = {
+                        'type': firebase_type,
+                        'project_id': firebase_project_id,
+                        'private_key_id': firebase_private_key_id,
+                        'private_key': firebase_private_key.replace('\\n', '\n'),
+                        'client_email': firebase_client_email,
+                        'client_id': os.environ.get('FIREBASE_CLIENT_ID'),
+                        'auth_uri': os.environ.get('FIREBASE_AUTH_URI', 'https://accounts.google.com/o/oauth2/auth'),
+                        'token_uri': os.environ.get('FIREBASE_TOKEN_URI', 'https://oauth2.googleapis.com/token'),
+                        'auth_provider_x509_cert_url': os.environ.get('FIREBASE_AUTH_PROVIDER_X509_CERT_URL', 'https://www.googleapis.com/oauth2/v1/certs'),
+                        'client_x509_cert_url': os.environ.get('FIREBASE_CLIENT_X509_CERT_URL'),
+                        'universe_domain': os.environ.get('FIREBASE_UNIVERSE_DOMAIN', 'googleapis.com')
+                    }
+                    cred = credentials.Certificate(firebase_credentials)
+                    firebase_admin.initialize_app(cred)
+                    print("[SUCCESS] Firebase initialized successfully from environment variables")
+                except Exception as cert_error:
+                    print(f"[WARNING] Failed to initialize Firebase with provided credentials: {str(cert_error)[:100]}")
+                    print("Continuing in development mode without Firebase...")
         else:
-            print("❌ Firebase credentials not found in environment variables")
+            print("[ERROR] Firebase credentials not found in environment variables")
             print("Please set up Firebase environment variables in your .env file")
             print("See .env.example for required variables")
     except Exception as e:
-        print(f"⚠️  Firebase initialization error: {str(e)}")
+        print(f"[WARNING] Firebase initialization error: {str(e)}")
         print("The app will continue to work, but Firebase features may be limited")
         if DEBUG:
             print("This is normal in development mode with placeholder credentials")
 
 # Development mode flag for bypassing Firebase when not configured
 DEVELOPMENT_MODE = DEBUG and not firebase_admin._apps
-print(f"🔧 DEVELOPMENT_MODE set to: {DEVELOPMENT_MODE} (DEBUG={DEBUG}, firebase_apps={len(firebase_admin._apps)})")
+print(f"[CONFIG] DEVELOPMENT_MODE set to: {DEVELOPMENT_MODE} (DEBUG={DEBUG}, firebase_apps={len(firebase_admin._apps)})")
 
 # Logging Configuration
 LOGGING = {

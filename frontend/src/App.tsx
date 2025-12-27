@@ -15,6 +15,13 @@ import SmartClassification from './pages/SmartClassification';
 import QuickResolution from './pages/QuickResolution';
 import Staff from './pages/Staff';
 import StaffDashboard from './pages/StaffDashboard';
+import StaffHome from './pages/StaffHome';
+import StaffProfile from './pages/StaffProfile';
+import StaffAnalytics from './pages/StaffAnalytics';
+import StaffPerformance from './pages/StaffPerformance';
+import AdminAnalytics from './pages/AdminAnalytics';
+import UserManagement from './pages/UserManagement';
+import Notifications from './pages/Notifications';
 import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import AdminCreator from './pages/AdminCreator';
@@ -81,7 +88,7 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const userType = getUserType();
   
   if (!userType) {
-    return <Navigate to="/login" />;
+    return <Navigate to="/login-portal" />;
   }
   
   if (userType !== 'admin') {
@@ -95,7 +102,7 @@ const UserRoute = ({ children }: { children: React.ReactNode }) => {
   const userType = getUserType();
   
   if (!userType) {
-    return <Navigate to="/login" />;
+    return <Navigate to="/login-portal" />;
   }
   
   if (userType === 'admin') {
@@ -179,8 +186,8 @@ const App = () => {
             <Route path="/realistic-animation" element={<RealisticRailAnimation />} />
             <Route path="/pure-css-animation" element={<PureCSSRailAnimation />} />
             <Route path="/track-status" element={<TrackStatus />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Login />} />
+            <Route path="/login" element={<Navigate to="/login-portal" replace />} />
+            <Route path="/register" element={<Navigate to="/login-portal" replace />} />
             <Route path="/admin-login" element={<AdminLogin />} />
             <Route path="/staff-login" element={<StaffLogin />} />
             <Route path="/passenger-login" element={<PassengerLogin />} />
@@ -213,7 +220,12 @@ const App = () => {
               <Route path="quick-resolution" element={<QuickResolution />} />
               <Route path="multi-lingual" element={<MultiLingual />} />
               <Route path="staff" element={<Staff />} />
+              <Route path="staff-management" element={<Staff />} />
               <Route path="staff-dashboard" element={<StaffDashboard />} />
+              <Route path="staff-performance" element={<StaffPerformance />} />
+              <Route path="analytics" element={<AdminAnalytics />} />
+              <Route path="user-management" element={<UserManagement />} />
+              <Route path="notifications" element={<Notifications />} />
               <Route path="settings" element={<Settings />} />
               <Route path="profile" element={<Profile />} />
               <Route path="sentiment-analysis" element={<SentimentAnalysisPage />} />
@@ -238,8 +250,23 @@ const App = () => {
               <Route path="multi-lingual" element={<MultiLingual />} />
               <Route path="help" element={<Help />} />
               <Route path="feedback-form" element={<FeedbackForm />} />
+              <Route path="notifications" element={<Notifications />} />
               <Route path="settings" element={<Settings />} />
               <Route path="profile" element={<Profile />} />
+            </Route>
+
+            {/* Staff Routes */}
+            <Route
+              path="/staff-dashboard"
+              element={
+                <Layout />
+              }
+            >
+              <Route index element={<StaffHome />} />
+              <Route path="assigned-complaints" element={<StaffDashboard />} />
+              <Route path="analytics" element={<StaffAnalytics />} />
+              <Route path="profile" element={<StaffProfile />} />
+              <Route path="settings" element={<Settings />} />
             </Route>
 
             {/* Fallback routes for backward compatibility */}
@@ -274,7 +301,7 @@ const App = () => {
                   <h1 className="text-4xl font-bold text-red-600 mb-4">Unauthorized</h1>
                   <p className="text-xl text-gray-600 dark:text-gray-400 mb-8">You don't have permission to access this page</p>
                   <Link 
-                    to="/login" 
+                    to="/login-portal" 
                     className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
                   >
                     Go to Login
@@ -297,7 +324,7 @@ const App = () => {
                       Go Home
                     </Link>
                     <Link 
-                      to="/login" 
+                      to="/login-portal" 
                       className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
                     >
                       Login

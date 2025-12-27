@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.utils import timezone
 
 class FirebaseUserManager(BaseUserManager):
     def create_user(self, email, firebase_uid, password=None, **extra_fields):
@@ -72,3 +73,183 @@ class FirebaseUser(AbstractBaseUser, PermissionsMixin):
     @property
     def is_user_passenger(self):
         return self.is_passenger
+
+
+# Role-based models
+class Admin(models.Model):
+    """Admin profile with admin-specific permissions and attributes"""
+    
+    user = models.OneToOneField(
+        FirebaseUser, 
+        on_delete=models.CASCADE, 
+        related_name='admin_profile',
+        primary_key=True
+    )
+    email = models.EmailField(max_length=254)  # Denormalized for easier querying
+    full_name = models.CharField(max_length=255)
+    phone_number = models.CharField(max_length=20, blank=True)
+    department = models.CharField(max_length=100, blank=True)
+    designation = models.CharField(max_length=100, blank=True)
+    employee_id = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    super_admin = models.BooleanField(default=False)
+    permissions = models.JSONField(default=list, blank=True)  # Array of permission strings
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'accounts_admin'
+        verbose_name = 'Admin'
+        verbose_name_plural = 'Admins'
+    
+    def __str__(self):
+        return f"{self.full_name} - Admin"
+
+
+class Staff(models.Model):
+    """Staff member profile with staff-specific attributes"""
+    
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
+        ('on_leave', 'On Leave'),
+    ]
+    
+    user = models.OneToOneField(
+        FirebaseUser, 
+        on_delete=models.CASCADE, 
+        related_name='staff_profile',
+        primary_key=True
+    )
+    email = models.EmailField(max_length=254)  # Denormalized for easier querying
+    full_name = models.CharField(max_length=255)
+    phone_number = models.CharField(max_length=20, blank=True)
+    employee_id = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    department = models.CharField(max_length=100)
+    role = models.CharField(max_length=100)  # cleaning_supervisor, catering_manager, etc.
+    location = models.CharField(max_length=255, blank=True)
+    avatar = models.CharField(max_length=255, blank=True)  # Path to avatar
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    joining_date = models.DateField(default=timezone.now)
+    expertise = models.JSONField(default=list, blank=True)  # Array of expertise areas
+    languages = models.JSONField(default=list, blank=True)  # Array of language codes
+    communication_preferences = models.JSONField(default=list, blank=True)  # ['Chat', 'Voice', 'Video']
+    rating = models.FloatField(default=0.0)
+    active_tickets = models.IntegerField(default=0)
+    shift_timings = models.JSONField(default=dict, blank=True)  # {"start": "09:00", "end": "17:00"}
+    reporting_to_id = models.IntegerField(null=True, blank=True)  # FK to Admin
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'accounts_staff'
+        verbose_name = 'Staff'
+        verbose_name_plural = 'Staff Members'
+    
+    def __str__(self):
+        return f"{self.full_name} - {self.role}"
+    
+    def is_available(self):
+        """Check if staff is currently available"""
+        return self.status == 'active' and self.active_tickets < 10
+
+
+class Passenger(models.Model):
+    """Passenger profile with passenger-specific travel information"""
+    
+    GENDER_CHOICES = [
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other'),
+        ('prefer_not_to_say', 'Prefer not to say'),
+    ]
+    
+    user = models.OneToOneField(
+        FirebaseUser, 
+        on_delete=models.CASCADE, 
+        related_name='passenger_profile',
+        primary_key=True
+    )
+    email = models.EmailField(max_length=254, blank=True)  # Denormalized for easier querying
+    full_name = models.CharField(max_length=255, blank=True)
+    phone_number = models.CharField(max_length=20, blank=True)
+    gender = models.CharField(max_length=20, choices=GENDER_CHOICES, blank=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    address = models.TextField(blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=100, blank=True)
+    pincode = models.CharField(max_length=10, blank=True)
+    preferred_language = models.CharField(max_length=10, default='en')
+    notification_preferences = models.JSONField(default=dict, blank=True)
+    frequent_routes = models.JSONField(default=list, blank=True)
+    total_complaints = models.IntegerField(default=0)
+    resolved_complaints = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'accounts_passenger'
+        verbose_name = 'Passenger'
+        verbose_name_plural = 'Passengers'
+    
+    def __str__(self):
+        return f"{self.full_name} ({self.user.email})"
+    
+    @property
+    def resolution_rate(self):
+        """Calculate percentage of resolved complaints"""
+        if self.total_complaints == 0:
+            return 0
+        return (self.resolved_complaints / self.total_complaints) * 100
+
+
+class StaffAvailability(models.Model):
+    """Track staff availability and shift schedules"""
+    
+    STATUS_CHOICES = [
+        ('available', 'Available'),
+        ('busy', 'Busy'),
+        ('on_break', 'On Break'),
+        ('offline', 'Offline'),
+    ]
+    
+    staff = models.ForeignKey(Staff, on_delete=models.CASCADE, related_name='availability_schedule')
+    date = models.DateField()
+    shift_start = models.TimeField()
+    shift_end = models.TimeField()
+    is_available = models.BooleanField(default=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='available')
+    notes = models.TextField(blank=True)
+    
+    class Meta:
+        db_table = 'accounts_staff_availability'
+        verbose_name = 'Staff Availability'
+        verbose_name_plural = 'Staff Availability'
+        unique_together = ['staff', 'date']
+        ordering = ['-date']
+    
+    def __str__(self):
+        return f"{self.staff.full_name} - {self.date} ({self.status})"
+
+
+class StaffPerformance(models.Model):
+    """Track staff performance metrics"""
+    
+    staff = models.ForeignKey(Staff, on_delete=models.CASCADE, related_name='performance_metrics')
+    month = models.IntegerField()  # 1-12
+    year = models.IntegerField()
+    tickets_resolved = models.IntegerField(default=0)
+    avg_resolution_time = models.FloatField(default=0.0)  # in hours
+    customer_satisfaction = models.FloatField(default=0.0)  # 0-5 rating
+    complaints_received = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'accounts_staff_performance'
+        verbose_name = 'Staff Performance'
+        verbose_name_plural = 'Staff Performance'
+        unique_together = ['staff', 'month', 'year']
+        ordering = ['-year', '-month']
+    
+    def __str__(self):
+        return f"{self.staff.full_name} - {self.month}/{self.year}"

@@ -373,7 +373,7 @@ const Profile: React.FC = () => {
       window.dispatchEvent(new Event('userTypeChanged'));
       
       // Redirect to login page
-      navigate('/login');
+      navigate('/login-portal');
       
       // Show success message
       alert('Account deleted successfully. You will be redirected to the login page.');

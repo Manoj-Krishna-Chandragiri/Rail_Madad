@@ -60,7 +60,7 @@ apiClient.interceptors.response.use(
     } else if (error.response?.status === 401) {
       console.warn('Authentication expired - redirecting to login');
       localStorage.removeItem('authToken');
-      window.location.href = '/login';
+      window.location.href = '/login-portal';
     } else if (error.response?.status >= 500) {
       console.warn('Server error occurred - please try again later');
     }

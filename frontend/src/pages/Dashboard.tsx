@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import Chart from 'react-apexcharts';
 import ApexCharts from 'apexcharts';
+import { getAuth } from 'firebase/auth';
 
 interface Complaint {
   id: number;
@@ -97,13 +98,15 @@ const Dashboard = () => {
 
   const fetchAdminStats = async () => {
     try {
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        console.error('No auth token found');
+      const auth = getAuth();
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        console.error('User not authenticated');
         return;
       }
 
-      console.log('Fetching admin stats with token:', token.substring(0, 20) + '...');
+      const token = await currentUser.getIdToken();
+      console.log('Fetching admin stats with Firebase token');
 
       const response = await axios.get(
         `${import.meta.env.VITE_API_BASE_URL}/api/complaints/admin/dashboard-stats/`,
@@ -158,12 +161,14 @@ const Dashboard = () => {
   const fetchComplaints = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        console.error('No auth token found');
+      const auth = getAuth();
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        console.error('User not authenticated');
         return;
       }
 
+      const token = await currentUser.getIdToken();
       const response = await axios.get(
         `${import.meta.env.VITE_API_BASE_URL}/api/complaints/user/`,
         {
@@ -182,7 +187,7 @@ const Dashboard = () => {
       // Show user-friendly error message
       if (axios.isAxiosError(error) && error.response?.status === 401) {
         // Redirect to login if unauthorized
-        window.location.href = '/login';
+        window.location.href = '/login-portal';
       }
     } finally {
       setLoading(false);
@@ -491,12 +496,14 @@ const Dashboard = () => {
   const handleStatusChange = async (id: number, newStatus: string) => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        console.error('No auth token found');
+      const auth = getAuth();
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        console.error('User not authenticated');
         return;
       }
 
+      const token = await currentUser.getIdToken();
       await axios.put(
         `${import.meta.env.VITE_API_BASE_URL}/api/complaints/${id}/`,
         { status: newStatus },

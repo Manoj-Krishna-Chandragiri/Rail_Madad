@@ -340,6 +340,45 @@ const AdminHome = () => {
               Manage staff and assignments
             </p>
           </Link>
+
+          <Link 
+            to="/admin-dashboard/staff-performance" 
+            className={`flex flex-col items-center p-6 rounded-lg border transition-all duration-300 ${cardHoverClass} transform hover:translate-y-[-4px]`}
+          >
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${isDark ? 'bg-green-900/50' : 'bg-green-100'}`}>
+              <TrendingUp className="h-8 w-8 text-green-500" />
+            </div>
+            <h3 className="font-semibold text-lg">Staff Performance</h3>
+            <p className={`text-sm text-center mt-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+              Monitor staff metrics and analytics
+            </p>
+          </Link>
+
+          <Link 
+            to="/admin-dashboard/analytics" 
+            className={`flex flex-col items-center p-6 rounded-lg border transition-all duration-300 ${cardHoverClass} transform hover:translate-y-[-4px]`}
+          >
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${isDark ? 'bg-purple-900/50' : 'bg-purple-100'}`}>
+              <BarChart2 className="h-8 w-8 text-purple-500" />
+            </div>
+            <h3 className="font-semibold text-lg">Analytics</h3>
+            <p className={`text-sm text-center mt-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+              View detailed insights and trends
+            </p>
+          </Link>
+
+          <Link 
+            to="/admin-dashboard/user-management" 
+            className={`flex flex-col items-center p-6 rounded-lg border transition-all duration-300 ${cardHoverClass} transform hover:translate-y-[-4px]`}
+          >
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${isDark ? 'bg-indigo-900/50' : 'bg-indigo-100'}`}>
+              <Users className="h-8 w-8 text-indigo-500" />
+            </div>
+            <h3 className="font-semibold text-lg">User Management</h3>
+            <p className={`text-sm text-center mt-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+              Manage all system users
+            </p>
+          </Link>
           
           <Link 
             to="/admin-dashboard/quick-resolution" 

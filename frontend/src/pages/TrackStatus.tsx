@@ -27,63 +27,25 @@ const TrackStatus = () => {
       try {
         setLoading(true);
         
-        // Check if we're in development mode
-        const isDevelopment = import.meta.env.DEV;
-        let response;
+        // Get Firebase auth token for API calls
+        const auth = getAuth();
+        const currentUser = auth.currentUser;
         
-        if (isDevelopment) {
-          // In development, make API call without Firebase authentication
-          console.log('Development mode: Fetching complaints without Firebase auth');
-          try {
-            response = await apiClient.get('/api/complaints/user/');
-          } catch (error: any) {
-            if (error.response?.status === 401) {
-              // If 401, try without authentication or show mock data
-              console.log('Development: API call failed, using mock data');
-              const mockData = [
-                {
-                  id: 1,
-                  pnr_number: 'DEV001',
-                  status: 'In Progress',
-                  date_of_incident: '2025-01-15',
-                  description: 'Development test complaint - Food quality issue',
-                  staff: 'Development Staff'
-                },
-                {
-                  id: 2,
-                  pnr_number: 'DEV002',
-                  status: 'Closed',
-                  date_of_incident: '2025-01-10',
-                  description: 'Development test complaint - Cleanliness issue',
-                  staff: 'Development Staff'
-                }
-              ];
-              response = { data: mockData };
-            } else {
-              throw error;
-            }
-          }
-        } else {
-          // Production mode: use Firebase authentication
-          const auth = getAuth();
-          const currentUser = auth.currentUser;
-          
-          if (!currentUser) {
-            setError('Please log in to view your complaints');
-            setLoading(false);
-            return;
-          }
-          
-          // Get the Firebase ID token
-          const token = await currentUser.getIdToken();
-          
-          // Make API request with authorization header
-          response = await apiClient.get('/api/complaints/user/', {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
+        if (!currentUser) {
+          setError('Please log in to view your complaints');
+          setLoading(false);
+          return;
         }
+        
+        // Get the Firebase ID token
+        const token = await currentUser.getIdToken();
+        
+        // Make API request with authorization header
+        const response = await apiClient.get('/api/complaints/user/', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
 
         const formatted = response.data.map((item: any) => ({
           id: `CMP${item.id.toString().padStart(3, '0')}`,

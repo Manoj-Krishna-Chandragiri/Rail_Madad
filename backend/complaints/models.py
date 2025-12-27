@@ -123,3 +123,7 @@ class QuickSolution(models.Model):
 
     class Meta:
         verbose_name_plural = "Quick Solutions"
+
+
+# Import assignment model so Django recognizes it
+from .models_assignment import ComplaintAssignment

@@ -17,18 +17,20 @@ def get_or_create_user(request):
     Gets an existing user or creates a new one based on Firebase authentication.
     Handles both email/password and Google auth scenarios with improved logging.
     Returns both the user object and a boolean indicating whether the user was created.
+    
+    AUTO-REGISTRATION: If user is authenticated with Firebase but not in DB, creates them automatically.
     """
     from django.conf import settings
     
-    # In development mode, use the user set by middleware
-    if hasattr(settings, 'DEVELOPMENT_MODE') and settings.DEVELOPMENT_MODE:
-        if hasattr(request, 'user') and request.user is not None and not isinstance(request.user, type(None)):
-            # Check if it's not an AnonymousUser by checking for email attribute
-            if hasattr(request.user, 'email') and request.user.email:
-                logger.info(f"Development mode: Using middleware user {request.user.email}, user_id: {request.user.id}")
+    # First check if middleware already set the user (happens in development with JWT decode)
+    if hasattr(request, 'user') and request.user is not None and hasattr(request.user, 'email'):
+        try:
+            # Verify it's a real User object, not AnonymousUser
+            if request.user.is_authenticated or hasattr(request.user, 'firebase_uid'):
+                logger.info(f"Using user from middleware: {request.user.email}, user_id: {request.user.id}")
                 return request.user, False
-        logger.error("Development mode: No user set by middleware")
-        return None, False
+        except AttributeError:
+            pass
     
     # Ensure we have the necessary Firebase authentication details
     if not hasattr(request, 'firebase_email') or not request.firebase_email:
@@ -45,9 +47,9 @@ def get_or_create_user(request):
             except User.DoesNotExist:
                 pass
 
-        # Try to find user by email
-        try:
-            user = User.objects.get(email=request.firebase_email)
+        # Try to find user by email (case-insensitive)
+        user = User.objects.filter(email__iexact=request.firebase_email).first()
+        if user:
             logger.info(f"User found by email: {user.email}")
             
             # Update Firebase UID if it wasn't set
@@ -57,15 +59,31 @@ def get_or_create_user(request):
                 logger.info(f"Updated Firebase UID for user: {user.email}")
             
             return user, False
-        except User.DoesNotExist:
-            pass
 
-        # User doesn't exist - this means they haven't registered through our system
-        logger.warning(f"User {request.firebase_email} authenticated with Firebase but not found in database")
-        return None, False
+        # AUTO-REGISTRATION: User authenticated with Firebase but not in DB - create them!
+        logger.warning(f"User {request.firebase_email} authenticated with Firebase but not in DB - creating new user")
+        
+        # Extract display name from Firebase user if available
+        display_name = ""
+        if hasattr(request, 'firebase_user') and request.firebase_user:
+            display_name = request.firebase_user.get('name', '') or request.firebase_user.get('display_name', '')
+        
+        # Create new user as passenger by default
+        new_user = User.objects.create(
+            email=request.firebase_email,
+            firebase_uid=getattr(request, 'firebase_uid', ''),
+            full_name=display_name or request.firebase_email.split('@')[0],
+            is_passenger=True,
+            is_staff=False,
+            is_admin=False,
+        )
+        logger.info(f"✅ Auto-registered new user: {new_user.email} (ID: {new_user.id})")
+        return new_user, True
 
     except Exception as e:
         logger.error(f"Error in get_or_create_user: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         return None, False
 
 # Development-only endpoints for user switching
@@ -385,14 +403,14 @@ def list_users(request):
     try:
         users = User.objects.all()
         data = [{
-            'id': user.id,
+            'id': str(user.id),
             'email': user.email,
-            'full_name': user.full_name,
-            'phone_number': user.phone_number,
-            'user_type': user.user_type,
-            'is_admin': user.is_user_admin,
-            'is_staff': user.is_user_staff,
-            'date_joined': user.date_joined
+            'full_name': user.full_name or 'N/A',
+            'role': 'admin' if user.is_user_admin else ('staff' if user.is_user_staff else 'passenger'),
+            'status': 'active' if user.is_active else 'inactive',
+            'phone_number': user.phone_number or '',
+            'location': getattr(user, 'address', '') or '',
+            'created_at': user.date_joined.isoformat() if user.date_joined else ''
         } for user in users]
         
         return Response(data)
@@ -693,4 +711,174 @@ def delete_user_account(request):
         
     except Exception as e:
         logger.error(f"Error in delete_user_account: {str(e)}")
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+def staff_list(request):
+    """Get list of all staff members"""
+    try:
+        from .models import Staff
+        
+        staff_members = Staff.objects.select_related('user').all()
+        
+        staff_data = [{
+            'id': staff.user_id,
+            'user_id': staff.user_id,
+            'email': staff.email,
+            'full_name': staff.full_name,
+            'department': staff.department,
+            'role': staff.role,
+            'location': staff.location,
+            'status': staff.status,
+            'rating': float(staff.rating),
+            'active_tickets': staff.active_tickets,
+            'joining_date': staff.joining_date.isoformat() if staff.joining_date else None,
+        } for staff in staff_members]
+        
+        return Response(staff_data, status=200)
+    except Exception as e:
+        logger.error(f"Error in staff_list: {str(e)}")
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+def staff_performance(request):
+    """Get staff performance metrics"""
+    try:
+        from .models import StaffPerformance, Staff
+        from django.db.models import Avg
+        
+        month = request.GET.get('month')
+        year = request.GET.get('year')
+        
+        performance_query = StaffPerformance.objects.select_related('staff', 'staff__user')
+        
+        if month:
+            performance_query = performance_query.filter(month=int(month))
+        if year:
+            performance_query = performance_query.filter(year=int(year))
+        
+        performance_data = [{
+            'staff_id': perf.staff.user_id,
+            'staff_name': perf.staff.full_name,
+            'staff_email': perf.staff.email,
+            'month': perf.month,
+            'year': perf.year,
+            'tickets_resolved': perf.tickets_resolved,
+            'avg_resolution_time': float(perf.avg_resolution_time),
+            'customer_satisfaction': float(perf.customer_satisfaction),
+            'complaints_received': perf.complaints_received,
+        } for perf in performance_query]
+        
+        return Response(performance_data, status=200)
+    except Exception as e:
+        logger.error(f"Error in staff_performance: {str(e)}")
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['POST'])
+def staff_register(request):
+    """Register a new staff member (called during signup, before authentication)"""
+    try:
+        from .models import Staff
+        import firebase_admin.auth as firebase_auth
+        
+        logger.info("staff_register called - Starting staff registration...")
+        
+        # Get Firebase ID token from Authorization header
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if not auth_header.startswith('Bearer '):
+            logger.error("No Bearer token in Authorization header")
+            return Response({'error': 'No authentication token provided'}, status=401)
+        
+        token = auth_header.split(' ')[1]
+        logger.info(f"Token received (length: {len(token)})")
+        
+        try:
+            # Verify the Firebase token
+            decoded_token = firebase_auth.verify_id_token(token)
+            firebase_uid = decoded_token.get('uid')
+            firebase_email = decoded_token.get('email')
+            logger.info(f"✅ Firebase token verified - UID: {firebase_uid}, Email: {firebase_email}")
+        except Exception as e:
+            logger.error(f"❌ Firebase token verification failed: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return Response({'error': f'Invalid authentication token: {str(e)}'}, status=401)
+        
+        # Get staff data from request
+        staff_data = request.data
+        
+        logger.info(f"📝 Staff registration data received:")
+        logger.info(f"   Email: {firebase_email}")
+        logger.info(f"   Name: {staff_data.get('name')}")
+        logger.info(f"   Employee ID: {staff_data.get('employee_id')}")
+        logger.info(f"   Department: {staff_data.get('department')}")
+        logger.info(f"   Role: {staff_data.get('role')}")
+        
+        # Create User entry
+        try:
+            user, created = User.objects.update_or_create(
+                email=firebase_email,
+                defaults={
+                    'firebase_uid': firebase_uid,
+                    'full_name': staff_data.get('name', ''),
+                    'phone_number': staff_data.get('phone_number', ''),
+                    'gender': staff_data.get('gender', ''),
+                    'address': staff_data.get('address', ''),
+                    'user_type': 'staff',
+                    'is_staff': True,
+                    'is_admin': False,
+                    'is_passenger': False,
+                }
+            )
+            
+            logger.info(f"✅ User {'created' if created else 'updated'}: {user.email} (ID: {user.id})")
+        except Exception as e:
+            logger.error(f"❌ Failed to create User: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return Response({'error': f'Failed to create user: {str(e)}'}, status=500)
+        
+        # Create Staff profile
+        try:
+            staff, staff_created = Staff.objects.update_or_create(
+                user=user,
+                defaults={
+                    'email': firebase_email,  # Required field
+                    'full_name': staff_data.get('name', ''),  # Required field
+                    'phone_number': staff_data.get('phone_number', ''),
+                    'employee_id': staff_data.get('employee_id', ''),
+                    'department': staff_data.get('department', ''),
+                    'role': staff_data.get('role', ''),
+                    'location': staff_data.get('location', ''),
+                    'expertise': staff_data.get('expertise', []),
+                    'languages': staff_data.get('languages', []),
+                    'communication_preferences': staff_data.get('communication_channels', []),  # Note: model field is communication_preferences
+                    'status': 'active',
+                }
+            )
+            
+            logger.info(f"✅ Staff profile {'created' if staff_created else 'updated'}: {staff.employee_id} (ID: {staff.user_id})")
+        except Exception as e:
+            logger.error(f"❌ Failed to create Staff profile: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return Response({'error': f'Failed to create staff profile: {str(e)}'}, status=500)
+        
+        logger.info(f"🎉 Staff registration completed successfully for {user.email}")
+        
+        return Response({
+            'message': 'Staff registered successfully',
+            'user_id': user.id,
+            'staff_id': staff.user_id,  # Staff uses user_id as primary key
+            'email': user.email,
+            'user_type': 'staff'
+        }, status=201)
+        
+    except Exception as e:
+        logger.error(f"Error in staff_register: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         return Response({'error': str(e)}, status=500)

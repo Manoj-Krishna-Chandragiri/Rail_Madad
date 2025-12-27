@@ -1,6 +1,7 @@
 import { Zap, Search, CheckCircle, Clock, AlertTriangle, MessageSquare, FileText } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
+import apiClient from '../utils/api';
 import axios from 'axios';
 
 interface Solution {
@@ -43,19 +44,12 @@ const QuickResolution = () => {
     try {
       setLoading(true);
       setError(null);
-      const token = localStorage.getItem('authToken');
-      
-      if (!token) {
-        setError('Authentication required');
-        return;
-      }
 
-      const headers = { Authorization: `Bearer ${token}` };
-
+      // apiClient automatically includes the token from interceptor
       // Fetch stats and solutions in parallel
       const [statsResponse, solutionsResponse] = await Promise.all([
-        axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/complaints/admin/quick-resolution/stats/`, { headers }),
-        axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/complaints/admin/quick-resolution/solutions/`, { headers })
+        apiClient.get('/api/complaints/admin/quick-resolution/stats/'),
+        apiClient.get('/api/complaints/admin/quick-resolution/solutions/')
       ]);
 
       setStats(statsResponse.data);

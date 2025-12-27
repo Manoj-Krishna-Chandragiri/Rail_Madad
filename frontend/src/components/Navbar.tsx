@@ -36,7 +36,7 @@ const Navbar = ({ toggleSidebar }: NavbarProps) => {
 
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
-    navigate('/login');
+    navigate('/login-portal');
   };
 
   const getUserType = (): 'admin' | 'user' | null => {
