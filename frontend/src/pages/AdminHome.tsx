@@ -221,7 +221,7 @@ const AdminHome = () => {
               View Dashboard
             </Link>
             <Link 
-              to="/admin-dashboard/staff" 
+              to="/admin-dashboard/staff-management" 
               className="px-6 py-3 bg-indigo-700 text-white rounded-lg font-medium hover:bg-indigo-800 transition-colors shadow-md hover:shadow-lg"
             >
               Manage Staff
@@ -329,7 +329,7 @@ const AdminHome = () => {
           </Link>
           
           <Link 
-            to="/admin-dashboard/staff" 
+            to="/admin-dashboard/staff-management" 
             className={`flex flex-col items-center p-6 rounded-lg border transition-all duration-300 ${cardHoverClass} transform hover:translate-y-[-4px]`}
           >
             <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${isDark ? 'bg-blue-900/50' : 'bg-blue-100'}`}>

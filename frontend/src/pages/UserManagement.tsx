@@ -40,6 +40,7 @@ const UserManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
@@ -59,14 +60,25 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      setError(null);
+      
+      console.log('Fetching users from API...');
       const response = await apiClient.get('/api/accounts/users/');
+      console.log('Users response:', response.data);
       
       if (response.data) {
         setUsers(response.data);
         calculateStats(response.data);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch users:', err);
+      const errorMsg = err.response?.data?.error || err.message || 'Failed to fetch users';
+      setError(errorMsg);
+      
+      // If it's an authentication error, show a specific message
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        setError('Authentication error. Please logout and login again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -128,6 +140,26 @@ const UserManagement = () => {
     return (
       <div className={`min-h-screen ${bgGradient} flex items-center justify-center`}>
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={`min-h-screen ${bgGradient} p-6`}>
+        <div className="max-w-4xl mx-auto">
+          <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-8 text-center`}>
+            <div className="text-red-500 text-6xl mb-4">⚠️</div>
+            <h2 className="text-2xl font-bold mb-2">Error Loading Users</h2>
+            <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} mb-6`}>{error}</p>
+            <button
+              onClick={fetchUsers}
+              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

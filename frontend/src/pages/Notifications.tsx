@@ -9,21 +9,23 @@ import {
   Trash2,
   CheckCheck,
   Filter,
-  Search
+  Search,
+  Users,
+  TrendingUp,
+  FileText
 } from 'lucide-react';
-import axios from 'axios';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+import apiClient from '../utils/api';
 
 interface Notification {
   id: string;
-  type: 'complaint_update' | 'assignment' | 'resolution' | 'system';
+  type: 'complaint_update' | 'assignment' | 'resolution' | 'system' | 'staff_assigned' | 'analytics' | 'user_activity';
   title: string;
   message: string;
   complaint_id?: string;
   is_read: boolean;
   created_at: string;
   priority: 'low' | 'medium' | 'high';
+  role_specific?: boolean;
 }
 
 const Notifications = () => {
@@ -35,60 +37,190 @@ const Notifications = () => {
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [userRole, setUserRole] = useState<string>('passenger');
 
   useEffect(() => {
-    fetchNotifications();
+    // Get user role from localStorage
+    const role = localStorage.getItem('userRole') || 'passenger';
+    setUserRole(role);
+    fetchNotifications(role);
   }, []);
 
   useEffect(() => {
     filterNotifications();
   }, [notifications, filterType, searchTerm]);
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = async (role: string) => {
     try {
       setLoading(true);
-      // Mock data - replace with actual API call
-      const mockNotifications: Notification[] = [
-        {
-          id: '1',
-          type: 'complaint_update',
-          title: 'Complaint Status Updated',
-          message: 'Your complaint #12345 has been assigned to a staff member and is being reviewed.',
-          complaint_id: '12345',
-          is_read: false,
-          created_at: new Date().toISOString(),
-          priority: 'high'
-        },
-        {
-          id: '2',
-          type: 'resolution',
-          title: 'Complaint Resolved',
-          message: 'Your complaint #12340 regarding cleanliness has been marked as resolved. Please provide feedback.',
-          complaint_id: '12340',
-          is_read: false,
-          created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          priority: 'medium'
-        },
-        {
-          id: '3',
-          type: 'assignment',
-          title: 'Staff Assigned',
-          message: 'A staff member has been assigned to handle your complaint #12342.',
-          complaint_id: '12342',
-          is_read: true,
-          created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          priority: 'medium'
-        },
-        {
-          id: '4',
-          type: 'system',
-          title: 'System Maintenance',
-          message: 'The Rail Madad system will undergo scheduled maintenance on Sunday, 2:00 AM - 4:00 AM.',
-          is_read: true,
-          created_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-          priority: 'low'
-        }
-      ];
+      
+      // Try to fetch from API
+      try {
+        const response = await apiClient.get(`/api/notifications/?role=${role}`);
+        setNotifications(response.data);
+        return;
+      } catch (apiError) {
+        console.log('API not available, using mock data');
+      }
+      
+      // Mock data based on role
+      let mockNotifications: Notification[] = [];
+      
+      if (role === 'admin') {
+        // Admin-specific notifications
+        mockNotifications = [
+          {
+            id: '1',
+            type: 'user_activity',
+            title: 'New User Registration',
+            message: '5 new passengers registered in the last 24 hours.',
+            is_read: false,
+            created_at: new Date().toISOString(),
+            priority: 'medium',
+            role_specific: true
+          },
+          {
+            id: '2',
+            type: 'analytics',
+            title: 'Complaint Resolution Rate Increased',
+            message: 'Great news! Resolution rate improved to 85% this week, up from 78% last week.',
+            is_read: false,
+            created_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+            priority: 'low',
+            role_specific: true
+          },
+          {
+            id: '3',
+            type: 'staff_assigned',
+            title: 'Staff Performance Report Ready',
+            message: 'Monthly staff performance report is now available for review.',
+            is_read: false,
+            created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+            priority: 'medium',
+            role_specific: true
+          },
+          {
+            id: '4',
+            type: 'complaint_update',
+            title: 'High Priority Complaints',
+            message: '23 complaints require immediate attention. Please assign staff members.',
+            complaint_id: 'Multiple',
+            is_read: true,
+            created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+            priority: 'high',
+            role_specific: true
+          },
+          {
+            id: '5',
+            type: 'analytics',
+            title: 'Weekly Analytics Summary',
+            message: 'System processed 142 complaints this week. View detailed analytics dashboard.',
+            is_read: true,
+            created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+            priority: 'low',
+            role_specific: true
+          },
+          {
+            id: '6',
+            type: 'system',
+            title: 'System Backup Completed',
+            message: 'Daily system backup completed successfully at 2:00 AM.',
+            is_read: true,
+            created_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+            priority: 'low'
+          }
+        ];
+      } else if (role === 'staff') {
+        // Staff-specific notifications
+        mockNotifications = [
+          {
+            id: '1',
+            type: 'assignment',
+            title: 'New Complaint Assigned',
+            message: 'You have been assigned complaint #12345 regarding cleanliness issues.',
+            complaint_id: '12345',
+            is_read: false,
+            created_at: new Date().toISOString(),
+            priority: 'high',
+            role_specific: true
+          },
+          {
+            id: '2',
+            type: 'complaint_update',
+            title: 'Complaint Deadline Approaching',
+            message: 'Complaint #12340 is due for resolution in 2 hours.',
+            complaint_id: '12340',
+            is_read: false,
+            created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+            priority: 'high',
+            role_specific: true
+          },
+          {
+            id: '3',
+            type: 'resolution',
+            title: 'Resolution Approved',
+            message: 'Your resolution for complaint #12338 has been approved by the admin.',
+            complaint_id: '12338',
+            is_read: true,
+            created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+            priority: 'medium',
+            role_specific: true
+          },
+          {
+            id: '4',
+            type: 'system',
+            title: 'Performance Review',
+            message: 'Your monthly performance review is ready. Check your analytics dashboard.',
+            is_read: true,
+            created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+            priority: 'medium',
+            role_specific: true
+          }
+        ];
+      } else {
+        // Passenger-specific notifications
+        mockNotifications = [
+          {
+            id: '1',
+            type: 'complaint_update',
+            title: 'Complaint Status Updated',
+            message: 'Your complaint #12345 has been assigned to a staff member and is being reviewed.',
+            complaint_id: '12345',
+            is_read: false,
+            created_at: new Date().toISOString(),
+            priority: 'high'
+          },
+          {
+            id: '2',
+            type: 'resolution',
+            title: 'Complaint Resolved',
+            message: 'Your complaint #12340 regarding cleanliness has been marked as resolved. Please provide feedback.',
+            complaint_id: '12340',
+            is_read: false,
+            created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+            priority: 'medium'
+          },
+          {
+            id: '3',
+            type: 'assignment',
+            title: 'Staff Assigned',
+            message: 'A staff member has been assigned to handle your complaint #12342.',
+            complaint_id: '12342',
+            is_read: true,
+            created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+            priority: 'medium'
+          },
+          {
+            id: '4',
+            type: 'system',
+            title: 'Service Update',
+            message: 'New AI-powered assistance feature is now available. Try it out!',
+            is_read: true,
+            created_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+            priority: 'low'
+          }
+        ];
+      }
       
       setNotifications(mockNotifications);
     } catch (err) {
@@ -157,6 +289,12 @@ const Notifications = () => {
         return <CheckCircle2 className="h-6 w-6 text-green-500" />;
       case 'system':
         return <AlertTriangle className="h-6 w-6 text-purple-500" />;
+      case 'staff_assigned':
+        return <Users className="h-6 w-6 text-indigo-500" />;
+      case 'analytics':
+        return <TrendingUp className="h-6 w-6 text-emerald-500" />;
+      case 'user_activity':
+        return <FileText className="h-6 w-6 text-cyan-500" />;
       default:
         return <Bell className="h-6 w-6 text-gray-500" />;
     }
@@ -209,7 +347,11 @@ const Notifications = () => {
                 )}
               </div>
               <p className={`text-lg mt-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                Stay updated with your complaint status
+                {userRole === 'admin' 
+                  ? 'Stay updated with system activity and admin alerts' 
+                  : userRole === 'staff'
+                  ? 'Track your assigned complaints and deadlines'
+                  : 'Stay updated with your complaint status'}
               </p>
             </div>
             {unreadCount > 0 && (
@@ -258,8 +400,11 @@ const Notifications = () => {
                 <option value="all">All Notifications</option>
                 <option value="unread">Unread Only</option>
                 <option value="complaint_update">Complaint Updates</option>
-                <option value="assignment">Assignments</option>
+                {userRole !== 'admin' && <option value="assignment">Assignments</option>}
                 <option value="resolution">Resolutions</option>
+                {userRole === 'admin' && <option value="analytics">Analytics</option>}
+                {userRole === 'admin' && <option value="user_activity">User Activity</option>}
+                {userRole === 'admin' && <option value="staff_assigned">Staff</option>}
                 <option value="system">System</option>
               </select>
             </div>
