@@ -15,6 +15,7 @@ urlpatterns = [
     path('users/', views.list_users, name='list_users'),
     path('admin/verify/', verify_admin, name='verify-admin'),
     path('admin/profile/', get_admin_profile, name='admin-profile'),
+    path('notifications/', views.get_notifications, name='get_notifications'),
     # Development endpoints
     path('dev/users/', views.dev_list_users, name='dev_list_users'),
     path('dev/switch-user/', views.dev_switch_user, name='dev_switch_user'),

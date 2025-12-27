@@ -12,7 +12,7 @@ import {
   CheckCircle2,
   AlertTriangle
 } from 'lucide-react';
-import axios from 'axios';
+import apiClient from '../utils/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -53,7 +53,7 @@ const StaffAnalytics = () => {
     try {
       setLoading(true);
       const userEmail = localStorage.getItem('userEmail');
-      const response = await axios.get(`${API_BASE_URL}/api/accounts/staff/performance/`, {
+      const response = await apiClient.get('/api/accounts/staff/performance/', {
         params: { email: userEmail }
       });
       
@@ -185,7 +185,7 @@ const StaffAnalytics = () => {
                   Avg Resolution Time
                 </h3>
                 <p className="text-3xl font-bold text-purple-500 mb-1">
-                  {currentMonth.avg_resolution_time.toFixed(1)}h
+                  {currentMonth?.avg_resolution_time?.toFixed(1) || '0.0'}h
                 </p>
                 <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
                   Per ticket

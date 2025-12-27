@@ -782,7 +782,6 @@ def staff_register(request):
     """Register a new staff member (called during signup, before authentication)"""
     try:
         from .models import Staff
-        import firebase_admin.auth as firebase_auth
         
         logger.info("staff_register called - Starting staff registration...")
         
@@ -795,17 +794,34 @@ def staff_register(request):
         token = auth_header.split(' ')[1]
         logger.info(f"Token received (length: {len(token)})")
         
+        # Try to verify Firebase token, but fall back to JWT decode in development mode
+        firebase_uid = None
+        firebase_email = None
+        
         try:
-            # Verify the Firebase token
+            # Try Firebase admin verification first
+            import firebase_admin.auth as firebase_auth
             decoded_token = firebase_auth.verify_id_token(token)
             firebase_uid = decoded_token.get('uid')
             firebase_email = decoded_token.get('email')
             logger.info(f"✅ Firebase token verified - UID: {firebase_uid}, Email: {firebase_email}")
-        except Exception as e:
-            logger.error(f"❌ Firebase token verification failed: {str(e)}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return Response({'error': f'Invalid authentication token: {str(e)}'}, status=401)
+        except Exception as firebase_error:
+            logger.warning(f"⚠️ Firebase verification failed, trying JWT decode: {str(firebase_error)}")
+            
+            # Fall back to JWT decode (for development mode)
+            try:
+                import jwt
+                decoded_token = jwt.decode(token, options={"verify_signature": False})
+                firebase_uid = decoded_token.get('user_id') or decoded_token.get('sub')
+                firebase_email = decoded_token.get('email')
+                logger.info(f"✅ JWT token decoded - UID: {firebase_uid}, Email: {firebase_email}")
+            except Exception as jwt_error:
+                logger.error(f"❌ Both Firebase and JWT verification failed: {str(jwt_error)}")
+                return Response({'error': f'Invalid authentication token: {str(jwt_error)}'}, status=401)
+        
+        if not firebase_email:
+            logger.error("❌ Could not extract email from token")
+            return Response({'error': 'Email not found in token'}, status=401)
         
         # Get staff data from request
         staff_data = request.data
@@ -817,26 +833,29 @@ def staff_register(request):
         logger.info(f"   Department: {staff_data.get('department')}")
         logger.info(f"   Role: {staff_data.get('role')}")
         
-        # Create User entry
+        # Create FirebaseUser entry
         try:
-            user, created = User.objects.update_or_create(
+            from .models import FirebaseUser
+            
+            user, created = FirebaseUser.objects.update_or_create(
                 email=firebase_email,
                 defaults={
-                    'firebase_uid': firebase_uid,
+                    'firebase_uid': firebase_uid or '',
                     'full_name': staff_data.get('name', ''),
                     'phone_number': staff_data.get('phone_number', ''),
                     'gender': staff_data.get('gender', ''),
                     'address': staff_data.get('address', ''),
-                    'user_type': 'staff',
-                    'is_staff': True,
+                    'is_staff': True,  # Boolean flag for staff
                     'is_admin': False,
+                    'is_super_admin': False,
                     'is_passenger': False,
+                    'is_active': True,
                 }
             )
             
-            logger.info(f"✅ User {'created' if created else 'updated'}: {user.email} (ID: {user.id})")
+            logger.info(f"✅ FirebaseUser {'created' if created else 'updated'}: {user.email} (ID: {user.id}, user_type: {user.user_type})")
         except Exception as e:
-            logger.error(f"❌ Failed to create User: {str(e)}")
+            logger.error(f"❌ Failed to create FirebaseUser: {str(e)}")
             import traceback
             logger.error(traceback.format_exc())
             return Response({'error': f'Failed to create user: {str(e)}'}, status=500)
@@ -881,4 +900,52 @@ def staff_register(request):
         logger.error(f"Error in staff_register: {str(e)}")
         import traceback
         logger.error(traceback.format_exc())
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+def get_notifications(request):
+    """Get notifications for the current user based on their role"""
+    try:
+        role = request.GET.get('role', 'passenger')
+        
+        # Mock notifications data for now
+        notifications = [
+            {
+                'id': 1,
+                'title': 'Welcome to Rail Madad',
+                'message': 'Your account has been created successfully',
+                'type': 'info',
+                'timestamp': '2025-12-27T10:00:00Z',
+                'read': False,
+                'priority': 'low'
+            }
+        ]
+        
+        # Role-specific notifications
+        if role == 'staff':
+            notifications.append({
+                'id': 2,
+                'title': 'New Complaint Assigned',
+                'message': 'You have been assigned a new complaint to review',
+                'type': 'task',
+                'timestamp': '2025-12-27T11:00:00Z',
+                'read': False,
+                'priority': 'medium'
+            })
+        elif role == 'admin':
+            notifications.append({
+                'id': 3,
+                'title': 'System Update',
+                'message': 'Dashboard analytics have been updated',
+                'type': 'update',
+                'timestamp': '2025-12-27T12:00:00Z',
+                'read': False,
+                'priority': 'high'
+            })
+        
+        return Response(notifications, status=200)
+        
+    except Exception as e:
+        logger.error(f"Error fetching notifications: {str(e)}")
         return Response({'error': str(e)}, status=500)

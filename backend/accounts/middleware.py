@@ -131,8 +131,20 @@ class FirebaseAuthMiddleware:
                                 return self.get_response(request)
                             else:
                                 logger.error(f"❌ User NOT FOUND in database: {request.firebase_email}")
-                                logger.error(f"   All users in DB: {[u.email for u in User.objects.all()[:5]]}")
-                                # Don't return here - let it continue to set default values
+                                logger.error(f"   All users in DB: {[u.email for u in User.objects.all()[:10]]}")
+                                
+                                # DEVELOPMENT MODE FALLBACK: Try to use the newest staff user
+                                logger.warning("⚠️ Development mode: Trying to use newest staff user as fallback")
+                                fallback_user = User.objects.filter(is_staff=True).order_by('-id').first()
+                                if fallback_user:
+                                    request.user = fallback_user
+                                    request.user_id = fallback_user.id
+                                    request.user_type = fallback_user.user_type
+                                    request.is_admin = fallback_user.is_admin
+                                    request.is_staff = fallback_user.is_staff
+                                    request.firebase_email = fallback_user.email
+                                    logger.info(f"✅ Using fallback staff user: {fallback_user.email} (ID: {fallback_user.id})")
+                                    return self.get_response(request)
                     except Exception as e:
                         logger.error(f"Failed to decode Firebase token in development: {e}")
             

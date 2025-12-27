@@ -17,7 +17,7 @@ import {
   Target,
   Activity
 } from 'lucide-react';
-import axios from 'axios';
+import apiClient from '../utils/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -66,7 +66,7 @@ const StaffHome = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/api/complaints/staff/dashboard/`);
+      const response = await apiClient.get('/api/complaints/staff/dashboard/');
       
       if (response.data) {
         const data = response.data;

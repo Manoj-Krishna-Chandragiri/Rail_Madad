@@ -12,7 +12,7 @@ import {
   Badge,
   Bell
 } from 'lucide-react';
-import axios from 'axios';
+import apiClient from '../utils/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
 
@@ -64,7 +64,7 @@ const StaffDashboard: React.FC = () => {
   const fetchStaffDashboard = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/api/complaints/staff/dashboard/`);
+      const response = await apiClient.get('/api/complaints/staff/dashboard/');
       
       if (response.data.success) {
         setComplaints(response.data.complaints || []);
@@ -82,7 +82,7 @@ const StaffDashboard: React.FC = () => {
 
   const handleResolveComplaint = async (complaintId: string) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/complaints/staff/resolve/${complaintId}/`);
+      const response = await apiClient.post(`/api/complaints/staff/resolve/${complaintId}/`);
       
       if (response.data.success) {
         // Update the complaint status locally
@@ -111,7 +111,7 @@ const StaffDashboard: React.FC = () => {
 
   const handleTakeAction = async (complaintId: string) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/complaints/staff/take-action/${complaintId}/`);
+      const response = await apiClient.post(`/api/complaints/staff/take-action/${complaintId}/`);
       
       if (response.data.success) {
         // Update the complaint status to in-progress

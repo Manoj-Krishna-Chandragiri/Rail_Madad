@@ -14,6 +14,9 @@ export const fetchAndStoreUserProfile = async () => {
     // Get a fresh token
     const token = await user.getIdToken(true);
     
+    // Store the token for future API calls
+    localStorage.setItem('authToken', token);
+    
     // Make API call to get user profile using apiClient
     const response = await apiClient.get(
       `/api/accounts/profile/`,

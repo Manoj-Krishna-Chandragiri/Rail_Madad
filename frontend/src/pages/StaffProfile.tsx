@@ -16,7 +16,7 @@ import {
   Target,
   TrendingUp
 } from 'lucide-react';
-import axios from 'axios';
+import apiClient from '../utils/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -68,7 +68,7 @@ const StaffProfile = () => {
     try {
       setLoading(true);
       const userEmail = localStorage.getItem('userEmail');
-      const response = await axios.get(`${API_BASE_URL}/api/accounts/profile/`, {
+      const response = await apiClient.get('/api/accounts/profile/', {
         params: { email: userEmail }
       });
       
@@ -89,7 +89,7 @@ const StaffProfile = () => {
       setError('');
       setSuccess('');
       
-      const response = await axios.put(`${API_BASE_URL}/api/accounts/profile/update/`, profile);
+      const response = await apiClient.put('/api/accounts/profile/update/', profile);
       
       if (response.data) {
         setSuccess('Profile updated successfully!');

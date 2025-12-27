@@ -161,7 +161,7 @@ const StaffLogin = () => {
       // Dispatch custom event to notify app of user type change
       window.dispatchEvent(new Event('userTypeChanged'));
       
-      navigate('/admin-dashboard/staff-dashboard');
+      navigate('/staff-dashboard');
     } catch (error: any) {
       console.error('Staff login error:', error);
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
@@ -195,7 +195,7 @@ const StaffLogin = () => {
       localStorage.setItem('isStaff', 'true');
       
       window.dispatchEvent(new Event('userTypeChanged'));
-      navigate('/admin-dashboard/staff-dashboard');
+      navigate('/staff-dashboard');
     } catch (error: any) {
       console.error('Google sign-in error:', error);
       setErrors({ general: 'Google sign-in failed. Please try again.' });

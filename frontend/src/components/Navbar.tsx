@@ -54,7 +54,7 @@ const Navbar = ({ toggleSidebar }: NavbarProps) => {
 
   const fetchNotifications = async (role: string) => {
     try {
-      const response = await apiClient.get(`/api/notifications/?role=${role}`);
+      const response = await apiClient.get(`/api/accounts/notifications/?role=${role}`);
       setNotifications(response.data.slice(0, 5)); // Only show 5 recent notifications
     } catch (error) {
       // Use mock data if API fails

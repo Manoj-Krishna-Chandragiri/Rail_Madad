@@ -56,7 +56,7 @@ const Notifications = () => {
       
       // Try to fetch from API
       try {
-        const response = await apiClient.get(`/api/notifications/?role=${role}`);
+        const response = await apiClient.get(`/api/accounts/notifications/?role=${role}`);
         setNotifications(response.data);
         return;
       } catch (apiError) {
