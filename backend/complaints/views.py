@@ -8,6 +8,7 @@ from django.http import JsonResponse
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
 from .models import Complaint, Staff, QuickSolution
 from .serializers import ComplaintSerializer, StaffSerializer
 import os
@@ -662,35 +663,66 @@ def admin_staff_list(request):
         print("Admin staff creation - serializer errors:", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+@csrf_exempt
 @api_view(['GET', 'PUT', 'DELETE'])
 def admin_staff_detail(request, pk):
     """
     Retrieve, update or delete a staff member
     """
+    print(f"\n{'='*80}")
+    print(f"[STAFF_DETAIL] Method: {request.method}, Staff ID: {pk}")
+    print(f"[STAFF_DETAIL] Authorization header present: {bool(request.META.get('HTTP_AUTHORIZATION'))}")
+    
     # Check authentication using custom middleware attributes
-    if not hasattr(request, 'is_authenticated') or not request.is_authenticated:
+    is_authenticated = getattr(request, 'is_authenticated', False)
+    is_admin = getattr(request, 'is_admin', False)
+    is_staff = getattr(request, 'is_staff', False)
+    firebase_email = getattr(request, 'firebase_email', None)
+    user_id = getattr(request, 'user_id', None)
+    
+    print(f"[STAFF_DETAIL] Auth status:")
+    print(f"  - is_authenticated: {is_authenticated}")
+    print(f"  - is_admin: {is_admin}")
+    print(f"  - is_staff: {is_staff}")
+    print(f"  - firebase_email: {firebase_email}")
+    print(f"  - user_id: {user_id}")
+    
+    if not is_authenticated:
+        print("[STAFF_DETAIL] ❌ Authentication failed - returning 401")
         return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
     
-    # Ensure the user is an admin
-    if not (getattr(request, 'is_admin', False) or getattr(request, 'is_staff', False)):
-        return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+    # Allow both admin and staff to update
+    if not (is_admin or is_staff):
+        print(f"[STAFF_DETAIL] ❌ Access denied - neither admin nor staff (admin={is_admin}, staff={is_staff})")
+        return Response({'error': 'Admin or Staff access required'}, status=status.HTTP_403_FORBIDDEN)
+    
+    print(f"[STAFF_DETAIL] ✅ Access granted (admin={is_admin}, staff={is_staff})")
     
     staff = get_object_or_404(Staff, pk=pk)
+    print(f"Found staff: {staff.name} (ID: {staff.id})")
     
     if request.method == 'GET':
         serializer = StaffSerializer(staff, context={'request': request})
         return Response(serializer.data)
     
     elif request.method == 'PUT':
-        serializer = StaffSerializer(staff, data=request.data, context={'request': request})
+        print(f"PUT request data: {request.data}")
+        print(f"PUT request FILES: {request.FILES}")
+        serializer = StaffSerializer(staff, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             updated_staff = serializer.save()
+            print(f"Staff updated successfully: {updated_staff.name}")
             response_serializer = StaffSerializer(updated_staff, context={'request': request})
             return Response(response_serializer.data)
+        print(f"Serializer errors: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     elif request.method == 'DELETE':
+        # Only admins can delete staff
+        if not is_admin:
+            return Response({'error': 'Only admins can delete staff members'}, status=status.HTTP_403_FORBIDDEN)
         staff.delete()
+        print(f"Staff deleted: {staff.name}")
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 # Admin Dashboard Statistics API View

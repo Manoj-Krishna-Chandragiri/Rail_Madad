@@ -27,6 +27,7 @@ class StaffSerializer(serializers.ModelSerializer):
     class Meta:
         model = Staff
         fields = '__all__'
+        read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_avatar_url(self, obj):
         if obj.avatar:
@@ -42,3 +43,12 @@ class StaffSerializer(serializers.ModelSerializer):
         # Replace avatar field with the full URL in the response
         data['avatar'] = self.get_avatar_url(instance)
         return data
+    
+    def validate_email(self, value):
+        """Ensure email is unique (except for the current instance during updates)"""
+        instance = getattr(self, 'instance', None)
+        if instance and instance.email == value:
+            return value
+        if Staff.objects.filter(email=value).exists():
+            raise serializers.ValidationError("A staff member with this email already exists.")
+        return value

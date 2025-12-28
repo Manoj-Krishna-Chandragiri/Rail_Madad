@@ -212,7 +212,7 @@ class StaffAvailability(models.Model):
         ('offline', 'Offline'),
     ]
     
-    staff = models.ForeignKey(Staff, on_delete=models.CASCADE, related_name='availability_schedule')
+    staff = models.ForeignKey('complaints.Staff', on_delete=models.CASCADE, related_name='availability_schedule', null=True, blank=True)
     date = models.DateField()
     shift_start = models.TimeField()
     shift_end = models.TimeField()
@@ -234,7 +234,7 @@ class StaffAvailability(models.Model):
 class StaffPerformance(models.Model):
     """Track staff performance metrics"""
     
-    staff = models.ForeignKey(Staff, on_delete=models.CASCADE, related_name='performance_metrics')
+    staff = models.ForeignKey('complaints.Staff', on_delete=models.CASCADE, related_name='performance_history', null=True, blank=True)
     month = models.IntegerField()  # 1-12
     year = models.IntegerField()
     tickets_resolved = models.IntegerField(default=0)

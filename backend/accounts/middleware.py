@@ -17,6 +17,12 @@ class FirebaseAuthMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        # Log ALL requests to see what's hitting the middleware
+        if request.path.startswith('/api/complaints/admin/staff'):
+            logger.info(f"\n{'='*80}")
+            logger.info(f"[MIDDLEWARE] {request.method} {request.path}")
+            logger.info(f"[MIDDLEWARE] Authorization header present: {bool(request.META.get('HTTP_AUTHORIZATION'))}")
+        
         # Extract the token from Authorization header first
         auth_header = request.META.get('HTTP_AUTHORIZATION')
         has_real_token = auth_header and auth_header.startswith('Bearer ') and len(auth_header.split(' ')[1]) > 100

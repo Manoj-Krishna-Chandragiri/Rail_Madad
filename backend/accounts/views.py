@@ -718,15 +718,16 @@ def delete_user_account(request):
 def staff_list(request):
     """Get list of all staff members"""
     try:
-        from .models import Staff
+        from complaints.models import Staff
         
-        staff_members = Staff.objects.select_related('user').all()
+        staff_members = Staff.objects.all()
         
         staff_data = [{
-            'id': staff.user_id,
-            'user_id': staff.user_id,
+            'id': staff.id,
+            'user_id': staff.id,  # Use staff.id since there's no separate user
             'email': staff.email,
-            'full_name': staff.full_name,
+            'full_name': staff.name,  # Changed from full_name to name
+            'name': staff.name,
             'department': staff.department,
             'role': staff.role,
             'location': staff.location,
@@ -739,6 +740,8 @@ def staff_list(request):
         return Response(staff_data, status=200)
     except Exception as e:
         logger.error(f"Error in staff_list: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return Response({'error': str(e)}, status=500)
 
 
@@ -746,34 +749,45 @@ def staff_list(request):
 def staff_performance(request):
     """Get staff performance metrics"""
     try:
-        from .models import StaffPerformance, Staff
+        from .models import StaffPerformance
+        from complaints.models import Staff
         from django.db.models import Avg
         
         month = request.GET.get('month')
         year = request.GET.get('year')
         
-        performance_query = StaffPerformance.objects.select_related('staff', 'staff__user')
+        logger.info(f"staff_performance called - month: {month}, year: {year}")
+        
+        # Since we're using 'complaints.Staff', we just select_related on 'staff'
+        performance_query = StaffPerformance.objects.select_related('staff')
         
         if month:
             performance_query = performance_query.filter(month=int(month))
         if year:
             performance_query = performance_query.filter(year=int(year))
         
-        performance_data = [{
-            'staff_id': perf.staff.user_id,
-            'staff_name': perf.staff.full_name,
-            'staff_email': perf.staff.email,
-            'month': perf.month,
-            'year': perf.year,
-            'tickets_resolved': perf.tickets_resolved,
-            'avg_resolution_time': float(perf.avg_resolution_time),
-            'customer_satisfaction': float(perf.customer_satisfaction),
-            'complaints_received': perf.complaints_received,
-        } for perf in performance_query]
+        logger.info(f"Found {performance_query.count()} performance records")
+        
+        performance_data = []
+        for perf in performance_query:
+            if perf.staff:  # Make sure staff is not null
+                performance_data.append({
+                    'staff_id': perf.staff.id,
+                    'staff_name': perf.staff.name,
+                    'staff_email': perf.staff.email,
+                    'month': perf.month,
+                    'year': perf.year,
+                    'tickets_resolved': perf.tickets_resolved,
+                    'avg_resolution_time': float(perf.avg_resolution_time),
+                    'customer_satisfaction': float(perf.customer_satisfaction),
+                    'complaints_received': perf.complaints_received,
+                })
         
         return Response(performance_data, status=200)
     except Exception as e:
         logger.error(f"Error in staff_performance: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return Response({'error': str(e)}, status=500)
 
 
@@ -781,7 +795,7 @@ def staff_performance(request):
 def staff_register(request):
     """Register a new staff member (called during signup, before authentication)"""
     try:
-        from .models import Staff
+        from complaints.models import Staff
         
         logger.info("staff_register called - Starting staff registration...")
         
@@ -853,33 +867,34 @@ def staff_register(request):
                 }
             )
             
-            logger.info(f"✅ FirebaseUser {'created' if created else 'updated'}: {user.email} (ID: {user.id}, user_type: {user.user_type})")
+            logger.info(f"✅ FirebaseUser {'created' if created else 'updated'}: {user.email} (ID: {user.id})")
         except Exception as e:
             logger.error(f"❌ Failed to create FirebaseUser: {str(e)}")
             import traceback
             logger.error(traceback.format_exc())
             return Response({'error': f'Failed to create user: {str(e)}'}, status=500)
         
-        # Create Staff profile
+        # Create Staff profile (new complaints.Staff model without user field)
         try:
+            import json
+            
             staff, staff_created = Staff.objects.update_or_create(
-                user=user,
+                email=firebase_email,  # Use email as unique identifier
                 defaults={
-                    'email': firebase_email,  # Required field
-                    'full_name': staff_data.get('name', ''),  # Required field
-                    'phone_number': staff_data.get('phone_number', ''),
+                    'name': staff_data.get('name', ''),  # Required field
+                    'phone': staff_data.get('phone_number', ''),
                     'employee_id': staff_data.get('employee_id', ''),
                     'department': staff_data.get('department', ''),
                     'role': staff_data.get('role', ''),
                     'location': staff_data.get('location', ''),
-                    'expertise': staff_data.get('expertise', []),
-                    'languages': staff_data.get('languages', []),
-                    'communication_preferences': staff_data.get('communication_channels', []),  # Note: model field is communication_preferences
+                    'expertise': json.dumps(staff_data.get('expertise', [])),
+                    'languages': json.dumps(staff_data.get('languages', [])),
+                    'communication_preferences': json.dumps(staff_data.get('communication_channels', ['Chat'])),
                     'status': 'active',
                 }
             )
             
-            logger.info(f"✅ Staff profile {'created' if staff_created else 'updated'}: {staff.employee_id} (ID: {staff.user_id})")
+            logger.info(f"✅ Staff profile {'created' if staff_created else 'updated'}: {staff.employee_id} (ID: {staff.id})")
         except Exception as e:
             logger.error(f"❌ Failed to create Staff profile: {str(e)}")
             import traceback
@@ -891,7 +906,7 @@ def staff_register(request):
         return Response({
             'message': 'Staff registered successfully',
             'user_id': user.id,
-            'staff_id': staff.user_id,  # Staff uses user_id as primary key
+            'staff_id': staff.id,  # Staff now uses its own id
             'email': user.email,
             'user_type': 'staff'
         }, status=201)

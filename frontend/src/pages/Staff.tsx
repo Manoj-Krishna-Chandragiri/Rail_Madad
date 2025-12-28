@@ -23,6 +23,7 @@ interface StaffMember {
   name: string;
   email: string;
   phone: string;
+  employee_id?: string;  // Added field
   role: string;
   department: string;
   location: string;
@@ -33,7 +34,11 @@ interface StaffMember {
   rating: number;
   active_tickets: number;
   languages: string[];
-  communication_preferences: string[]; // Add this new field
+  communication_preferences: string[];
+  performance_metrics?: any;  // Added field (JSON)
+  notes?: string;  // Added field
+  created_at?: string;  // Added field
+  updated_at?: string;  // Added field
 }
 
 const Staff = () => {
@@ -47,13 +52,15 @@ const Staff = () => {
     name: '',
     email: '',
     phone: '',
+    employee_id: '',  // Added field
     role: '',
     department: '',
     location: '',
     status: 'active',
     expertise: [],
     languages: [],
-    communication_preferences: ['Chat'] // Default to Chat
+    communication_preferences: ['Chat'], // Default to Chat
+    notes: ''  // Added field
   });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>('');
@@ -249,6 +256,7 @@ const Staff = () => {
       formData.append('name', newStaff.name || '');
       formData.append('email', newStaff.email || '');
       formData.append('phone', newStaff.phone || '');
+      formData.append('employee_id', newStaff.employee_id || '');  // Added field
       formData.append('role', newStaff.role || '');
       formData.append('department', newStaff.department || '');
       formData.append('location', newStaff.location || '');
@@ -258,6 +266,8 @@ const Staff = () => {
       formData.append('communication_preferences', JSON.stringify(newStaff.communication_preferences || ['Chat']));
       formData.append('rating', '0');
       formData.append('active_tickets', '0');
+      formData.append('performance_metrics', '{}');  // Added field
+      formData.append('notes', newStaff.notes || '');  // Added field
       
       // Append avatar file if selected
       if (avatarFile) {
@@ -315,13 +325,15 @@ const Staff = () => {
         name: '',
         email: '',
         phone: '',
+        employee_id: '',
         role: '',
         department: '',
         location: '',
         status: 'active',
         expertise: [],
         languages: [],
-        communication_preferences: ['Chat']
+        communication_preferences: ['Chat'],
+        notes: ''
       });
       setAvatarFile(null);
       setAvatarPreview('');
@@ -492,12 +504,14 @@ const Staff = () => {
       name: staff.name,
       email: staff.email,
       phone: staff.phone,
+      employee_id: staff.employee_id || '',
       role: staff.role,
       department: staff.department,
       location: staff.location || '',
       status: staff.status,
       avatar: staff.avatar,
       expertise: Array.isArray(staff.expertise) ? staff.expertise : [],
+      notes: staff.notes || '',
       languages: Array.isArray(staff.languages) ? staff.languages : [],
       communication_preferences: Array.isArray(staff.communication_preferences) ? staff.communication_preferences : ['Chat']
     });
@@ -527,6 +541,7 @@ const Staff = () => {
       formData.append('name', newStaff.name || '');
       formData.append('email', newStaff.email || '');
       formData.append('phone', newStaff.phone || '');
+      formData.append('employee_id', newStaff.employee_id || '');  // Added field
       formData.append('role', newStaff.role || '');
       formData.append('department', newStaff.department || '');
       formData.append('location', newStaff.location || '');
@@ -534,6 +549,7 @@ const Staff = () => {
       formData.append('expertise', JSON.stringify(newStaff.expertise || []));
       formData.append('languages', JSON.stringify(newStaff.languages || []));
       formData.append('communication_preferences', JSON.stringify(newStaff.communication_preferences || ['Chat']));
+      formData.append('notes', newStaff.notes || '');  // Added field
       
       // Append avatar file if selected
       if (avatarFile) {

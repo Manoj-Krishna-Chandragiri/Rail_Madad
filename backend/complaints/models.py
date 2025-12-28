@@ -84,8 +84,9 @@ class Staff(models.Model):
     name = models.CharField(max_length=100)
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=15)
-    role = models.CharField(max_length=50)
+    employee_id = models.CharField(max_length=50, blank=True, null=True)  # Added field
     department = models.CharField(max_length=50)
+    role = models.CharField(max_length=50)
     location = models.CharField(max_length=100, blank=True, null=True)
     avatar = models.ImageField(upload_to=staff_avatar_path, blank=True, null=True)
     status = models.CharField(
@@ -99,7 +100,10 @@ class Staff(models.Model):
     communication_preferences = models.TextField(blank=True, null=True, default='["Chat"]')  # Stored as JSON string
     rating = models.FloatField(default=0)
     active_tickets = models.IntegerField(default=0)
-    created_at = models.DateTimeField(default=timezone.now)  # Add default value
+    performance_metrics = models.TextField(blank=True, null=True, default='{}')  # Stored as JSON string
+    notes = models.TextField(blank=True, null=True)  # Added field
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)  # Added field
 
     def __str__(self):
         return self.name
