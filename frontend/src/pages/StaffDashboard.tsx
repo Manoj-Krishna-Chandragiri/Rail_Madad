@@ -64,6 +64,14 @@ const StaffDashboard: React.FC = () => {
   const fetchStaffDashboard = async () => {
     try {
       setLoading(true);
+      
+      // Debug: Check localStorage values
+      console.log('🔍 Staff Dashboard Debug:');
+      console.log('  - authToken:', localStorage.getItem('authToken') ? 'Present' : 'Missing');
+      console.log('  - userEmail:', localStorage.getItem('userEmail'));
+      console.log('  - isStaff:', localStorage.getItem('isStaff'));
+      console.log('  - userRole:', localStorage.getItem('userRole'));
+      
       const response = await apiClient.get('/api/complaints/staff/dashboard/');
       
       if (response.data.success) {
@@ -73,7 +81,9 @@ const StaffDashboard: React.FC = () => {
         setError('Failed to load dashboard data');
       }
     } catch (err: any) {
-      console.error('Dashboard fetch error:', err);
+      console.error('❌ Dashboard fetch error:', err);
+      console.error('❌ Error response:', err.response?.data);
+      console.error('❌ Error status:', err.response?.status);
       setError(err.response?.data?.error || 'Failed to load dashboard');
     } finally {
       setLoading(false);
