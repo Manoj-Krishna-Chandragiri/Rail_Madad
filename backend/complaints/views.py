@@ -699,11 +699,17 @@ def admin_dashboard_stats(request):
     """
     Get dashboard statistics for admin
     """
+    print("=" * 80)
+    print("[ADMIN_STATS] Endpoint called!")
+    print("=" * 80)
+    
     # Check authentication using custom middleware attributes
     if not hasattr(request, 'is_authenticated') or not request.is_authenticated:
+        print("[ADMIN_STATS] ERROR: User not authenticated")
         return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
     
     if not (request.is_admin or request.is_staff):
+        print("[ADMIN_STATS] ERROR: User not admin/staff")
         return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
     
     try:
@@ -712,16 +718,24 @@ def admin_dashboard_stats(request):
         import logging
         
         logger = logging.getLogger(__name__)
-        logger.info(f"[ADMIN_STATS] Request from user: {getattr(request, 'firebase_email', 'Unknown')}")
-        logger.info(f"[ADMIN_STATS] is_admin: {getattr(request, 'is_admin', False)}, is_staff: {getattr(request, 'is_staff', False)}")
+        print(f"[ADMIN_STATS] Request from user: {getattr(request, 'firebase_email', 'Unknown')}")
+        print(f"[ADMIN_STATS] is_admin: {getattr(request, 'is_admin', False)}, is_staff: {getattr(request, 'is_staff', False)}")
         
         # Basic complaint counts
-        logger.info("[ADMIN_STATS] Fetching complaint counts...")
+        print("[ADMIN_STATS] Fetching complaint counts...")
         total_complaints = Complaint.objects.count()
+        print(f"[ADMIN_STATS] Total complaints in DB: {total_complaints}")
+        
         open_complaints = Complaint.objects.filter(status='Open').count()
+        print(f"[ADMIN_STATS] Open complaints: {open_complaints}")
+        
         in_progress_complaints = Complaint.objects.filter(status='In Progress').count()
+        print(f"[ADMIN_STATS] In Progress complaints: {in_progress_complaints}")
+        
         closed_complaints = Complaint.objects.filter(status='Closed').count()
-        logger.info(f"[ADMIN_STATS] Complaints: Total={total_complaints}, Open={open_complaints}, InProgress={in_progress_complaints}, Closed={closed_complaints}")
+        print(f"[ADMIN_STATS] Closed complaints: {closed_complaints}")
+        
+        print(f"[ADMIN_STATS] Complaints: Total={total_complaints}, Open={open_complaints}, InProgress={in_progress_complaints}, Closed={closed_complaints}")
         
         # Today's statistics
         logger.info("[ADMIN_STATS] Calculating today's statistics...")
@@ -739,25 +753,24 @@ def admin_dashboard_stats(request):
         from django.contrib.auth import get_user_model
         User = get_user_model()
         
-        # Get staff count from Staff model
-        total_staff_from_staff_model = Staff.objects.count()
-        active_staff_from_staff_model = Staff.objects.filter(status='active').count()
+        # Get staff count from Staff model only
+        total_staff = Staff.objects.count()
+        active_staff = Staff.objects.filter(status='active').count()
         
-        # Get staff count from User model (users with staff or admin role)
-        total_staff_from_users = User.objects.filter(
-            user_type__in=['admin', 'staff']
-        ).count()
-        active_staff_from_users = User.objects.filter(
-            user_type__in=['admin', 'staff'],
-            is_active=True
-        ).count()
+        print(f"[ADMIN_STATS] Staff from Staff model: {total_staff}")
+        print(f"[ADMIN_STATS] Active staff: {active_staff}")
         
-        # Use the higher count between both models
-        total_staff = max(total_staff_from_staff_model, total_staff_from_users, 1)  # Ensure at least 1
-        active_staff = max(active_staff_from_staff_model, active_staff_from_users, 1)  # Ensure at least 1
+        # Ensure at least 1 to avoid division by zero
+        if total_staff == 0:
+            total_staff = 1
+        if active_staff == 0:
+            active_staff = 1
+        
+        print(f"[ADMIN_STATS] Final total_staff: {total_staff}, active_staff: {active_staff}")
         
         # Resolution statistics
         resolution_rate = round((closed_complaints / total_complaints * 100), 2) if total_complaints > 0 else 0
+        print(f"[ADMIN_STATS] Resolution rate: {resolution_rate}%")
         
         # Calculate average resolution time
         resolved_complaints = Complaint.objects.filter(
@@ -835,8 +848,16 @@ def admin_dashboard_stats(request):
         return Response(response_data)
         
     except Exception as e:
-        logger.error(f"[ADMIN_STATS] ERROR: {str(e)}")
+        print("=" * 80)
+        print("[ADMIN_STATS] EXCEPTION OCCURRED!")
+        print(f"[ADMIN_STATS] ERROR: {str(e)}")
+        print("=" * 80)
         import traceback
+        print(f"[ADMIN_STATS] Traceback:")
+        print(traceback.format_exc())
+        print("=" * 80)
+        
+        logger.error(f"[ADMIN_STATS] ERROR: {str(e)}")
         logger.error(f"[ADMIN_STATS] Traceback:\n{traceback.format_exc()}")
         
         # Return a safe fallback response instead of error
@@ -854,6 +875,7 @@ def admin_dashboard_stats(request):
             'pendingEscalations': 0,
             'complaintTrends': []
         }
+        print(f"[ADMIN_STATS] Returning fallback data")
         logger.info(f"[ADMIN_STATS] Returning fallback data")
         return Response(fallback_data)
 
