@@ -25,6 +25,7 @@ const AdminSidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
     { path: '/analytics', icon: TrendingUp, label: 'Analytics' },
     { path: '/user-management', icon: Users, label: 'User Management' },
     { path: '/sentiment-analysis', icon: PieChart, label: 'Sentiment Analysis' },
+    { path: '/multi-lingual', icon: Globe, label: 'Multi-lingual' },
     { path: '/notifications', icon: Bell, label: 'Notifications' },
     { path: '/settings', icon: Settings, label: 'Settings' }
   ];

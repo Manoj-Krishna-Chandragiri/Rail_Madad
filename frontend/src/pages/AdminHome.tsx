@@ -18,6 +18,7 @@ import {
   Search
 } from 'lucide-react';
 import axios from 'axios';
+import { getAuth } from 'firebase/auth';
 
 interface StatsData {
   openComplaints: number;
@@ -101,53 +102,48 @@ const AdminHome = () => {
       try {
         setLoading(true);
         
-        // Try to fetch real data from the admin stats endpoint
-        const token = localStorage.getItem('authToken');
-        if (token) {
-          try {
-            const response = await axios.get(
-              `${import.meta.env.VITE_API_BASE_URL}/api/complaints/admin/dashboard-stats/`,
-              {
-                headers: { Authorization: `Bearer ${token}` },
-              }
-            );
-            
-            const data = response.data;
-            setStats({
-              openComplaints: data.openComplaints || 0,
-              closedComplaints: data.closedComplaints || 0,
-              inProgressComplaints: data.inProgressComplaints || 0,
-              staffCount: data.totalStaff || 0,
-              avgResponseTime: '1h 23m',
-              avgResolutionTime: data.averageResolutionTime || '0h',
-              resolutionRate: data.resolutionRate || 0
-            });
-            
-            console.log('AdminHome: Real stats loaded:', data);
-          } catch (apiError) {
-            console.warn('AdminHome: Failed to fetch real stats, using fallback data:', apiError);
-            // Fallback to dummy data
-            setStats({
-              openComplaints: 23,
-              closedComplaints: 45,
-              inProgressComplaints: 12,
-              staffCount: 18,
-              avgResponseTime: '1h 23m',
-              avgResolutionTime: '5h 45m',
-              resolutionRate: 78
-            });
-          }
-        } else {
-          // No token, use dummy data
+        // Get fresh Firebase token
+        const auth = getAuth();
+        const currentUser = auth.currentUser;
+        
+        if (!currentUser) {
+          console.error('AdminHome: User not authenticated');
+          setLoading(false);
+          return;
+        }
+
+        const token = await currentUser.getIdToken();
+        console.log('AdminHome: Fetching stats with Firebase token');
+        
+        // Fetch real data from the admin stats endpoint
+        try {
+          const response = await axios.get(
+            `${import.meta.env.VITE_API_BASE_URL}/api/complaints/admin/dashboard-stats/`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          
+          const data = response.data;
+          console.log('AdminHome: API Response:', data);
+          
           setStats({
-            openComplaints: 23,
-            closedComplaints: 45,
-            inProgressComplaints: 12,
-            staffCount: 18,
+            openComplaints: data.openComplaints || 0,
+            closedComplaints: data.closedComplaints || 0,
+            inProgressComplaints: data.inProgressComplaints || 0,
+            staffCount: data.totalStaff || 0,
             avgResponseTime: '1h 23m',
-            avgResolutionTime: '5h 45m',
-            resolutionRate: 78
+            avgResolutionTime: data.averageResolutionTime || '0h',
+            resolutionRate: data.resolutionRate || 0
           });
+          
+          console.log('AdminHome: Stats updated successfully');
+        } catch (apiError) {
+          console.error('AdminHome: Failed to fetch real stats:', apiError);
+          if (axios.isAxiosError(apiError)) {
+            console.error('AdminHome: Error status:', apiError.response?.status);
+            console.error('AdminHome: Error data:', apiError.response?.data);
+          }
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -377,6 +373,19 @@ const AdminHome = () => {
             <h3 className="font-semibold text-lg">User Management</h3>
             <p className={`text-sm text-center mt-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
               Manage all system users
+            </p>
+          </Link>
+
+          <Link 
+            to="/admin-dashboard/sentiment-analysis" 
+            className={`flex flex-col items-center p-6 rounded-lg border transition-all duration-300 ${cardHoverClass} transform hover:translate-y-[-4px]`}
+          >
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${isDark ? 'bg-pink-900/50' : 'bg-pink-100'}`}>
+              <MessageSquare className="h-8 w-8 text-pink-500" />
+            </div>
+            <h3 className="font-semibold text-lg">Sentiment Analysis</h3>
+            <p className={`text-sm text-center mt-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+              Analyze complaint sentiments
             </p>
           </Link>
           

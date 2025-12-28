@@ -105,8 +105,9 @@ const Dashboard = () => {
         return;
       }
 
-      const token = await currentUser.getIdToken();
-      console.log('Fetching admin stats with Firebase token');
+      // Force refresh to get a new token (handles expiration)
+      const token = await currentUser.getIdToken(true);
+      console.log('Fetching admin stats with fresh Firebase token');
 
       const response = await axios.get(
         `${import.meta.env.VITE_API_BASE_URL}/api/complaints/admin/dashboard-stats/`,
@@ -168,7 +169,8 @@ const Dashboard = () => {
         return;
       }
 
-      const token = await currentUser.getIdToken();
+      // Force refresh to get a new token (handles expiration)
+      const token = await currentUser.getIdToken(true);
       const response = await axios.get(
         `${import.meta.env.VITE_API_BASE_URL}/api/complaints/user/`,
         {
