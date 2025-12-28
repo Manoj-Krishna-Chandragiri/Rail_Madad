@@ -42,7 +42,7 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
 
   // Staff menu items
   const staffMenuItems = [
-    { path: '/home', icon: Home, label: 'Home' },
+    { path: '', icon: Home, label: 'Home' },
     { path: '/assigned-complaints', icon: ClipboardList, label: 'My Complaints' },
     { path: '/analytics', icon: BarChart2, label: 'My Analytics' },
     { path: '/profile', icon: User, label: 'My Profile' },

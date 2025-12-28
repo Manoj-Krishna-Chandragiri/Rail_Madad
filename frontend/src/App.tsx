@@ -266,6 +266,7 @@ const App = () => {
               <Route path="assigned-complaints" element={<StaffDashboard />} />
               <Route path="analytics" element={<StaffAnalytics />} />
               <Route path="profile" element={<StaffProfile />} />
+              <Route path="notifications" element={<Notifications />} />
               <Route path="settings" element={<Settings />} />
             </Route>
 

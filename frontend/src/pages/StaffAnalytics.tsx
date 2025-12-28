@@ -171,7 +171,7 @@ const StaffAnalytics = () => {
                   {currentMonth.tickets_resolved}
                 </p>
                 <p className={`text-xs ${resolvedChange.isPositive ? 'text-green-500' : 'text-red-500'}`}>
-                  {resolvedChange.isPositive ? '+' : '-'}{resolvedChange.value.toFixed(1)}% from last month
+                  {resolvedChange.isPositive ? '+' : '-'}{resolvedChange?.value?.toFixed(1) || '0.0'}% from last month
                 </p>
               </div>
 
@@ -207,10 +207,10 @@ const StaffAnalytics = () => {
                   Customer Satisfaction
                 </h3>
                 <p className="text-3xl font-bold text-green-500 mb-1">
-                  {currentMonth.customer_satisfaction.toFixed(1)}%
+                  {currentMonth?.customer_satisfaction?.toFixed(1) || '0.0'}%
                 </p>
                 <p className={`text-xs ${satisfactionChange.isPositive ? 'text-green-500' : 'text-red-500'}`}>
-                  {satisfactionChange.isPositive ? '+' : '-'}{satisfactionChange.value.toFixed(1)}% from last month
+                  {satisfactionChange.isPositive ? '+' : '-'}{satisfactionChange?.value?.toFixed(1) || '0.0'}% from last month
                 </p>
               </div>
 
@@ -253,11 +253,11 @@ const StaffAnalytics = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Avg Time:</span>
-                      <span className="font-semibold text-purple-500">{currentMonth.avg_resolution_time.toFixed(1)}h</span>
+                      <span className="font-semibold text-purple-500">{currentMonth?.avg_resolution_time?.toFixed(1) || '0.0'}h</span>
                     </div>
                     <div className="flex justify-between">
                       <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Satisfaction:</span>
-                      <span className="font-semibold text-green-500">{currentMonth.customer_satisfaction.toFixed(1)}%</span>
+                      <span className="font-semibold text-green-500">{currentMonth?.customer_satisfaction?.toFixed(1) || '0.0'}%</span>
                     </div>
                   </div>
                 </div>
@@ -277,11 +277,11 @@ const StaffAnalytics = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Avg Time:</span>
-                        <span className={`font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{lastMonth.avg_resolution_time.toFixed(1)}h</span>
+                        <span className={`font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{lastMonth?.avg_resolution_time?.toFixed(1) || '0.0'}h</span>
                       </div>
                       <div className="flex justify-between">
                         <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Satisfaction:</span>
-                        <span className={`font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{lastMonth.customer_satisfaction.toFixed(1)}%</span>
+                        <span className={`font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{lastMonth?.customer_satisfaction?.toFixed(1) || '0.0'}%</span>
                       </div>
                     </div>
                   </div>
@@ -322,7 +322,7 @@ const StaffAnalytics = () => {
                   Average Rating
                 </h3>
                 <p className="text-3xl font-bold text-yellow-500">
-                  {yearlyStats.avg_rating.toFixed(1)} ⭐
+                  {yearlyStats?.avg_rating?.toFixed(1) || '0.0'} ⭐
                 </p>
                 <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>
                   Overall performance
@@ -339,7 +339,7 @@ const StaffAnalytics = () => {
                   Avg Satisfaction
                 </h3>
                 <p className="text-3xl font-bold text-green-500">
-                  {yearlyStats.avg_satisfaction.toFixed(1)}%
+                  {yearlyStats?.avg_satisfaction?.toFixed(1) || '0.0'}%
                 </p>
                 <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>
                   Customer feedback
@@ -394,10 +394,10 @@ const StaffAnalytics = () => {
                             {month.tickets_resolved}
                           </td>
                           <td className="text-right py-3 px-4 font-semibold text-purple-500">
-                            {month.avg_resolution_time.toFixed(1)}h
+                            {month?.avg_resolution_time?.toFixed(1) || '0.0'}h
                           </td>
                           <td className="text-right py-3 px-4 font-semibold text-green-500">
-                            {month.customer_satisfaction.toFixed(1)}%
+                            {month?.customer_satisfaction?.toFixed(1) || '0.0'}%
                           </td>
                         </tr>
                       ))}

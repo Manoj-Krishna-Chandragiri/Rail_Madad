@@ -195,7 +195,7 @@ const StaffProfile = () => {
                   Rating
                 </h3>
                 <p className="text-2xl font-bold text-yellow-500">
-                  {profile.rating.toFixed(1)} ⭐
+                  {profile.rating?.toFixed(1) || '0.0'} ⭐
                 </p>
               </div>
             </div>

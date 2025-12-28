@@ -192,19 +192,29 @@ const Navbar = ({ toggleSidebar }: NavbarProps) => {
     navigate('/login-portal');
   };
 
-  const getUserType = (): 'admin' | 'user' | null => {
+  const getUserType = (): 'admin' | 'user' | 'staff' | null => {
     const userRole = localStorage.getItem('userRole');
     const adminToken = localStorage.getItem('adminToken');
     const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+    const isStaff = localStorage.getItem('isStaff') === 'true';
     const userEmail = localStorage.getItem('userEmail');
+    const adminEmails = ['adm.railmadad@gmail.com', 'admin@railmadad.in'];
     
     if (!isAuthenticated) return null;
     
+    // Check for admin first (highest priority)
     if (adminToken && userRole === 'admin') return 'admin';
-    if (userEmail === 'adm.railmadad@gmail.com') return 'admin';
+    if (userEmail && adminEmails.includes(userEmail)) return 'admin';
     if (userRole === 'admin') return 'admin';
     
-    if (userRole === 'passenger' || userRole === 'user' || isAuthenticated) return 'user';
+    // Check for staff (must have both userRole='staff' AND isStaff=true)
+    if (userRole === 'staff' && isStaff) return 'staff';
+    
+    // Check for passenger/user
+    if (userRole === 'passenger' || userRole === 'user') return 'user';
+    
+    // Default to user if authenticated
+    if (isAuthenticated) return 'user';
     
     return null;
   };
@@ -216,6 +226,8 @@ const Navbar = ({ toggleSidebar }: NavbarProps) => {
     // Navigate to the correct nested route based on user type
     if (userType === 'admin') {
       navigate(`/admin-dashboard${path}`);
+    } else if (userType === 'staff') {
+      navigate(`/staff-dashboard${path}`);
     } else {
       navigate(`/user-dashboard${path}`);
     }
