@@ -212,7 +212,7 @@ class StaffAvailability(models.Model):
         ('offline', 'Offline'),
     ]
     
-    staff = models.ForeignKey('complaints.Staff', on_delete=models.CASCADE, related_name='availability_schedule', null=True, blank=True)
+    staff = models.ForeignKey(Staff, on_delete=models.CASCADE, related_name='availability_schedule', null=True, blank=True)
     date = models.DateField()
     shift_start = models.TimeField()
     shift_end = models.TimeField()
@@ -234,7 +234,7 @@ class StaffAvailability(models.Model):
 class StaffPerformance(models.Model):
     """Track staff performance metrics"""
     
-    staff = models.ForeignKey('complaints.Staff', on_delete=models.CASCADE, related_name='performance_history', null=True, blank=True)
+    staff = models.ForeignKey(Staff, on_delete=models.CASCADE, related_name='performance_history', null=True, blank=True)
     month = models.IntegerField()  # 1-12
     year = models.IntegerField()
     tickets_resolved = models.IntegerField(default=0)
@@ -253,3 +253,7 @@ class StaffPerformance(models.Model):
     
     def __str__(self):
         return f"{self.staff.full_name} - {self.month}/{self.year}"
+
+
+# Import facial authentication models
+from .face_models import FaceProfile, FaceAuthLog, FaceEnrollmentSession

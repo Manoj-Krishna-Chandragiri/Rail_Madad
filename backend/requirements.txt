@@ -33,6 +33,10 @@ pandas==2.1.4
 numpy==1.24.3
 joblib==1.3.2
 
+# Facial Recognition (using DeepFace - more lightweight alternative)
+deepface==0.0.79
+tf-keras>=2.16.0
+
 # Additional utilities (if needed for development/production)
 # psycopg2-binary==2.9.9  # PostgreSQL support (uncomment if using PostgreSQL)
 # redis==5.0.1            # Redis for caching (uncomment if using Redis)

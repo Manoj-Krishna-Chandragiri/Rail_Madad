@@ -34,6 +34,19 @@ class FirebaseAuthMiddleware:
             # Check if there's a specific user email in the request headers or session
             # This allows the frontend to specify which user to simulate
             dev_user_email = request.META.get('HTTP_X_DEV_USER_EMAIL')
+            dev_token_header = request.META.get('HTTP_AUTHORIZATION')
+            dev_token_user_id = None
+
+            # Accept dev face tokens of format "Bearer dev-face-token-<user_id>-<suffix>"
+            if dev_token_header and dev_token_header.startswith('Bearer dev-face-token-'):
+                try:
+                    token_body = dev_token_header.split(' ')[1]
+                    parts = token_body.split('-')
+                    if len(parts) >= 4:
+                        dev_token_user_id = int(parts[3])
+                        logger.info(f"Development mode: Parsed dev face token for user id {dev_token_user_id}")
+                except Exception as e:
+                    logger.warning(f"Development mode: Failed to parse dev face token: {e}")
             
             # Set default values for development
             request.firebase_user = None
@@ -47,7 +60,10 @@ class FirebaseAuthMiddleware:
                 dev_user = None
                 
                 # If a specific email is provided, use that user
-                if dev_user_email:
+                if dev_token_user_id:
+                    dev_user = User.objects.filter(id=dev_token_user_id).first()
+                    logger.info(f"Development mode: Using user from dev face token: {dev_token_user_id}")
+                elif dev_user_email:
                     dev_user = User.objects.filter(email=dev_user_email).first()
                     logger.info(f"Development mode: Requested specific user: {dev_user_email}")
                 
@@ -96,6 +112,17 @@ class FirebaseAuthMiddleware:
         if not firebase_admin._apps:
             logger.warning("Firebase not initialized")
             
+            # Initialize default values FIRST
+            request.firebase_user = None
+            request.firebase_email = None
+            request.firebase_uid = None
+            request.user_type = 'passenger'
+            request.is_authenticated = False
+            request.is_admin = False
+            request.is_staff = False
+            request.user = None
+            request.user_id = None
+            
             # In development, try to decode the Firebase token without verification
             if auth_header and auth_header.startswith('Bearer '):
                 token = auth_header.split(' ')[1]
@@ -110,60 +137,48 @@ class FirebaseAuthMiddleware:
                         request.firebase_uid = decoded.get('uid') or decoded.get('user_id')
                         request.is_authenticated = True
                         
-                        logger.info(f"🔍 Firebase token decoded - Email: {request.firebase_email}, UID: {request.firebase_uid}")
+                        logger.info(f"[FIREBASE] Token decoded - Email: {request.firebase_email}, UID: {request.firebase_uid}")
                         
                         # Try to find user in database
                         User = get_user_model()
+                        found_user = None
+                        
                         try:
                             # Try exact match first
-                            user = User.objects.get(email=request.firebase_email)
-                            request.user = user
-                            request.user_id = user.id
-                            request.user_type = user.user_type
-                            request.is_admin = user.is_admin
-                            request.is_staff = user.is_staff
-                            logger.info(f"✅ User found in DB: {user.email} (ID: {user.id})")
-                            return self.get_response(request)
+                            found_user = User.objects.get(email=request.firebase_email)
                         except User.DoesNotExist:
                             # Try case-insensitive search
-                            user = User.objects.filter(email__iexact=request.firebase_email).first()
-                            if user:
-                                request.user = user
-                                request.user_id = user.id
-                                request.user_type = user.user_type
-                                request.is_admin = user.is_admin
-                                request.is_staff = user.is_staff
-                                logger.info(f"✅ User found with case-insensitive search: {user.email} (ID: {user.id})")
-                                return self.get_response(request)
+                            found_user = User.objects.filter(email__iexact=request.firebase_email).first()
+                        
+                        if found_user:
+                            request.user = found_user
+                            request.user_id = found_user.id
+                            request.user_type = found_user.user_type
+                            request.is_admin = found_user.is_admin
+                            request.is_staff = found_user.is_staff
+                            logger.info(f"[AUTH] User found in DB: {found_user.email} (ID: {found_user.id})")
+                        else:
+                            logger.error(f"[ERROR] User NOT FOUND in database: {request.firebase_email}")
+                            logger.error(f"   All users in DB: {[u.email for u in User.objects.all()[:10]]}")
+                            
+                            # DEVELOPMENT MODE FALLBACK: Try to use the newest staff user
+                            logger.warning("[WARNING] Development mode: Trying to use newest staff user as fallback")
+                            fallback_user = User.objects.filter(is_staff=True).order_by('-id').first()
+                            if fallback_user:
+                                request.user = fallback_user
+                                request.user_id = fallback_user.id
+                                request.user_type = fallback_user.user_type
+                                request.is_admin = fallback_user.is_admin
+                                request.is_staff = fallback_user.is_staff
+                                request.firebase_email = fallback_user.email
+                                logger.info(f"[AUTH] Using fallback staff user: {fallback_user.email} (ID: {fallback_user.id})")
                             else:
-                                logger.error(f"❌ User NOT FOUND in database: {request.firebase_email}")
-                                logger.error(f"   All users in DB: {[u.email for u in User.objects.all()[:10]]}")
-                                
-                                # DEVELOPMENT MODE FALLBACK: Try to use the newest staff user
-                                logger.warning("⚠️ Development mode: Trying to use newest staff user as fallback")
-                                fallback_user = User.objects.filter(is_staff=True).order_by('-id').first()
-                                if fallback_user:
-                                    request.user = fallback_user
-                                    request.user_id = fallback_user.id
-                                    request.user_type = fallback_user.user_type
-                                    request.is_admin = fallback_user.is_admin
-                                    request.is_staff = fallback_user.is_staff
-                                    request.firebase_email = fallback_user.email
-                                    logger.info(f"✅ Using fallback staff user: {fallback_user.email} (ID: {fallback_user.id})")
-                                    return self.get_response(request)
+                                logger.error("[ERROR] No fallback user found in database")
                     except Exception as e:
                         logger.error(f"Failed to decode Firebase token in development: {e}")
+                        import traceback
+                        logger.error(f"Traceback: {traceback.format_exc()}")
             
-            # Set default values for unauthenticated request
-            request.firebase_user = None
-            request.firebase_email = None
-            request.firebase_uid = None
-            request.user_type = 'passenger'
-            request.is_authenticated = False
-            request.is_admin = False
-            request.is_staff = False
-            request.user = None
-            request.user_id = None
             return self.get_response(request)
         
         # Try to resolve the url and get the url name
@@ -232,7 +247,7 @@ class FirebaseAuthMiddleware:
                     request.user = user
                     
                     # Log successful authentication
-                    logger.info(f"✅ User authenticated: {user.email}")
+                    logger.info(f"[AUTH] User authenticated: {user.email}")
                     logger.info(f"   User flags - is_admin: {user.is_admin}, is_staff: {user.is_staff}, is_passenger: {user.is_passenger}")
                     logger.info(f"   Request flags set - is_authenticated: {request.is_authenticated}, is_admin: {request.is_admin}, is_staff: {request.is_staff}")
                     
@@ -259,6 +274,7 @@ class FirebaseAuthMiddleware:
                         request.user_type = 'passenger'
                         request.is_admin = False
                         request.is_staff = False
+                        # Don't set request.user here - leave it as None to trigger permission denial
                 
             except auth.ExpiredIdTokenError:
                 logger.error("Firebase token expired")

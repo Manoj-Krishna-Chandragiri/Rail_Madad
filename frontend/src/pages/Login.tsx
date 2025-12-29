@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import GoogleIcon from '../components/icons/GoogleIcon';
 import { useTheme } from '../context/ThemeContext';
+import FaceAuthModal from '../components/FaceAuthModal';
 import { initializeApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, sendEmailVerification, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, signInWithCredential } from "firebase/auth";
 import { getFirestore, setDoc, doc, getDoc } from "firebase/firestore";
@@ -151,6 +152,7 @@ const Login: React.FC = () => {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [modalType, setModalType] = useState<'terms' | 'privacy'>('terms');
+  const [showFaceAuthModal, setShowFaceAuthModal] = useState(false);
 
   useEffect(() => {
     // Only initialize if we're in the phone recovery view
@@ -559,6 +561,51 @@ const handleGoogleSignIn = async () => {
     setShowTermsModal(true);
   };
 
+  const handleFaceAuthSuccess = async (userData: any, firebaseToken: string) => {
+    try {
+      const isDevToken = firebaseToken && firebaseToken.startsWith('dev-face-token-');
+      const effectiveToken = firebaseToken || (isDevToken ? firebaseToken : `dev-face-token-${userData?.id || 'user'}`);
+
+      // Only attempt Firebase sign-in when we have a real Firebase token
+      if (firebaseToken && !isDevToken) {
+        const { signInWithCustomToken } = await import('firebase/auth');
+        await signInWithCustomToken(auth, firebaseToken);
+      }
+
+      // Store authentication data
+      localStorage.setItem('authToken', effectiveToken || '');
+      localStorage.setItem('userEmail', userData.email || '');
+      localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('userRole', userData.user_type || 'passenger');
+
+      if (userData.is_admin || userData.user_type === 'admin') {
+        localStorage.setItem('adminToken', effectiveToken || '');
+      }
+
+      // Fetch and store complete user profile
+      await fetchAndStoreUserProfile();
+
+      // Dispatch event to notify components
+      setTimeout(() => {
+        window.dispatchEvent(new Event('userTypeChanged'));
+      }, 100);
+
+      setMessageType(showMessage('Face authentication successful!', setError, 'success'));
+
+      // Navigate based on user type
+      if (userData.is_admin || userData.user_type === 'admin') {
+        navigate('/admin-dashboard');
+      } else if (userData.is_staff || userData.user_type === 'staff') {
+        navigate('/staff-dashboard');
+      } else {
+        navigate('/user-dashboard');
+      }
+    } catch (error) {
+      console.error('Error processing face auth:', error);
+      setMessageType(showMessage('Authentication successful but setup failed', setError, 'info'));
+    }
+  };
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -799,6 +846,17 @@ const handleGoogleSignIn = async () => {
                 >
                   <GoogleIcon />
                   Sign in with Google
+                </button>
+
+                <button
+                  onClick={() => setShowFaceAuthModal(true)}
+                  className={`w-full flex items-center justify-center gap-2 border py-2 rounded-lg mt-3
+                    ${theme === 'dark' ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-300 hover:bg-gray-50'}`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  Sign in with Face
                 </button>
 
                 <p className={`mt-6 text-center ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
@@ -1113,6 +1171,14 @@ const handleGoogleSignIn = async () => {
         isOpen={showTermsModal}
         onClose={() => setShowTermsModal(false)}
         type={modalType}
+      />
+
+      {/* Face Authentication Modal */}
+      <FaceAuthModal
+        isOpen={showFaceAuthModal}
+        onClose={() => setShowFaceAuthModal(false)}
+        onSuccess={handleFaceAuthSuccess}
+        mode="login"
       />
     </div>
   );

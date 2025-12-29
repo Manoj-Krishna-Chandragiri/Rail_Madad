@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import FaceAuthSettings from '../components/FaceAuthSettings';
 import { 
   getAuth, 
   onAuthStateChanged, 
@@ -704,6 +705,11 @@ const Profile: React.FC = () => {
               </button>
             )}
           </div>
+        </div>
+
+        {/* Face Authentication Section */}
+        <div className="mt-8">
+          <FaceAuthSettings />
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
 from .views import verify_admin, get_admin_profile
 
@@ -16,6 +16,10 @@ urlpatterns = [
     path('admin/verify/', verify_admin, name='verify-admin'),
     path('admin/profile/', get_admin_profile, name='admin-profile'),
     path('notifications/', views.get_notifications, name='get_notifications'),
+    
+    # Facial Authentication endpoints
+    path('', include('accounts.face_urls')),
+    
     # Development endpoints
     path('dev/users/', views.dev_list_users, name='dev_list_users'),
     path('dev/switch-user/', views.dev_switch_user, name='dev_switch_user'),

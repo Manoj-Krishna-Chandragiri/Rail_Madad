@@ -7,7 +7,10 @@ console.log('MODE:', import.meta.env.MODE);
 console.log('VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
 console.log('All env vars:', import.meta.env);
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://rail-madad-backend.onrender.com';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:8000';
 
 console.log('🚀 Final API_BASE_URL:', API_BASE_URL);
 

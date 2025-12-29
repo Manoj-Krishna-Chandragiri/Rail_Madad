@@ -34,6 +34,8 @@ import PureCSSRailAnimation from './pages/PureCSSRailAnimation';
 import SentimentAnalysisPage from './pages/SentimentAnalysisPage';
 import TranslationTest from './pages/TranslationTest';
 
+import SignUpStaff from './pages/SignUpStaff';
+
 // User routes components
 import AIAssistance from './pages/AIAssistance';
 import FileComplaint from './pages/FileComplaint';
@@ -188,6 +190,7 @@ const App = () => {
             <Route path="/track-status" element={<TrackStatus />} />
             <Route path="/login" element={<Navigate to="/login-portal" replace />} />
             <Route path="/register" element={<Navigate to="/login-portal" replace />} />
+            <Route path="/staff-signup" element={<SignUpStaff />} />
             <Route path="/admin-login" element={<AdminLogin />} />
             <Route path="/staff-login" element={<StaffLogin />} />
             <Route path="/passenger-login" element={<PassengerLogin />} />

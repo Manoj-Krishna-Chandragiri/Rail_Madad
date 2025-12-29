@@ -9,8 +9,8 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
-from .models import Complaint, Staff, QuickSolution
-from .serializers import ComplaintSerializer, StaffSerializer
+from .models import Complaint, QuickSolution  # Staff not imported here - imported locally in functions
+from .serializers import ComplaintSerializer  # StaffSerializer not imported here
 import os
 from rest_framework import status
 from rest_framework.decorators import api_view
@@ -501,8 +501,12 @@ def feedback_view(request):
 
 @api_view(['GET', 'POST'])
 def staff_list(request):
+    """List all staff members - uses accounts.Staff model"""
+    from accounts.models import Staff
+    from accounts.serializers import StaffSerializer
+    
     if request.method == 'GET':
-        staffs = Staff.objects.all()
+        staffs = Staff.objects.select_related('user').all()
         serializer = StaffSerializer(staffs, many=True, context={'request': request})
         return Response(serializer.data)
     
@@ -519,8 +523,12 @@ def staff_list(request):
 
 @api_view(['GET', 'PUT', 'DELETE'])
 def staff_detail(request, pk):
+    """Get/Update/Delete staff member by user_id - uses accounts.Staff model"""
+    from accounts.models import Staff
+    from accounts.serializers import StaffSerializer
+    
     try:
-        staff = Staff.objects.get(pk=pk)
+        staff = Staff.objects.select_related('user').get(user_id=pk)
     except Staff.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -625,8 +633,11 @@ def admin_update_complaint_status(request, complaint_id):
 @api_view(['GET', 'POST'])
 def admin_staff_list(request):
     """
-    List all staff or create a new staff member
+    List all staff or create a new staff member - uses accounts.Staff model
     """
+    from accounts.models import Staff
+    from accounts.serializers import StaffSerializer
+    
     print(f"admin_staff_list called with method: {request.method}")
     print(f"Request headers: {dict(request.headers)}")
     print(f"Request data: {request.data}")
@@ -648,7 +659,7 @@ def admin_staff_list(request):
         return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
     
     if request.method == 'GET':
-        staff = Staff.objects.all()
+        staff = Staff.objects.select_related('user').all()
         serializer = StaffSerializer(staff, many=True, context={'request': request})
         return Response(serializer.data)
     
@@ -667,10 +678,13 @@ def admin_staff_list(request):
 @api_view(['GET', 'PUT', 'DELETE'])
 def admin_staff_detail(request, pk):
     """
-    Retrieve, update or delete a staff member
+    Retrieve, update or delete a staff member (using accounts.Staff model with user_id as pk)
     """
+    from accounts.models import Staff
+    from accounts.serializers import StaffSerializer
+    
     print(f"\n{'='*80}")
-    print(f"[STAFF_DETAIL] Method: {request.method}, Staff ID: {pk}")
+    print(f"[STAFF_DETAIL] Method: {request.method}, Staff user_id: {pk}")
     print(f"[STAFF_DETAIL] Authorization header present: {bool(request.META.get('HTTP_AUTHORIZATION'))}")
     
     # Check authentication using custom middleware attributes
@@ -688,18 +702,20 @@ def admin_staff_detail(request, pk):
     print(f"  - user_id: {user_id}")
     
     if not is_authenticated:
-        print("[STAFF_DETAIL] ❌ Authentication failed - returning 401")
+        print("[STAFF_DETAIL] Authentication failed - returning 401")
         return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
     
     # Allow both admin and staff to update
     if not (is_admin or is_staff):
-        print(f"[STAFF_DETAIL] ❌ Access denied - neither admin nor staff (admin={is_admin}, staff={is_staff})")
+        print(f"[STAFF_DETAIL] Access denied - neither admin nor staff (admin={is_admin}, staff={is_staff})")
         return Response({'error': 'Admin or Staff access required'}, status=status.HTTP_403_FORBIDDEN)
     
-    print(f"[STAFF_DETAIL] ✅ Access granted (admin={is_admin}, staff={is_staff})")
+    print(f"[STAFF_DETAIL] Access granted (admin={is_admin}, staff={is_staff})")
     
+    # Get staff by pk (user is the primary key in accounts_staff table)
+    # Since user is a OneToOneField with primary_key=True, we query by pk directly
     staff = get_object_or_404(Staff, pk=pk)
-    print(f"Found staff: {staff.name} (ID: {staff.id})")
+    print(f"Found staff: {staff.full_name} (pk: {staff.pk})")
     
     if request.method == 'GET':
         serializer = StaffSerializer(staff, context={'request': request})
@@ -711,18 +727,22 @@ def admin_staff_detail(request, pk):
         serializer = StaffSerializer(staff, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             updated_staff = serializer.save()
-            print(f"Staff updated successfully: {updated_staff.name}")
+            print(f"Staff updated successfully: {updated_staff.full_name}")
             response_serializer = StaffSerializer(updated_staff, context={'request': request})
             return Response(response_serializer.data)
-        print(f"Serializer errors: {serializer.errors}")
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        print(f"Serializer validation errors: {serializer.errors}")
+        # Return detailed error information
+        return Response({
+            'error': 'Validation failed',
+            'details': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
     
     elif request.method == 'DELETE':
         # Only admins can delete staff
         if not is_admin:
             return Response({'error': 'Only admins can delete staff members'}, status=status.HTTP_403_FORBIDDEN)
         staff.delete()
-        print(f"Staff deleted: {staff.name}")
+        print(f"Staff deleted: {staff.full_name}")
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 # Admin Dashboard Statistics API View
@@ -779,9 +799,9 @@ def admin_dashboard_stats(request):
         ).count()
         logger.info(f"[ADMIN_STATS] Today: Complaints={today_complaints}, Resolved={today_resolved}")
         
-        # Staff statistics - fetch from Staff model and User model
+        # Staff statistics - fetch from Staff model (accounts app)
         logger.info("[ADMIN_STATS] Fetching staff statistics...")
-        from .models import Staff
+        from accounts.models import Staff
         from django.contrib.auth import get_user_model
         User = get_user_model()
         
@@ -987,6 +1007,8 @@ def admin_performance_metrics(request):
     """
     Get detailed performance metrics for admin
     """
+    from accounts.models import Staff
+    
     user = request.user
     
     if not user.is_staff and not user.is_superuser:
@@ -1013,9 +1035,9 @@ def admin_performance_metrics(request):
     # Staff performance
     staff_performance = []
     for staff in Staff.objects.filter(status='active'):
-        assigned_complaints = Complaint.objects.filter(staff=staff.name).count()
+        assigned_complaints = Complaint.objects.filter(staff=staff.full_name).count()
         resolved_complaints = Complaint.objects.filter(
-            staff=staff.name, 
+            staff=staff.full_name, 
             status='Closed'
         ).count()
         
@@ -1024,8 +1046,8 @@ def admin_performance_metrics(request):
             resolution_rate = round((resolved_complaints / assigned_complaints) * 100, 2)
         
         staff_performance.append({
-            'name': staff.name,
-            'id': staff.id,
+            'name': staff.full_name,
+            'id': staff.user_id,
             'assigned_complaints': assigned_complaints,
             'resolved_complaints': resolved_complaints,
             'resolution_rate': resolution_rate,
@@ -1049,8 +1071,8 @@ def admin_performance_metrics(request):
         dept_complaints = 0
         dept_resolved = 0
         for staff in dept_staff:
-            dept_complaints += Complaint.objects.filter(staff=staff.name).count()
-            dept_resolved += Complaint.objects.filter(staff=staff.name, status='Closed').count()
+            dept_complaints += Complaint.objects.filter(staff=staff.full_name).count()
+            dept_resolved += Complaint.objects.filter(staff=staff.full_name, status='Closed').count()
         
         dept_resolution_rate = 0
         if dept_complaints > 0:

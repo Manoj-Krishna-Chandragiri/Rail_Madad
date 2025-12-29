@@ -718,16 +718,16 @@ def delete_user_account(request):
 def staff_list(request):
     """Get list of all staff members"""
     try:
-        from complaints.models import Staff
+        from .models import Staff
         
-        staff_members = Staff.objects.all()
+        staff_members = Staff.objects.select_related('user').all()
         
         staff_data = [{
-            'id': staff.id,
-            'user_id': staff.id,  # Use staff.id since there's no separate user
+            'id': staff.user_id,  # Use user_id as primary key
+            'user_id': staff.user_id,
             'email': staff.email,
-            'full_name': staff.name,  # Changed from full_name to name
-            'name': staff.name,
+            'full_name': staff.full_name,  # Use full_name field
+            'name': staff.full_name,  # Also include as name for compatibility
             'department': staff.department,
             'role': staff.role,
             'location': staff.location,
@@ -749,8 +749,7 @@ def staff_list(request):
 def staff_performance(request):
     """Get staff performance metrics"""
     try:
-        from .models import StaffPerformance
-        from complaints.models import Staff
+        from .models import StaffPerformance, Staff
         from django.db.models import Avg
         
         month = request.GET.get('month')
@@ -758,8 +757,8 @@ def staff_performance(request):
         
         logger.info(f"staff_performance called - month: {month}, year: {year}")
         
-        # Since we're using 'complaints.Staff', we just select_related on 'staff'
-        performance_query = StaffPerformance.objects.select_related('staff')
+        # Use accounts.Staff, select_related on 'staff__user'
+        performance_query = StaffPerformance.objects.select_related('staff__user')
         
         if month:
             performance_query = performance_query.filter(month=int(month))
@@ -772,8 +771,8 @@ def staff_performance(request):
         for perf in performance_query:
             if perf.staff:  # Make sure staff is not null
                 performance_data.append({
-                    'staff_id': perf.staff.id,
-                    'staff_name': perf.staff.name,
+                    'staff_id': perf.staff.user_id,  # Use user_id as primary key
+                    'staff_name': perf.staff.full_name,  # Use full_name field
                     'staff_email': perf.staff.email,
                     'month': perf.month,
                     'year': perf.year,
@@ -795,7 +794,7 @@ def staff_performance(request):
 def staff_register(request):
     """Register a new staff member (called during signup, before authentication)"""
     try:
-        from complaints.models import Staff
+        from .models import Staff, FirebaseUser
         
         logger.info("staff_register called - Starting staff registration...")
         
@@ -818,9 +817,9 @@ def staff_register(request):
             decoded_token = firebase_auth.verify_id_token(token)
             firebase_uid = decoded_token.get('uid')
             firebase_email = decoded_token.get('email')
-            logger.info(f"✅ Firebase token verified - UID: {firebase_uid}, Email: {firebase_email}")
+            logger.info(f"Firebase token verified - UID: {firebase_uid}, Email: {firebase_email}")
         except Exception as firebase_error:
-            logger.warning(f"⚠️ Firebase verification failed, trying JWT decode: {str(firebase_error)}")
+            logger.warning(f"Firebase verification failed, trying JWT decode: {str(firebase_error)}")
             
             # Fall back to JWT decode (for development mode)
             try:
@@ -828,19 +827,19 @@ def staff_register(request):
                 decoded_token = jwt.decode(token, options={"verify_signature": False})
                 firebase_uid = decoded_token.get('user_id') or decoded_token.get('sub')
                 firebase_email = decoded_token.get('email')
-                logger.info(f"✅ JWT token decoded - UID: {firebase_uid}, Email: {firebase_email}")
+                logger.info(f"JWT token decoded - UID: {firebase_uid}, Email: {firebase_email}")
             except Exception as jwt_error:
-                logger.error(f"❌ Both Firebase and JWT verification failed: {str(jwt_error)}")
+                logger.error(f"Both Firebase and JWT verification failed: {str(jwt_error)}")
                 return Response({'error': f'Invalid authentication token: {str(jwt_error)}'}, status=401)
         
         if not firebase_email:
-            logger.error("❌ Could not extract email from token")
+            logger.error("Could not extract email from token")
             return Response({'error': 'Email not found in token'}, status=401)
         
         # Get staff data from request
         staff_data = request.data
         
-        logger.info(f"📝 Staff registration data received:")
+        logger.info(f"Staff registration data received:")
         logger.info(f"   Email: {firebase_email}")
         logger.info(f"   Name: {staff_data.get('name')}")
         logger.info(f"   Employee ID: {staff_data.get('employee_id')}")
@@ -849,8 +848,6 @@ def staff_register(request):
         
         # Create FirebaseUser entry
         try:
-            from .models import FirebaseUser
-            
             user, created = FirebaseUser.objects.update_or_create(
                 email=firebase_email,
                 defaults={
@@ -867,46 +864,45 @@ def staff_register(request):
                 }
             )
             
-            logger.info(f"✅ FirebaseUser {'created' if created else 'updated'}: {user.email} (ID: {user.id})")
+            logger.info(f"FirebaseUser {'created' if created else 'updated'}: {user.email} (ID: {user.id})")
         except Exception as e:
-            logger.error(f"❌ Failed to create FirebaseUser: {str(e)}")
+            logger.error(f"Failed to create FirebaseUser: {str(e)}")
             import traceback
             logger.error(traceback.format_exc())
             return Response({'error': f'Failed to create user: {str(e)}'}, status=500)
         
-        # Create Staff profile (new complaints.Staff model without user field)
+        # Create Staff profile (accounts.Staff model with user FK)
         try:
-            import json
-            
             staff, staff_created = Staff.objects.update_or_create(
-                email=firebase_email,  # Use email as unique identifier
+                user=user,  # Use user FK as primary key
                 defaults={
-                    'name': staff_data.get('name', ''),  # Required field
-                    'phone': staff_data.get('phone_number', ''),
+                    'email': firebase_email,
+                    'full_name': staff_data.get('name', ''),  # full_name field
+                    'phone_number': staff_data.get('phone_number', ''),
                     'employee_id': staff_data.get('employee_id', ''),
                     'department': staff_data.get('department', ''),
                     'role': staff_data.get('role', ''),
                     'location': staff_data.get('location', ''),
-                    'expertise': json.dumps(staff_data.get('expertise', [])),
-                    'languages': json.dumps(staff_data.get('languages', [])),
-                    'communication_preferences': json.dumps(staff_data.get('communication_channels', ['Chat'])),
+                    'expertise': staff_data.get('expertise', []),  # JSON field, no need to dump
+                    'languages': staff_data.get('languages', []),
+                    'communication_preferences': staff_data.get('communication_channels', ['Chat']),
                     'status': 'active',
                 }
             )
             
-            logger.info(f"✅ Staff profile {'created' if staff_created else 'updated'}: {staff.employee_id} (ID: {staff.id})")
+            logger.info(f"Staff profile {'created' if staff_created else 'updated'}: {staff.employee_id} (user_id: {staff.user_id})")
         except Exception as e:
-            logger.error(f"❌ Failed to create Staff profile: {str(e)}")
+            logger.error(f"Failed to create Staff profile: {str(e)}")
             import traceback
             logger.error(traceback.format_exc())
             return Response({'error': f'Failed to create staff profile: {str(e)}'}, status=500)
         
-        logger.info(f"🎉 Staff registration completed successfully for {user.email}")
+        logger.info(f"Staff registration completed successfully for {user.email}")
         
         return Response({
             'message': 'Staff registered successfully',
             'user_id': user.id,
-            'staff_id': staff.id,  # Staff now uses its own id
+            'staff_id': staff.user_id,  # Staff uses user_id as primary key
             'email': user.email,
             'user_type': 'staff'
         }, status=201)

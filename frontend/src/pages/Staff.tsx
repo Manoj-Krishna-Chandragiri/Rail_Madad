@@ -160,22 +160,30 @@ const Staff = () => {
       
       // Parse expertise and languages fields if they're strings
       const processedData = response.data.map((staff: any) => {
-        console.log('Original staff avatar path:', staff.avatar);
-        const processedAvatar = processAvatarUrl(staff.avatar, staff.name);
+        // Map new API field names to frontend expected names
+        const mappedStaff = {
+          ...staff,
+          id: staff.user_id?.toString() || staff.id?.toString(),  // user_id is the primary key in accounts_staff
+          name: staff.full_name || staff.name,  // API returns full_name
+          phone: staff.phone_number || staff.phone  // API returns phone_number
+        };
+        
+        console.log('Original staff avatar path:', mappedStaff.avatar);
+        const processedAvatar = processAvatarUrl(mappedStaff.avatar, mappedStaff.name);
         console.log('Processed avatar URL:', processedAvatar);
         
         return {
-          ...staff,
+          ...mappedStaff,
           avatar: processedAvatar,
-          expertise: typeof staff.expertise === 'string' 
-            ? JSON.parse(staff.expertise || '[]') 
-            : (Array.isArray(staff.expertise) ? staff.expertise : []),
-          languages: typeof staff.languages === 'string' 
-            ? JSON.parse(staff.languages || '[]') 
-            : (Array.isArray(staff.languages) ? staff.languages : []),
-          communication_preferences: typeof staff.communication_preferences === 'string' 
-            ? JSON.parse(staff.communication_preferences || '["Chat"]') 
-            : (Array.isArray(staff.communication_preferences) ? staff.communication_preferences : ['Chat'])
+          expertise: typeof mappedStaff.expertise === 'string' 
+            ? JSON.parse(mappedStaff.expertise || '[]') 
+            : (Array.isArray(mappedStaff.expertise) ? mappedStaff.expertise : []),
+          languages: typeof mappedStaff.languages === 'string' 
+            ? JSON.parse(mappedStaff.languages || '[]') 
+            : (Array.isArray(mappedStaff.languages) ? mappedStaff.languages : []),
+          communication_preferences: typeof mappedStaff.communication_preferences === 'string' 
+            ? JSON.parse(mappedStaff.communication_preferences || '["Chat"]') 
+            : (Array.isArray(mappedStaff.communication_preferences) ? mappedStaff.communication_preferences : ['Chat'])
         };
       });
       
@@ -253,9 +261,9 @@ const Staff = () => {
       const formData = new FormData();
       
       // Add all staff fields to FormData
-      formData.append('name', newStaff.name || '');
+      formData.append('full_name', newStaff.name || '');  // Backend expects full_name
       formData.append('email', newStaff.email || '');
-      formData.append('phone', newStaff.phone || '');
+      formData.append('phone_number', newStaff.phone || '');  // Backend expects phone_number
       formData.append('employee_id', newStaff.employee_id || '');  // Added field
       formData.append('role', newStaff.role || '');
       formData.append('department', newStaff.department || '');
@@ -266,8 +274,6 @@ const Staff = () => {
       formData.append('communication_preferences', JSON.stringify(newStaff.communication_preferences || ['Chat']));
       formData.append('rating', '0');
       formData.append('active_tickets', '0');
-      formData.append('performance_metrics', '{}');  // Added field
-      formData.append('notes', newStaff.notes || '');  // Added field
       
       // Append avatar file if selected
       if (avatarFile) {
@@ -419,10 +425,10 @@ const Staff = () => {
   const filteredStaff = staffMembers.filter(staff => {
     // Search term filter
     const matchesSearch = 
-      staff.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      staff.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      staff.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      staff.email.toLowerCase().includes(searchTerm.toLowerCase());
+      (staff.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (staff.role || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (staff.department || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (staff.email || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     // Additional filters
     const matchesDepartment = filters.department ? staff.department === filters.department : true;
@@ -501,9 +507,9 @@ const Staff = () => {
     // Initialize edit data with current staff data
     setSelectedStaff(staff);
     setNewStaff({
-      name: staff.name,
-      email: staff.email,
-      phone: staff.phone,
+      name: staff.name || '',  // Already mapped from full_name in fetchStaffData
+      email: staff.email || '',
+      phone: staff.phone || '',  // Already mapped from phone_number in fetchStaffData
       employee_id: staff.employee_id || '',
       role: staff.role,
       department: staff.department,
@@ -538,9 +544,9 @@ const Staff = () => {
       const formData = new FormData();
       
       // Add all staff fields to FormData
-      formData.append('name', newStaff.name || '');
+      formData.append('full_name', newStaff.name || '');  // Backend expects full_name
       formData.append('email', newStaff.email || '');
-      formData.append('phone', newStaff.phone || '');
+      formData.append('phone_number', newStaff.phone || '');  // Backend expects phone_number
       formData.append('employee_id', newStaff.employee_id || '');  // Added field
       formData.append('role', newStaff.role || '');
       formData.append('department', newStaff.department || '');
@@ -549,7 +555,6 @@ const Staff = () => {
       formData.append('expertise', JSON.stringify(newStaff.expertise || []));
       formData.append('languages', JSON.stringify(newStaff.languages || []));
       formData.append('communication_preferences', JSON.stringify(newStaff.communication_preferences || ['Chat']));
-      formData.append('notes', newStaff.notes || '');  // Added field
       
       // Append avatar file if selected
       if (avatarFile) {
