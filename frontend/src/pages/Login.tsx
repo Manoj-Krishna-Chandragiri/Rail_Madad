@@ -563,6 +563,8 @@ const handleGoogleSignIn = async () => {
 
   const handleFaceAuthSuccess = async (userData: any, firebaseToken: string) => {
     try {
+      console.log('🎯 Face auth success handler called:', { userData, firebaseToken });
+      
       const isDevToken = firebaseToken && firebaseToken.startsWith('dev-face-token-');
       const effectiveToken = firebaseToken || (isDevToken ? firebaseToken : `dev-face-token-${userData?.id || 'user'}`);
 
@@ -572,34 +574,56 @@ const handleGoogleSignIn = async () => {
         await signInWithCustomToken(auth, firebaseToken);
       }
 
+      console.log('✅ Storing auth data:', {
+        token: effectiveToken,
+        userType: userData.user_type,
+        userId: userData.id
+      });
+
       // Store authentication data
       localStorage.setItem('authToken', effectiveToken || '');
+      localStorage.setItem('firebaseToken', effectiveToken || '');
+      localStorage.setItem('userId', String(userData.id || ''));
+      localStorage.setItem('userName', userData.full_name || userData.name || userData.email);
       localStorage.setItem('userEmail', userData.email || '');
       localStorage.setItem('isAuthenticated', 'true');
       localStorage.setItem('userRole', userData.user_type || 'passenger');
 
       if (userData.is_admin || userData.user_type === 'admin') {
         localStorage.setItem('adminToken', effectiveToken || '');
+        localStorage.setItem('isAdmin', 'true');
+      }
+      
+      if (userData.is_staff || userData.user_type === 'staff') {
+        localStorage.setItem('isStaff', 'true');
+      }
+
+      if (userData.profile_image) {
+        localStorage.setItem('userAvatar', userData.profile_image);
       }
 
       // Fetch and store complete user profile
       await fetchAndStoreUserProfile();
 
       // Dispatch event to notify components
+      console.log('✅ Auth data stored, triggering userTypeChanged event');
       setTimeout(() => {
         window.dispatchEvent(new Event('userTypeChanged'));
       }, 100);
 
       setMessageType(showMessage('Face authentication successful!', setError, 'success'));
 
-      // Navigate based on user type
-      if (userData.is_admin || userData.user_type === 'admin') {
-        navigate('/admin-dashboard');
-      } else if (userData.is_staff || userData.user_type === 'staff') {
-        navigate('/staff-dashboard');
-      } else {
-        navigate('/user-dashboard');
-      }
+      console.log('✅ Navigating based on user type...');
+      // Navigate based on user type with small delay
+      setTimeout(() => {
+        if (userData.is_admin || userData.user_type === 'admin') {
+          navigate('/admin-dashboard');
+        } else if (userData.is_staff || userData.user_type === 'staff') {
+          navigate('/staff-dashboard');
+        } else {
+          navigate('/user-dashboard');
+        }
+      }, 100);
     } catch (error) {
       console.error('Error processing face auth:', error);
       setMessageType(showMessage('Authentication successful but setup failed', setError, 'info'));

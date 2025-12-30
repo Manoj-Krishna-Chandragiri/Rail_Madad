@@ -208,6 +208,8 @@ const StaffLogin = () => {
 
   const handleFaceAuthSuccess = async (userData: any, firebaseToken: string) => {
     try {
+      console.log('🎯 Face auth success handler called:', { userData, firebaseToken });
+      
       const isDevToken = firebaseToken && firebaseToken.startsWith('dev-face-token-');
       const effectiveToken = firebaseToken || (isDevToken ? firebaseToken : `dev-face-token-${userData?.id || 'user'}`);
 
@@ -218,24 +220,38 @@ const StaffLogin = () => {
         return;
       }
 
+      console.log('✅ Storing auth data:', {
+        token: effectiveToken,
+        userType: userData.user_type,
+        userId: userData.id
+      });
+
       // Store authentication data
       localStorage.setItem('authToken', effectiveToken || '');
       localStorage.setItem('firebaseToken', effectiveToken || '');
       localStorage.setItem('loginType', 'staff');
       localStorage.setItem('userRole', 'staff');
       localStorage.setItem('isStaff', 'true');
-      localStorage.setItem('userName', userData.name || userData.email);
+      localStorage.setItem('userId', String(userData.id || ''));
+      localStorage.setItem('userName', userData.full_name || userData.name || userData.email);
       localStorage.setItem('userEmail', userData.email);
 
       if (userData.profile_image) {
         localStorage.setItem('userAvatar', userData.profile_image);
       }
 
+      console.log('✅ Auth data stored, triggering userTypeChanged event');
       window.dispatchEvent(new Event('userTypeChanged'));
+      
       setShowFaceAuthModal(false);
-      navigate('/staff-dashboard');
+      
+      console.log('✅ Navigating to staff dashboard...');
+      // Small delay to ensure storage is complete
+      setTimeout(() => {
+        navigate('/staff-dashboard');
+      }, 100);
     } catch (error) {
-      console.error('Face auth success handler error:', error);
+      console.error('❌ Face auth success handler error:', error);
       setErrors({ general: 'Authentication succeeded but navigation failed.' });
     }
   };

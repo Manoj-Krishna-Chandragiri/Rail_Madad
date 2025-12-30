@@ -26,11 +26,19 @@ const apiClient = axios.create({
 // Add request interceptor to include auth token
 apiClient.interceptors.request.use(
   (config) => {
-    console.log('📡 Making request to:', (config.baseURL || '') + (config.url || ''));
+    const url = (config.baseURL || '') + (config.url || '');
+    console.log('📡 Making request to:', url);
+    
     const token = localStorage.getItem('authToken');
+    console.log('🔑 Token from localStorage:', token ? `${token.substring(0, 30)}...` : 'NOT FOUND');
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('✅ Authorization header set');
+    } else {
+      console.warn('⚠️ No authToken in localStorage!');
     }
+    
     return config;
   },
   (error) => {
@@ -61,9 +69,14 @@ apiClient.interceptors.response.use(
       console.warn('Request timeout - please check your connection and try again');
       error.message = 'Request timeout. Please check your connection and try again.';
     } else if (error.response?.status === 401) {
-      console.warn('Authentication expired - redirecting to login');
-      localStorage.removeItem('authToken');
-      window.location.href = '/login-portal';
+      console.warn('Authentication failed - status 401');
+      // Don't auto-redirect if we just logged in (give a grace period)
+      const authToken = localStorage.getItem('authToken');
+      if (!authToken) {
+        // No token at all - redirect
+        window.location.href = '/login-portal';
+      }
+      // If we have a token but got 401, let the calling code handle it
     } else if (error.response?.status >= 500) {
       console.warn('Server error occurred - please try again later');
     }

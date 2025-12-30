@@ -29,7 +29,8 @@ class FirebaseAuthMiddleware:
         
         # Check if we're in development mode without Firebase AND no real token is provided
         if hasattr(settings, 'DEVELOPMENT_MODE') and settings.DEVELOPMENT_MODE and not has_real_token:
-            logger.info("Running in development mode - Firebase authentication bypassed (no real token)")
+            logger.info(f"🔧 Development mode - Request to: {request.path}")
+            logger.info(f"🔧 Authorization header: {auth_header[:50] if auth_header else 'None'}...")
             
             # Check if there's a specific user email in the request headers or session
             # This allows the frontend to specify which user to simulate
@@ -41,12 +42,15 @@ class FirebaseAuthMiddleware:
             if dev_token_header and dev_token_header.startswith('Bearer dev-face-token-'):
                 try:
                     token_body = dev_token_header.split(' ')[1]
+                    logger.info(f"🎯 Parsing dev face token: {token_body}")
                     parts = token_body.split('-')
+                    logger.info(f"🎯 Token parts: {parts}")
                     if len(parts) >= 4:
                         dev_token_user_id = int(parts[3])
-                        logger.info(f"Development mode: Parsed dev face token for user id {dev_token_user_id}")
+                        logger.info(f"✅ Development mode: Parsed dev face token for user id {dev_token_user_id}")
                 except Exception as e:
-                    logger.warning(f"Development mode: Failed to parse dev face token: {e}")
+                    logger.warning(f"❌ Development mode: Failed to parse dev face token: {e}")
+
             
             # Set default values for development
             request.firebase_user = None
