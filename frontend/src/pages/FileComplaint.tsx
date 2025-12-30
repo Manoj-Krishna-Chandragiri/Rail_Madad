@@ -351,28 +351,6 @@ const FileComplaint = () => {
                     <span className={`font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Staff:</span>
                     <span className={`ml-2 ${theme === 'dark' ? 'text-green-300' : 'text-green-700'}`}>{aiPrediction.staff_assignment}</span>
                   </div>
-                  <div>
-                    <span className={`font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Priority:</span>
-                    <span className={`ml-2 px-2 py-0.5 rounded text-xs font-semibold ${
-                      aiPrediction.priority === 'Critical' ? 'bg-red-200 text-red-800' :
-                      aiPrediction.priority === 'High' ? 'bg-orange-200 text-orange-800' :
-                      aiPrediction.priority === 'Medium' ? 'bg-yellow-200 text-yellow-800' :
-                      'bg-green-200 text-green-800'
-                    }`}>
-                      {aiPrediction.priority}
-                    </span>
-                  </div>
-                  <div>
-                    <span className={`font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Severity:</span>
-                    <span className={`ml-2 px-2 py-0.5 rounded text-xs font-semibold ${
-                      aiPrediction.severity === 'Critical' ? 'bg-red-200 text-red-800' :
-                      aiPrediction.severity === 'High' ? 'bg-orange-200 text-orange-800' :
-                      aiPrediction.severity === 'Medium' ? 'bg-yellow-200 text-yellow-800' :
-                      'bg-green-200 text-green-800'
-                    }`}>
-                      {aiPrediction.severity}
-                    </span>
-                  </div>
                 </div>
                 <p className={`text-xs mt-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                   Classification confidence: {Math.min(

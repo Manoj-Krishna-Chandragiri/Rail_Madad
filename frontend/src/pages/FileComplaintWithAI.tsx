@@ -1,4 +1,4 @@
-import { FileUp, Camera, Brain, Sparkles, CheckCircle } from 'lucide-react';
+import { FileUp, Camera, Brain, Sparkles, CheckCircle, Mic, MicOff } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import axios from "axios";
@@ -42,6 +42,7 @@ const FileComplaintWithAI = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showAISuggestion, setShowAISuggestion] = useState(false);
   const [useAISuggestion, setUseAISuggestion] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
 
   // Map AI categories to form categories
   const categoryMapping: { [key: string]: string } = {
@@ -232,6 +233,27 @@ const FileComplaintWithAI = () => {
     setPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
+  const handleVoiceInput = () => {
+    if ('webkitSpeechRecognition' in window) {
+      const recognition = new (window as any).webkitSpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => setIsRecording(true);
+      recognition.onend = () => setIsRecording(false);
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setFormData(prev => ({
+          ...prev,
+          description: `${prev.description} ${transcript}`.trim()
+        }));
+      };
+
+      recognition.start();
+    }
+  };
+
   const isDark = theme === 'dark';
 
   return (
@@ -268,6 +290,20 @@ const FileComplaintWithAI = () => {
                 }`}
                 placeholder="Describe your complaint in detail... (AI will analyze and suggest category)"
               />
+              <button
+                type="button"
+                onClick={handleVoiceInput}
+                className={`absolute right-2 bottom-2 p-2 rounded-full ${
+                  isRecording 
+                    ? 'bg-red-600 hover:bg-red-700' 
+                    : isDark 
+                      ? 'bg-gray-600 hover:bg-gray-700' 
+                      : 'bg-gray-200 hover:bg-gray-300'
+                }`}
+                title={isRecording ? 'Stop Recording' : 'Start Voice Input'}
+              >
+                {isRecording ? <MicOff className="h-5 w-5 text-white" /> : <Mic className="h-5 w-5 text-gray-700" />}
+              </button>
               
               {/* AI Analysis Indicator */}
               {(isAnalyzing || aiSuggestion) && (
@@ -434,44 +470,7 @@ const FileComplaintWithAI = () => {
             </div>
           </div>
 
-          {/* Priority and Severity */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className={`p-6 rounded-lg shadow-sm ${isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'}`}>
-              <label className="block text-sm font-medium mb-2">Severity</label>
-              <select
-                name="severity"
-                value={formData.severity}
-                onChange={handleInputChange}
-                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  isDark 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
-                    : 'bg-white border-gray-300 text-gray-900'
-                }`}
-              >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-              </select>
-            </div>
-
-            <div className={`p-6 rounded-lg shadow-sm ${isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'}`}>
-              <label className="block text-sm font-medium mb-2">Priority</label>
-              <select
-                name="priority"
-                value={formData.priority}
-                onChange={handleInputChange}
-                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  isDark 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
-                    : 'bg-white border-gray-300 text-gray-900'
-                }`}
-              >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-              </select>
-            </div>
-          </div>
+          {/* Priority/Severity now decided by AI; hidden from passenger */}
 
           {/* Photo Upload */}
           <div className={`p-6 rounded-lg shadow-sm ${isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'}`}>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { 
   User, 
@@ -38,6 +39,7 @@ interface StaffProfile {
 const StaffProfile = () => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const navigate = useNavigate();
   
   const [profile, setProfile] = useState<StaffProfile>({
     email: '',
@@ -107,6 +109,14 @@ const StaffProfile = () => {
   const handleCancel = () => {
     setEditMode(false);
     fetchProfile();
+  };
+
+  const openSecuritySettings = () => {
+    navigate('/profile');
+  };
+
+  const openDangerZone = () => {
+    navigate('/profile');
   };
 
   const bgGradient = isDark 
@@ -393,6 +403,35 @@ const StaffProfile = () => {
                 </p>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Security & Danger Zone (redirect to shared profile page) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+          <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6 border ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+            <h3 className="text-lg font-semibold mb-2">Security Settings</h3>
+            <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} mb-4`}>
+              Manage two-factor authentication and face authentication from the main profile security page.
+            </p>
+            <button
+              onClick={openSecuritySettings}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              Open Security Settings
+            </button>
+          </div>
+
+          <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6 border border-red-400`}>
+            <h3 className="text-lg font-semibold mb-2 text-red-500">Danger Zone</h3>
+            <p className={`${isDark ? 'text-gray-300' : 'text-gray-700'} mb-4`}>
+              Account deletion is handled from the shared profile page. You will be redirected there to proceed.
+            </p>
+            <button
+              onClick={openDangerZone}
+              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+            >
+              Go to Account Deletion
+            </button>
           </div>
         </div>
       </div>

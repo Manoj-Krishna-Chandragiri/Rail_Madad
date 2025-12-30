@@ -331,6 +331,22 @@ def user_profile(request):
                 'date_joined': user.date_joined.isoformat(),  # Include date_joined in ISO format
                 'created_now': created  # Indicate if this is a newly created user
             }
+
+            # Include staff profile details when available so staff uses the same profile endpoint
+            if is_staff and hasattr(user, 'staff_profile'):
+                staff = user.staff_profile
+                data.update({
+                    'employee_id': staff.employee_id or "",
+                    'department': staff.department or "",
+                    'role': staff.role or "",
+                    'location': staff.location or "",
+                    'status': staff.status or "",
+                    'joining_date': staff.joining_date.isoformat() if staff.joining_date else "",
+                    'expertise_areas': staff.expertise or [],
+                    'languages_spoken': staff.languages or [],
+                    'rating': staff.rating or 0.0,
+                    'active_tickets': staff.active_tickets or 0,
+                })
         else:
             # ❌ User not found in database - this means they haven't completed signup
             logger.error(f"User {request.firebase_email} authenticated with Firebase but not found in database")
