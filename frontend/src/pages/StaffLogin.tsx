@@ -232,6 +232,7 @@ const StaffLogin = () => {
       localStorage.setItem('loginType', 'staff');
       localStorage.setItem('userRole', 'staff');
       localStorage.setItem('isStaff', 'true');
+      localStorage.setItem('isAuthenticated', 'true');
       localStorage.setItem('userId', String(userData.id || ''));
       localStorage.setItem('userName', userData.full_name || userData.name || userData.email);
       localStorage.setItem('userEmail', userData.email);
