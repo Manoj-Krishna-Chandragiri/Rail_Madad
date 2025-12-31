@@ -1,22 +1,27 @@
-import { Clock, Search } from 'lucide-react';
+import { Clock, Search, MessageSquare } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import apiClient from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
 import { getAuth } from 'firebase/auth';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 interface ComplaintStatus {
   id: string;
+  rawId: number;
   pnr: string;
   status: string;
   lastUpdated: string;
   description: string;
   assignedTo: string;
+  staffId?: number;
+  resolvedAt?: string;
+  hasFeedback?: boolean;
 }
 
 const TrackStatus = () => {
   const { theme } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [complaints, setComplaints] = useState<ComplaintStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,11 +54,15 @@ const TrackStatus = () => {
 
         const formatted = response.data.map((item: any) => ({
           id: `CMP${item.id.toString().padStart(3, '0')}`,
+          rawId: item.id,
           pnr: item.pnr_number || 'N/A',
           status: item.status === 'Closed' ? 'Resolved' : item.status,
           lastUpdated: item.date_of_incident,
           description: item.description,
           assignedTo: item.staff || 'Unassigned',
+          staffId: item.staff_id,
+          resolvedAt: item.resolved_at,
+          hasFeedback: item.has_feedback || false,
         }));
 
         setComplaints(formatted);
@@ -179,6 +188,36 @@ const TrackStatus = () => {
                         <span className="font-medium">Last Updated:</span>{' '}
                         {complaint.lastUpdated}
                       </p>
+                      
+                      {/* Show feedback button for resolved complaints */}
+                      {complaint.status === 'Resolved' && !complaint.hasFeedback && (
+                        <div className="mt-4 pt-4 border-t border-gray-600">
+                          <button
+                            onClick={() => navigate(`/user-dashboard/feedback-form/${complaint.rawId}`, { 
+                              state: { 
+                                complaintId: complaint.rawId,
+                                staffId: complaint.staffId,
+                                staffName: complaint.assignedTo
+                              } 
+                            })}
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                            Give Feedback
+                          </button>
+                          <p className={`text-sm mt-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                            Share your experience and rate the resolution
+                          </p>
+                        </div>
+                      )}
+                      
+                      {complaint.hasFeedback && (
+                        <div className="mt-4 pt-4 border-t border-gray-600">
+                          <p className={`text-sm ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>
+                            ✓ Feedback submitted
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))

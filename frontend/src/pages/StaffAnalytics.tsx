@@ -10,7 +10,11 @@ import {
   Calendar,
   Activity,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Star,
+  MessageSquare,
+  ThumbsUp,
+  ThumbsDown
 } from 'lucide-react';
 import apiClient from '../utils/api';
 
@@ -23,6 +27,40 @@ interface MonthlyPerformance {
   avg_resolution_time: number;
   customer_satisfaction: number;
   complaints_received: number;
+}
+
+interface FeedbackStats {
+  average_rating: number;
+  total_feedback: number;
+  positive_feedback: number;
+  negative_feedback: number;
+  feedback_rate: number;
+}
+
+interface ComplaintStats {
+  total_assigned: number;
+  total_resolved: number;
+  resolution_rate: number;
+  active_tickets: number;
+}
+
+interface RecentFeedback {
+  rating: number;
+  sentiment: string;
+  feedback_message: string;
+  submitted_at: string;
+  name: string;
+}
+
+interface StaffAnalyticsData {
+  staff_name: string;
+  staff_id: number;
+  department: string;
+  location: string;
+  current_rating: number;
+  feedback_stats: FeedbackStats;
+  complaint_stats: ComplaintStats;
+  recent_feedback: RecentFeedback[];
 }
 
 interface AnalyticsData {
@@ -42,12 +80,50 @@ const StaffAnalytics = () => {
   const isDark = theme === 'dark';
   
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [staffAnalytics, setStaffAnalytics] = useState<StaffAnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState('current_month');
+  const [staffId, setStaffId] = useState<number | null>(null);
 
   useEffect(() => {
-    fetchAnalytics();
+    // Get staff ID from profile or localStorage
+    const userEmail = localStorage.getItem('userEmail');
+    if (userEmail) {
+      // Fetch staff profile to get ID
+      fetchStaffId(userEmail);
+    }
   }, []);
+
+  useEffect(() => {
+    if (staffId) {
+      fetchAnalytics();
+      fetchStaffAnalytics();
+    }
+  }, [staffId]);
+
+  const fetchStaffId = async (email: string) => {
+    try {
+      // Get staff ID from the staff list based on email
+      const response = await apiClient.get('/api/complaints/staff/');
+      const staffMember = response.data.find((s: any) => s.email === email);
+      if (staffMember) {
+        setStaffId(staffMember.id);
+      }
+    } catch (err) {
+      console.error('Failed to fetch staff ID:', err);
+    }
+  };
+
+  const fetchStaffAnalytics = async () => {
+    if (!staffId) return;
+    
+    try {
+      const response = await apiClient.get(`/api/complaints/staff/${staffId}/analytics/`);
+      setStaffAnalytics(response.data);
+    } catch (err) {
+      console.error('Failed to fetch staff analytics:', err);
+    }
+  };
 
   const fetchAnalytics = async () => {
     try {
@@ -231,6 +307,134 @@ const StaffAnalytics = () => {
                 </p>
               </div>
             </div>
+
+            {/* Feedback & Ratings Section */}
+            {staffAnalytics && (
+              <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-8 mb-8`}>
+                <h2 className="text-2xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center gap-2">
+                  <MessageSquare className="h-6 w-6" />
+                  Customer Feedback & Ratings
+                </h2>
+                
+                {/* Feedback Statistics */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                  <div className={`p-4 rounded-lg border ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Star className="h-5 w-5 text-yellow-500" />
+                      <span className={`text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Average Rating
+                      </span>
+                    </div>
+                    <p className="text-3xl font-bold text-yellow-500">
+                      {staffAnalytics.feedback_stats.average_rating.toFixed(1)}
+                    </p>
+                    <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                      out of 5.0
+                    </p>
+                  </div>
+
+                  <div className={`p-4 rounded-lg border ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <MessageSquare className="h-5 w-5 text-blue-500" />
+                      <span className={`text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Total Feedback
+                      </span>
+                    </div>
+                    <p className="text-3xl font-bold text-blue-500">
+                      {staffAnalytics.feedback_stats.total_feedback}
+                    </p>
+                    <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                      {staffAnalytics.feedback_stats.feedback_rate.toFixed(1)}% of resolved
+                    </p>
+                  </div>
+
+                  <div className={`p-4 rounded-lg border ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <ThumbsUp className="h-5 w-5 text-green-500" />
+                      <span className={`text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Positive
+                      </span>
+                    </div>
+                    <p className="text-3xl font-bold text-green-500">
+                      {staffAnalytics.feedback_stats.positive_feedback}
+                    </p>
+                    <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                      {((staffAnalytics.feedback_stats.positive_feedback / staffAnalytics.feedback_stats.total_feedback) * 100).toFixed(0)}% positive
+                    </p>
+                  </div>
+
+                  <div className={`p-4 rounded-lg border ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <ThumbsDown className="h-5 w-5 text-red-500" />
+                      <span className={`text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Negative
+                      </span>
+                    </div>
+                    <p className="text-3xl font-bold text-red-500">
+                      {staffAnalytics.feedback_stats.negative_feedback}
+                    </p>
+                    <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                      {((staffAnalytics.feedback_stats.negative_feedback / staffAnalytics.feedback_stats.total_feedback) * 100).toFixed(0)}% negative
+                    </p>
+                  </div>
+                </div>
+
+                {/* Recent Feedback */}
+                {staffAnalytics.recent_feedback.length > 0 && (
+                  <div>
+                    <h3 className={`text-lg font-semibold mb-4 ${isDark ? 'text-gray-300' : 'text-gray-900'}`}>
+                      Recent Feedback
+                    </h3>
+                    <div className="space-y-4">
+                      {staffAnalytics.recent_feedback.map((feedback, index) => (
+                        <div
+                          key={index}
+                          className={`p-4 rounded-lg border ${isDark ? 'border-gray-700 bg-gray-700/50' : 'border-gray-200 bg-gray-50'}`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center">
+                                {[...Array(5)].map((_, i) => (
+                                  <Star
+                                    key={i}
+                                    className={`h-4 w-4 ${
+                                      i < feedback.rating
+                                        ? 'text-yellow-500 fill-yellow-500'
+                                        : 'text-gray-400'
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                              <span
+                                className={`text-xs px-2 py-1 rounded ${
+                                  feedback.sentiment === 'POSITIVE'
+                                    ? 'bg-green-100 text-green-800'
+                                    : feedback.sentiment === 'NEGATIVE'
+                                    ? 'bg-red-100 text-red-800'
+                                    : 'bg-gray-100 text-gray-800'
+                                }`}
+                              >
+                                {feedback.sentiment}
+                              </span>
+                            </div>
+                            <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                              {new Date(feedback.submitted_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <p className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {feedback.feedback_message.slice(0, 200)}
+                            {feedback.feedback_message.length > 200 && '...'}
+                          </p>
+                          <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                            - {feedback.name}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Monthly Comparison */}
             <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-8 mb-8`}>

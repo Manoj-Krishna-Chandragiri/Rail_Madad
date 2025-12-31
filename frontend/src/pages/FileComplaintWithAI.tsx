@@ -136,12 +136,12 @@ const FileComplaintWithAI = () => {
         // Use the AI-powered smart complaint submission endpoint
         const smartComplaintData = {
           description: formData.description,
-          location: formData.location,
-          train_number: formData.train_number,
-          pnr_number: formData.pnr_number,
-          severity: formData.severity,
-          priority: formData.priority,
-          date_of_incident: formData.date_of_incident,
+          location: formData.location || '',
+          train_number: formData.train_number || '',
+          pnr_number: formData.pnr_number || '',
+          severity: formData.severity || 'Medium',
+          priority: formData.priority || 'Medium',
+          date_of_incident: formData.date_of_incident || new Date().toISOString().split('T')[0],
           ai_category: aiSuggestion.category,
           ai_confidence: aiSuggestion.confidence
         };
@@ -162,9 +162,27 @@ const FileComplaintWithAI = () => {
         }
       } else {
         // Use traditional submission
+        console.log("Form data before submission:", formData);
+        
         Object.entries(formData).forEach(([key, value]) => {
-          formDataToSend.append(key, value?.toString() || '');
+          // Only add fields that have non-empty values
+          if (value && value.toString().trim() !== '') {
+            formDataToSend.append(key, value.toString());
+          }
         });
+        
+        // If date_of_incident is not provided, use today's date
+        if (!formData.date_of_incident || formData.date_of_incident.trim() === '') {
+          const today = new Date().toISOString().split('T')[0];
+          formDataToSend.set('date_of_incident', today);
+          console.log("Using default date:", today);
+        }
+        
+        // Log what's being sent
+        console.log("FormData entries:");
+        for (let [key, value] of formDataToSend.entries()) {
+          console.log(`  ${key}:`, value);
+        }
         
         if (photos.length > 0) {
           const photo = photos[0];
@@ -172,6 +190,7 @@ const FileComplaintWithAI = () => {
           const uniqueId = generateRandomString(32);
           const fileName = `${uniqueId}.${extension}`;
           formDataToSend.append('photos', photo, fileName);
+          console.log("Added photo:", fileName);
         }
 
         await axios.post(
@@ -205,11 +224,27 @@ const FileComplaintWithAI = () => {
       
     } catch (error: any) {
       console.error("Error submitting:", error.response?.data || error);
+      console.error("Full error details:", {
+        status: error.response?.status,
+        data: error.response?.data,
+        details: error.response?.data?.details
+      });
       
       if (error.response?.status === 401) {
         alert("Session expired. Please log in again.");
       } else {
-        alert(error.response?.data?.error || "Failed to submit complaint. Please try again.");
+        const errorMessage = error.response?.data?.error || "Failed to submit complaint. Please try again.";
+        const errorDetails = error.response?.data?.details;
+        
+        if (errorDetails) {
+          console.error("Validation errors:", errorDetails);
+          const detailsText = Object.entries(errorDetails)
+            .map(([field, errors]) => `${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`)
+            .join('\n');
+          alert(`${errorMessage}\n\nDetails:\n${detailsText}`);
+        } else {
+          alert(errorMessage);
+        }
       }
     }
   };

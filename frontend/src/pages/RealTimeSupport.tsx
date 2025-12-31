@@ -62,7 +62,8 @@ const RealTimeSupport = () => {
       console.log('API Response:', response.data);
       
       // Transform data to match SupportAgent interface
-      const supportAgents = response.data.map((staff: any) => {
+      const supportAgents = (response.data || [])
+        .map((staff: any) => {
         console.log('Staff data from API:', staff);
         
         // Parse expertise
@@ -91,18 +92,24 @@ const RealTimeSupport = () => {
         
         console.log('Parsed communication preferences:', communication_preferences);
         
+        const rawId = staff.id ?? staff.user_id;
+        if (rawId === undefined || rawId === null) {
+          return null; // skip malformed rows
+        }
+
         return {
-          id: staff.id.toString(),
-          name: staff.name,
-          email: staff.email,
-          phone: staff.phone,
-          status: staff.status,
-          activeChats: staff.active_tickets || 0,
+          id: rawId.toString(),
+          name: staff.name || staff.full_name || 'Support Agent',
+          email: staff.email || '',
+          phone: staff.phone || staff.phone_number || staff.contact_number || '',
+          status: staff.status || 'active',
+          activeChats: staff.active_chats || staff.active_tickets || 0,
           expertise: expertise,
-          rating: staff.rating || 4.0,
+          rating: typeof staff.rating === 'number' ? staff.rating : 4.0,
           communication_preferences: communication_preferences,
-        };
-      });
+        } as SupportAgent;
+      })
+        .filter((agent: SupportAgent | null): agent is SupportAgent => agent !== null);
       
       setAgents(supportAgents);
       console.log('Final agents data:', supportAgents);

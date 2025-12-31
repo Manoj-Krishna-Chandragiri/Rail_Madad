@@ -17,18 +17,26 @@ import apiClient from '../utils/api';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
 
 interface AssignedComplaint {
-  id: string;
-  complaint_id: string;
+  id: string | number;
+  complaint_id?: string;
+  type?: string;
   description: string;
-  category: string;
-  priority_level: 'Low' | 'Medium' | 'High' | 'Critical';
-  status: 'pending' | 'in-progress' | 'resolved';
+  category?: string;
+  priority?: string;
+  priority_level?: 'Low' | 'Medium' | 'High' | 'Critical';
+  severity?: string;
+  status: string;
   created_at: string;
-  passenger_name: string;
-  passenger_contact: string;
-  ai_confidence: number;
-  assigned_at: string;
+  passenger_name?: string;
+  passenger_contact?: string;
+  user?: any;
+  ai_confidence?: number;
+  assigned_at?: string;
   location?: string;
+  train_number?: string;
+  pnr_number?: string;
+  date_of_incident?: string;
+  staff?: string;
 }
 
 interface StaffDashboardStats {
@@ -64,6 +72,7 @@ const StaffDashboard: React.FC = () => {
   const fetchStaffDashboard = async () => {
     try {
       setLoading(true);
+      setError('');
       
       // Debug: Check localStorage values
       console.log('🔍 Staff Dashboard Debug:');
@@ -74,17 +83,36 @@ const StaffDashboard: React.FC = () => {
       
       const response = await apiClient.get('/api/complaints/staff/dashboard/');
       
-      if (response.data.success) {
-        setComplaints(response.data.complaints || []);
-        setStats(response.data.stats || stats);
+      console.log('✅ Dashboard Response:', response.data);
+      
+      // Handle response - check if success field exists, otherwise just use the data
+      if (response.data) {
+        const complaintsData = response.data.complaints || [];
+        const statsData = response.data.stats || response.data.statistics || stats;
+        
+        console.log('📊 Complaints count:', complaintsData.length);
+        console.log('📈 Stats:', statsData);
+        
+        setComplaints(complaintsData);
+        setStats({
+          total_assigned: statsData.total_assigned || 0,
+          pending: statsData.pending || statsData.open_complaints || 0,
+          in_progress: statsData.in_progress || statsData.in_progress_complaints || 0,
+          resolved_today: statsData.resolved_today || statsData.today_resolved || 0,
+          avg_resolution_time: statsData.avg_resolution_time || '0 hours'
+        });
+        
+        // Clear error on successful load
+        setError('');
       } else {
-        setError('Failed to load dashboard data');
+        setError('No data received from server');
       }
     } catch (err: any) {
       console.error('❌ Dashboard fetch error:', err);
       console.error('❌ Error response:', err.response?.data);
       console.error('❌ Error status:', err.response?.status);
-      setError(err.response?.data?.error || 'Failed to load dashboard');
+      console.error('❌ Full error:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to load dashboard');
     } finally {
       setLoading(false);
     }
@@ -92,14 +120,16 @@ const StaffDashboard: React.FC = () => {
 
   const handleResolveComplaint = async (complaintId: string) => {
     try {
-      const response = await apiClient.post(`/api/complaints/staff/resolve/${complaintId}/`);
+      const response = await apiClient.post(`/api/complaints/staff/resolve/${complaintId}/`, {
+        resolution_notes: 'Resolved by staff member'
+      });
       
       if (response.data.success) {
         // Update the complaint status locally
         setComplaints(prev => 
           prev.map(complaint => 
-            complaint.id === complaintId 
-              ? { ...complaint, status: 'resolved' }
+            complaint.id.toString() === complaintId 
+              ? { ...complaint, status: 'Closed' }
               : complaint
           )
         );
@@ -108,10 +138,10 @@ const StaffDashboard: React.FC = () => {
         setStats(prev => ({
           ...prev,
           resolved_today: prev.resolved_today + 1,
-          pending: prev.pending - 1
+          in_progress: prev.in_progress - 1
         }));
         
-        alert('Complaint resolved successfully!');
+        alert('Complaint marked as resolved!');
       }
     } catch (err: any) {
       console.error('Resolve error:', err);
@@ -121,14 +151,16 @@ const StaffDashboard: React.FC = () => {
 
   const handleTakeAction = async (complaintId: string) => {
     try {
-      const response = await apiClient.post(`/api/complaints/staff/take-action/${complaintId}/`);
+      const response = await apiClient.post(`/api/complaints/staff/update-status/${complaintId}/`, {
+        status: 'In Progress'
+      });
       
       if (response.data.success) {
-        // Update the complaint status to in-progress
+        // Update the complaint status to in-progress locally
         setComplaints(prev => 
           prev.map(complaint => 
-            complaint.id === complaintId 
-              ? { ...complaint, status: 'in-progress' }
+            complaint.id.toString() === complaintId 
+              ? { ...complaint, status: 'In Progress' }
               : complaint
           )
         );
@@ -139,6 +171,8 @@ const StaffDashboard: React.FC = () => {
           in_progress: prev.in_progress + 1,
           pending: prev.pending - 1
         }));
+        
+        alert('Complaint status updated to In Progress!');
       }
     } catch (err: any) {
       console.error('Take action error:', err);
@@ -148,13 +182,22 @@ const StaffDashboard: React.FC = () => {
 
   // Filter complaints based on search and filters
   const filteredComplaints = complaints.filter(complaint => {
-    const matchesSearch = 
-      complaint.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      complaint.complaint_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      complaint.passenger_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = searchTerm.toLowerCase();
+    const complaintId = complaint.complaint_id || complaint.id.toString();
+    const category = complaint.category || complaint.type || '';
+    const passengerName = complaint.passenger_name || complaint.user?.name || complaint.user?.email || 'Unknown';
     
-    const matchesStatus = statusFilter === 'all' || complaint.status === statusFilter;
-    const matchesPriority = priorityFilter === 'all' || complaint.priority_level === priorityFilter;
+    const matchesSearch = 
+      complaint.description.toLowerCase().includes(searchLower) ||
+      complaintId.toLowerCase().includes(searchLower) ||
+      passengerName.toLowerCase().includes(searchLower) ||
+      category.toLowerCase().includes(searchLower);
+    
+    const complaintStatus = complaint.status.toLowerCase().replace(' ', '-');
+    const matchesStatus = statusFilter === 'all' || complaintStatus === statusFilter.toLowerCase();
+    
+    const priority = complaint.priority_level || complaint.priority || complaint.severity || 'Medium';
+    const matchesPriority = priorityFilter === 'all' || priority === priorityFilter;
     
     return matchesSearch && matchesStatus && matchesPriority;
   });
@@ -170,11 +213,19 @@ const StaffDashboard: React.FC = () => {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'resolved': return 'text-green-600 bg-green-100 dark:bg-green-900/20';
-      case 'in-progress': return 'text-blue-600 bg-blue-100 dark:bg-blue-900/20';
-      case 'pending': return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/20';
-      default: return 'text-gray-600 bg-gray-100 dark:bg-gray-700';
+    const statusLower = status.toLowerCase();
+    switch (statusLower) {
+      case 'resolved':
+      case 'closed':
+        return 'text-green-600 bg-green-100 dark:bg-green-900/20';
+      case 'in progress':
+      case 'in-progress':
+        return 'text-blue-600 bg-blue-100 dark:bg-blue-900/20';
+      case 'pending':
+      case 'open':
+        return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/20';
+      default:
+        return 'text-gray-600 bg-gray-100 dark:bg-gray-700';
     }
   };
 
@@ -311,9 +362,11 @@ const StaffDashboard: React.FC = () => {
               }`}
             >
               <option value="all">All Status</option>
+              <option value="open">Open</option>
               <option value="pending">Pending</option>
               <option value="in-progress">In Progress</option>
               <option value="resolved">Resolved</option>
+              <option value="closed">Closed</option>
             </select>
             <ChevronDown className="h-4 w-4 absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
@@ -350,72 +403,98 @@ const StaffDashboard: React.FC = () => {
             </p>
           </div>
         ) : (
-          filteredComplaints.map((complaint) => (
+          filteredComplaints.map((complaint) => {
+            const complaintId = complaint.complaint_id || `C${complaint.id}`;
+            const category = complaint.category || complaint.type || 'General';
+            const priority = complaint.priority_level || complaint.priority || complaint.severity || 'Medium';
+            const status = (complaint.status || 'pending').toLowerCase().replace(/ /g, '-');
+            const passengerName = complaint.passenger_name || complaint.user?.name || complaint.user?.email || 'Unknown';
+            const staffAssigned = complaint.staff || 'Unassigned';
+            
+            return (
             <div
               key={complaint.id}
-              className={`p-6 rounded-lg shadow-sm ${isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'}`}
+              className={`p-6 rounded-lg shadow-sm transition-all hover:shadow-md ${isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'}`}
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-lg font-semibold">#{complaint.complaint_id}</h3>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(complaint.priority_level)}`}>
-                      {complaint.priority_level}
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <h3 className="text-lg font-semibold">#{complaintId}</h3>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(priority)}`}>
+                      {priority}
                     </span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(complaint.status)}`}>
-                      {complaint.status.replace('-', ' ').toUpperCase()}
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(status)}`}>
+                      {complaint.status.toUpperCase()}
                     </span>
+                    {complaint.train_number && (
+                      <span className={`px-2 py-1 rounded text-xs ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                        Train: {complaint.train_number}
+                      </span>
+                    )}
                   </div>
                   <p className={`text-sm mb-2 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                    <strong>Category:</strong> {complaint.category.replace('_', ' ').toUpperCase()}
+                    <strong>Category:</strong> {(category || 'General').replace(/_/g, ' ').replace(/-/g, ' ').toUpperCase()}
                   </p>
+                  {complaint.location && (
+                    <p className={`text-sm mb-2 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                      <strong>Location:</strong> {complaint.location}
+                    </p>
+                  )}
                   <p className={`mb-3 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
                     {complaint.description}
                   </p>
-                  <div className="flex items-center gap-4 text-sm text-gray-500">
+                  <div className="flex items-center gap-4 text-sm text-gray-500 flex-wrap">
                     <span className="flex items-center gap-1">
                       <User className="h-4 w-4" />
-                      {complaint.passenger_name}
+                      {passengerName}
                     </span>
                     <span className="flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
                       {formatDate(complaint.created_at)}
                     </span>
+                    {complaint.date_of_incident && (
+                      <span className="flex items-center gap-1">
+                        📅 Incident: {new Date(complaint.date_of_incident).toLocaleDateString()}
+                      </span>
+                    )}
                     {complaint.ai_confidence && (
                       <span className="flex items-center gap-1">
                         <Badge className="h-4 w-4" />
-                        AI Confidence: {(complaint.ai_confidence * 100).toFixed(1)}%
+                        AI: {(complaint.ai_confidence * 100).toFixed(1)}%
                       </span>
                     )}
+                    <span className={`flex items-center gap-1 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>
+                      👤 Assigned: {staffAssigned}
+                    </span>
                   </div>
                 </div>
                 
                 <div className="flex gap-2 ml-4">
-                  {complaint.status === 'pending' && (
+                  {(status === 'pending' || status === 'open') && (
                     <button
-                      onClick={() => handleTakeAction(complaint.id)}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      onClick={() => handleTakeAction(complaint.id.toString())}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
                     >
                       Take Action
                     </button>
                   )}
-                  {complaint.status === 'in-progress' && (
+                  {status === 'in-progress' && (
                     <button
-                      onClick={() => handleResolveComplaint(complaint.id)}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                      onClick={() => handleResolveComplaint(complaint.id.toString())}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors whitespace-nowrap"
                     >
                       Mark Resolved
                     </button>
                   )}
-                  {complaint.status === 'resolved' && (
-                    <span className="px-4 py-2 bg-green-100 text-green-800 rounded-lg">
+                  {(status === 'resolved' || status === 'closed') && (
+                    <span className={`px-4 py-2 rounded-lg ${isDark ? 'bg-green-900/20 text-green-400' : 'bg-green-100 text-green-800'}`}>
                       ✓ Resolved
                     </span>
                   )}
                 </div>
               </div>
             </div>
-          ))
+          )})
         )}
       </div>
     </div>

@@ -17,7 +17,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .models import Feedback
 from .serializers import FeedbackSerializer
-from django.db.models import Count, Q, Avg
+from django.db.models import Count, Q, Avg, Case, When, Value, IntegerField
 from django.utils import timezone
 # Import AI views
 from .ai_views import *
@@ -214,13 +214,40 @@ def file_complaint(request):
                         data['type'] = mapped_category
                     
                     # Set priority and severity from AI (hybrid classifier)
-                    data['priority'] = ai_result.get('priority', 'Medium')
-                    data['severity'] = ai_result.get('severity', 'Medium')
+                    ai_priority = ai_result.get('priority', 'Medium')
+                    ai_severity = ai_result.get('severity', 'Medium')
                     
-                    # Get staff assignment from AI
+                    # Map 'Critical' severity to 'High' (model only accepts Low/Medium/High)
+                    if ai_severity == 'Critical':
+                        ai_severity = 'High'
+                    
+                    data['priority'] = ai_priority
+                    data['severity'] = ai_severity
+                    
+                    # Get staff assignment from AI (use smart assignment to find best staff member)
+                    from .assignment_service import ComplaintAssignmentService
+                    
                     staff_dept = ai_result.get('staff', 'Customer Service')
-                    if not data.get('staff'):
-                        data['staff'] = staff_dept
+                    staff_name, staff_id = ComplaintAssignmentService.assign_complaint(
+                        complaint_category=ai_category,
+                        severity=ai_severity
+                    )
+                    
+                    # Use specific staff member if found, otherwise use department
+                    if staff_name:
+                        data['staff'] = staff_name  # Use actual staff member name
+                        logger.info(f"✅ Assigned to specific staff: {staff_name} (ID: {staff_id})")
+                    else:
+                        # Try to find ANY active staff as fallback
+                        from .models import Staff
+                        any_staff = Staff.objects.filter(status='active').first()
+                        if any_staff:
+                            data['staff'] = any_staff.name
+                            logger.warning(f"⚠️ No best match found, assigned to first available staff: {any_staff.name}")
+                        else:
+                            # Last resort: use department name
+                            data['staff'] = staff_dept
+                            logger.warning(f"⚠️ No active staff available, using department: {staff_dept}")
                     
                     # Store AI metadata for tracking and transparency
                     data['ai_categorized'] = True
@@ -259,6 +286,31 @@ def file_complaint(request):
                     data['type'] = 'miscellaneous'
                 if not data.get('priority'):
                     data['priority'] = 'Medium'
+                # Assign to any available staff even when AI fails
+                if not data.get('staff'):
+                    try:
+                        from .models import Staff
+                        any_staff = Staff.objects.filter(status='active').first()
+                        if any_staff:
+                            data['staff'] = any_staff.name
+                            logger.info(f"✅ Fallback assignment to: {any_staff.name}")
+                    except Exception as staff_error:
+                        logger.error(f"Could not assign staff: {staff_error}")
+        
+        # Final check: Ensure staff is assigned
+        if not data.get('staff') or data.get('staff') == '':
+            try:
+                from .models import Staff
+                any_staff = Staff.objects.filter(status='active').first()
+                if any_staff:
+                    data['staff'] = any_staff.name
+                    logger.info(f"✅ Final fallback assignment to: {any_staff.name}")
+                else:
+                    data['staff'] = 'Unassigned'
+                    logger.warning("⚠️ No active staff found, marking as Unassigned")
+            except Exception as e:
+                data['staff'] = 'Unassigned'
+                logger.error(f"⚠️ Staff assignment failed: {e}")
         
         # Validate required fields (type is now optional since AI can provide it)
         required_fields = ['description', 'train_number', 'pnr_number', 'location', 'date_of_incident']
@@ -463,6 +515,8 @@ def feedback_view(request):
                 # First get sentiment analysis results
                 feedback_message = serializer.validated_data.get('feedback_message', '')
                 rating = serializer.validated_data.get('rating', 3)
+                complaint_id = serializer.validated_data.get('complaint_id')
+                staff_id = request.data.get('staff_id')  # Get staff_id from request
                 
                 sentiment = None
                 sentiment_confidence = None
@@ -483,8 +537,42 @@ def feedback_view(request):
                     sentiment = map_rating_to_sentiment(rating)
                     sentiment_confidence = 0.7
                 
-                # Now save with the sentiment data
-                feedback = serializer.save(sentiment=sentiment, sentiment_confidence=sentiment_confidence)
+                # Link feedback to staff if staff_id provided
+                staff_instance = None
+                if staff_id:
+                    try:
+                        from .models import Staff
+                        staff_instance = Staff.objects.get(id=staff_id)
+                    except Staff.DoesNotExist:
+                        logger.warning(f"Staff with id {staff_id} not found")
+                
+                # Now save with the sentiment data and staff link
+                feedback = serializer.save(
+                    sentiment=sentiment, 
+                    sentiment_confidence=sentiment_confidence,
+                    staff=staff_instance
+                )
+                
+                # Mark the complaint as having feedback
+                if complaint_id:
+                    try:
+                        complaint = Complaint.objects.get(id=complaint_id)
+                        complaint.has_feedback = True
+                        complaint.save()
+                    except Complaint.DoesNotExist:
+                        logger.warning(f"Complaint {complaint_id} not found")
+                
+                # Update staff rating and metrics
+                if staff_instance:
+                    try:
+                        # Calculate new average rating for staff
+                        staff_feedbacks = Feedback.objects.filter(staff=staff_instance)
+                        avg_rating = staff_feedbacks.aggregate(models.Avg('rating'))['rating__avg'] or 0
+                        staff_instance.rating = round(avg_rating, 2)
+                        staff_instance.save()
+                    except Exception as e:
+                        logger.error(f"Error updating staff metrics: {str(e)}")
+                
                 return Response({'message': 'Feedback submitted successfully'}, status=201)
             return Response(serializer.errors, status=400)
         
@@ -501,12 +589,12 @@ def feedback_view(request):
 
 @api_view(['GET', 'POST'])
 def staff_list(request):
-    """List all staff members - uses accounts.Staff model"""
-    from accounts.models import Staff
-    from accounts.serializers import StaffSerializer
+    """List all staff members - uses complaints.Staff model (complaints_staff table)"""
+    from .models import Staff
+    from .serializers import StaffSerializer
     
     if request.method == 'GET':
-        staffs = Staff.objects.select_related('user').all()
+        staffs = Staff.objects.all()
         serializer = StaffSerializer(staffs, many=True, context={'request': request})
         return Response(serializer.data)
     
@@ -523,12 +611,12 @@ def staff_list(request):
 
 @api_view(['GET', 'PUT', 'DELETE'])
 def staff_detail(request, pk):
-    """Get/Update/Delete staff member by user_id - uses accounts.Staff model"""
-    from accounts.models import Staff
-    from accounts.serializers import StaffSerializer
+    """Get/Update/Delete staff member by id - uses complaints.Staff model (complaints_staff table)"""
+    from .models import Staff
+    from .serializers import StaffSerializer
     
     try:
-        staff = Staff.objects.select_related('user').get(user_id=pk)
+        staff = Staff.objects.get(id=pk)
     except Staff.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -548,6 +636,106 @@ def staff_detail(request, pk):
     elif request.method == 'DELETE':
         staff.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET'])
+def staff_analytics(request, staff_id):
+    """Get analytics and feedback ratings for a staff member"""
+    from .models import Staff, Complaint, Feedback
+    from django.db.models import Avg, Count, Q, F, ExpressionWrapper, DurationField
+    from datetime import timedelta
+    
+    try:
+        staff = Staff.objects.get(id=staff_id)
+    except Staff.DoesNotExist:
+        return Response({'error': 'Staff not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Get feedback statistics (linked by staff foreign key)
+    feedback_stats = Feedback.objects.filter(staff=staff).aggregate(
+        avg_rating=Avg('rating'),
+        total_feedback=Count('id'),
+        positive_feedback=Count('id', filter=Q(sentiment='POSITIVE')),
+        negative_feedback=Count('id', filter=Q(sentiment='NEGATIVE')),
+    )
+    
+    # Get complaint resolution statistics (by staff name)
+    resolved_complaints = Complaint.objects.filter(
+        staff=staff.name,
+        status='Closed'
+    )
+    
+    total_resolved = resolved_complaints.count()
+    
+    total_assigned = Complaint.objects.filter(
+        staff=staff.name
+    ).count()
+    
+    # Calculate average resolution time for resolved complaints
+    avg_resolution_time_seconds = 0
+    if total_resolved > 0:
+        resolved_with_time = resolved_complaints.filter(
+            resolved_at__isnull=False,
+            created_at__isnull=False
+        )
+        
+        if resolved_with_time.exists():
+            time_diffs = []
+            for complaint in resolved_with_time:
+                time_diff = (complaint.resolved_at - complaint.created_at).total_seconds()
+                time_diffs.append(time_diff)
+            
+            if time_diffs:
+                avg_resolution_time_seconds = sum(time_diffs) / len(time_diffs)
+    
+    # Convert to hours
+    avg_resolution_time_hours = avg_resolution_time_seconds / 3600 if avg_resolution_time_seconds > 0 else 0
+    
+    # Calculate resolution rate
+    resolution_rate = (total_resolved / total_assigned * 100) if total_assigned > 0 else 0
+    
+    # Calculate customer satisfaction percentage (from feedback ratings)
+    customer_satisfaction = 0
+    if feedback_stats['avg_rating']:
+        customer_satisfaction = (feedback_stats['avg_rating'] / 5.0) * 100
+    
+    # Update staff model with latest rating
+    if feedback_stats['avg_rating']:
+        staff.rating = round(feedback_stats['avg_rating'], 2)
+        staff.save()
+    
+    # Get recent feedback
+    recent_feedback = Feedback.objects.filter(staff=staff).order_by('-submitted_at')[:5].values(
+        'rating',
+        'sentiment',
+        'feedback_message',
+        'submitted_at',
+        'name'
+    )
+    
+    return Response({
+        'staff_name': staff.name,
+        'staff_id': staff.id,
+        'department': staff.department,
+        'location': staff.location,
+        'current_rating': staff.rating,
+        'avg_resolution_time_hours': round(avg_resolution_time_hours, 1),
+        'feedback_stats': {
+            'average_rating': round(feedback_stats['avg_rating'], 2) if feedback_stats['avg_rating'] else 0,
+            'total_feedback': feedback_stats['total_feedback'],
+            'positive_feedback': feedback_stats['positive_feedback'],
+            'negative_feedback': feedback_stats['negative_feedback'],
+            'feedback_rate': round((feedback_stats['total_feedback'] / total_resolved * 100), 1) if total_resolved > 0 else 0
+        },
+        'complaint_stats': {
+            'total_assigned': total_assigned,
+            'total_resolved': total_resolved,
+            'resolution_rate': round(resolution_rate, 1),
+            'customer_satisfaction': round(customer_satisfaction, 1),
+            'active_tickets': staff.active_tickets
+        },
+        'recent_feedback': list(recent_feedback)
+    })
+
 
 # Admin Complaints Management API Views
 @api_view(['GET'])
@@ -1903,6 +2091,7 @@ def feedback_sentiment_stats(request):
 def submit_feedback(request):
     """
     Submit feedback for a complaint and analyze sentiment.
+    Links feedback to staff member for performance tracking.
     """
     try:
         # Import the sentiment analysis function
@@ -1941,9 +2130,27 @@ def submit_feedback(request):
                 sentiment = 'NEUTRAL'
                 sentiment_confidence = 0.6
             
-            # Now save with the sentiment data
-            feedback = serializer.save(sentiment=sentiment, sentiment_confidence=sentiment_confidence)
-            return Response({"message": "Feedback submitted successfully"}, status=status.HTTP_201_CREATED)
+            # Link to staff member if provided
+            staff_id = request.data.get('staff_id')
+            staff_instance = None
+            if staff_id:
+                try:
+                    from .models import Staff
+                    staff_instance = Staff.objects.get(id=staff_id)
+                except Exception as staff_error:
+                    logger.warning(f"⚠️ Could not link staff to feedback: {staff_error}")
+            
+            # Now save with the sentiment data and staff link
+            feedback = serializer.save(
+                sentiment=sentiment,
+                sentiment_confidence=sentiment_confidence,
+                staff=staff_instance
+            )
+            
+            return Response({
+                "message": "Feedback submitted successfully",
+                "feedback_id": feedback.id
+            }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.error(f"Error in submit_feedback: {str(e)}")
@@ -2129,18 +2336,60 @@ def staff_dashboard(request):
         
         # Try to find staff member by email or show all if admin
         try:
+            from .assignment_service import ComplaintAssignmentService
+            
             staff_member = Staff.objects.filter(email=staff_email).first()
             if staff_member:
-                # Filter complaints assigned to this specific staff member
+                # Filter complaints assigned to this specific staff member OR all complaints if no specific assignment yet
+                # (Since we're transitioning from department-based to person-based assignment)
+                # Sort by: Status (Open > In Progress), then Severity (High > Medium > Low), then Priority
                 assigned_complaints = Complaint.objects.filter(
                     staff=staff_member.name
-                ).order_by('-created_at')
+                )
+                
+                # If no complaints specifically assigned to this staff member, show all unassigned or department-assigned complaints
+                # This helps during transition period
+                if assigned_complaints.count() == 0:
+                    # Show all complaints (staff can work on any complaint during transition)
+                    assigned_complaints = Complaint.objects.all()
+                
+                assigned_complaints = assigned_complaints.order_by(
+                    # Status ordering: Open=0, In Progress=1, Closed=2 (so negate for descending)
+                    Case(
+                        When(status='Open', then=Value(0)),
+                        When(status='In Progress', then=Value(1)),
+                        When(status='Closed', then=Value(2)),
+                        output_field=IntegerField()
+                    ),
+                    # Severity ordering: High=0, Medium=1, Low=2
+                    Case(
+                        When(severity='High', then=Value(0)),
+                        When(severity='Medium', then=Value(1)),
+                        When(severity='Low', then=Value(2)),
+                        output_field=IntegerField()
+                    ),
+                    # Priority ordering: Critical=0, High=1, Medium=2, Low=3
+                    Case(
+                        When(priority='Critical', then=Value(0)),
+                        When(priority='High', then=Value(1)),
+                        When(priority='Medium', then=Value(2)),
+                        When(priority='Low', then=Value(3)),
+                        output_field=IntegerField()
+                    ),
+                    '-created_at'  # Newest first for same priority
+                )
+                
+                # Get staff workload
+                workload = ComplaintAssignmentService.get_staff_workload(staff_member.name)
             else:
                 # If no specific staff found (e.g., admin), show all complaints
                 assigned_complaints = Complaint.objects.all().order_by('-created_at')
-        except:
-            # Fallback to showing all complaints
+                workload = None
+        except Exception as e:
+            logger.warning(f"Error in staff dashboard: {e}")
+            # Fallback to showing all complaints sorted by date
             assigned_complaints = Complaint.objects.all().order_by('-created_at')
+            workload = None
         
         # Get statistics for the staff dashboard
         total_assigned = assigned_complaints.count()
@@ -2160,7 +2409,16 @@ def staff_dashboard(request):
         serializer = ComplaintSerializer(assigned_complaints, many=True)
         
         response_data = {
+            'success': True,
             'complaints': serializer.data,
+            'stats': {
+                'total_assigned': total_assigned,
+                'pending': open_complaints,
+                'in_progress': in_progress_complaints,
+                'resolved': closed_complaints,
+                'assigned_today': today_assigned,
+                'resolved_today': today_resolved,
+            },
             'statistics': {
                 'total_assigned': total_assigned,
                 'open_complaints': open_complaints,
@@ -2173,6 +2431,10 @@ def staff_dashboard(request):
             }
         }
         
+        # Add workload info if available
+        if workload:
+            response_data['workload'] = workload
+        
         return Response(response_data)
         
     except Exception as e:
@@ -2180,10 +2442,54 @@ def staff_dashboard(request):
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(['PUT'])
+@api_view(['POST'])
+def update_complaint_status(request, complaint_id):
+    """
+    Staff endpoint to update complaint status (Take Action, In Progress, etc.)
+    """
+    try:
+        # Check authentication
+        if not hasattr(request, 'is_authenticated') or not request.is_authenticated:
+            return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Check if user is staff or admin
+        if not (getattr(request, 'is_staff', False) or getattr(request, 'is_admin', False)):
+            return Response({'error': 'Staff access required'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Get the complaint
+        try:
+            complaint = Complaint.objects.get(id=complaint_id)
+        except Complaint.DoesNotExist:
+            return Response({'error': 'Complaint not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get the new status from request (default to In Progress)
+        new_status = request.data.get('status', 'In Progress')
+        
+        # Update complaint status
+        complaint.status = new_status
+        complaint.updated_at = timezone.now()
+        complaint.save()
+        
+        logger.info(f"✅ Complaint {complaint_id} status updated to {new_status} by {getattr(request, 'firebase_email', 'Unknown')}")
+        
+        # Return updated complaint data
+        serializer = ComplaintSerializer(complaint)
+        return Response({
+            'success': True,
+            'message': f'Complaint status updated to {new_status}',
+            'complaint': serializer.data
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in update_complaint_status: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
 def resolve_complaint(request, complaint_id):
     """
-    Staff endpoint to resolve/update a complaint
+    Staff endpoint to resolve/mark complaint as closed
+    Links staff member to resolved complaint for feedback tracking
     """
     try:
         # Check authentication using custom middleware attributes
@@ -2200,34 +2506,52 @@ def resolve_complaint(request, complaint_id):
         except Complaint.DoesNotExist:
             return Response({'error': 'Complaint not found'}, status=status.HTTP_404_NOT_FOUND)
         
-        # Get the new status and resolution details from request
-        new_status = request.data.get('status')
+        # Get resolution details from request
         resolution_notes = request.data.get('resolution_notes', '')
+        staff_email = getattr(request, 'firebase_email', 'Unknown')
         
-        if not new_status:
-            return Response({'error': 'Status is required'}, status=status.HTTP_400_BAD_REQUEST)
+        # Update complaint to Closed status
+        complaint.status = 'Closed'
+        complaint.resolved_at = timezone.now()
+        complaint.resolved_by = staff_email
         
-        # Update complaint status
-        complaint.status = new_status
-        
-        # If status is closed, add resolution details
-        if new_status == 'Closed':
-            complaint.resolved_at = timezone.now()
-            if hasattr(request, 'firebase_email'):
-                complaint.resolved_by = request.firebase_email
-            if resolution_notes:
-                # Add resolution notes to description or create a separate field
-                if complaint.resolution_notes:
-                    complaint.resolution_notes += f"\n\n[{timezone.now().strftime('%Y-%m-%d %H:%M')}] {resolution_notes}"
-                else:
-                    complaint.resolution_notes = f"[{timezone.now().strftime('%Y-%m-%d %H:%M')}] {resolution_notes}"
+        # Add resolution notes
+        if resolution_notes:
+            if complaint.resolution_notes:
+                complaint.resolution_notes += f"\n\n[{timezone.now().strftime('%Y-%m-%d %H:%M')}] {resolution_notes}"
+            else:
+                complaint.resolution_notes = f"[{timezone.now().strftime('%Y-%m-%d %H:%M')}] {resolution_notes}"
         
         complaint.save()
+        
+        # Try to send notification to passenger
+        try:
+            from .models import Notification
+            if hasattr(complaint, 'user') and complaint.user:
+                user_email = complaint.user.email
+            else:
+                user_email = getattr(complaint, 'email', None)
+            
+            if user_email:
+                Notification.objects.create(
+                    user_email=user_email,
+                    type='complaint_resolved',
+                    title='Complaint Resolved',
+                    message=f'Your complaint #{complaint.id} has been resolved. Please provide feedback.',
+                    related_id=str(complaint.id),
+                    action_url=f'/track-status?highlight={complaint.id}'
+                )
+                logger.info(f"✅ Resolution notification sent for complaint #{complaint.id}")
+        except Exception as notif_error:
+            logger.warning(f"⚠️ Failed to create resolution notification: {notif_error}")
+        
+        logger.info(f"✅ Complaint {complaint_id} marked as resolved by {staff_email}")
         
         # Return updated complaint data
         serializer = ComplaintSerializer(complaint)
         return Response({
-            'message': f'Complaint {complaint_id} status updated to {new_status}',
+            'success': True,
+            'message': f'Complaint {complaint_id} marked as resolved',
             'complaint': serializer.data
         })
         

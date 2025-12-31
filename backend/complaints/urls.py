@@ -72,9 +72,11 @@ urlpatterns = [
     
     # Staff management endpoints
     path('staff/dashboard/', views.staff_dashboard, name='staff_dashboard'),
+    path('staff/update-status/<int:complaint_id>/', views.update_complaint_status, name='update_complaint_status'),
     path('staff/resolve/<int:complaint_id>/', views.resolve_complaint, name='resolve_complaint'),
     
     # Public staff endpoints (for passengers to view staff)
     path('staff/', views.staff_list, name='staff-list'),
     path('staff/<int:pk>/', views.staff_detail, name='staff-detail'),
+    path('staff/<int:staff_id>/analytics/', views.staff_analytics, name='staff-analytics'),
 ]

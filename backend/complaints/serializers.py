@@ -2,10 +2,32 @@ from rest_framework import serializers
 from .models import Complaint, Feedback, Staff
 
 class ComplaintSerializer(serializers.ModelSerializer):
+    passenger_name = serializers.SerializerMethodField()
+    passenger_email = serializers.SerializerMethodField()
+    
     class Meta:
         model = Complaint
         fields = '__all__'
  
+    def get_passenger_name(self, obj):
+        """Get passenger name from the user relationship"""
+        if obj.user:
+            # Try to get from FirebaseUser
+            if hasattr(obj.user, 'full_name') and obj.user.full_name:
+                return obj.user.full_name
+            # Try to get from Passenger profile
+            if hasattr(obj.user, 'passenger_profile'):
+                return obj.user.passenger_profile.full_name
+            # Fallback to email
+            return obj.user.email
+        return 'Unknown'
+    
+    def get_passenger_email(self, obj):
+        """Get passenger email from the user relationship"""
+        if obj.user:
+            return obj.user.email
+        return None
+    
     def validate_photos(self, value):
         # Allow both string (filepath) and None values
         if value and not isinstance(value, str):

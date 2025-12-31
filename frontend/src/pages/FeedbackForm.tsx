@@ -2,12 +2,50 @@ import React, { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { Star } from 'lucide-react';
 import { feedbackService } from '../services/feedbackService';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import apiClient from '../utils/api';
  
 interface Complaint {
-  id: string;
-  title: string;
+  id: string | number;
+  title?: string;
+  type?: string;
+  description?: string;
+  status?: string;
 }
+
+interface LocationState {
+  complaintId?: number;
+  staffId?: number;
+  staffName?: string;
+}
+ 
+// Map complaint types to categories and subcategories
+const complaintTypeMapping: { [key: string]: { category: string; subcategory: string } } = {
+  'Train_Cleanliness': { category: 'cleanliness', subcategory: 'Unclean Coaches' },
+  'Safety_Security': { category: 'security', subcategory: 'Safety Concerns' },
+  'Ticketing': { category: 'facilities', subcategory: 'Booking Issue' },
+  'Staff_Behavior': { category: 'staff', subcategory: 'Rude Behavior' },
+  'Schedule_Delay': { category: 'facilities', subcategory: 'Other' },
+  // Add more mappings as needed
+};
+
+// Default mapping for common complaint titles
+const titleToCategoryMap: { [key: string]: { category: string; subcategory: string } } = {
+  'delay': { category: 'facilities', subcategory: 'Schedule Issue' },
+  'clean-toilet': { category: 'cleanliness', subcategory: 'Unclean Toilets' },
+  'clean-coach': { category: 'cleanliness', subcategory: 'Unclean Coaches' },
+  'ac': { category: 'facilities', subcategory: 'AC Not Working' },
+  'food': { category: 'food', subcategory: 'Poor Food Quality' },
+  'bedroll': { category: 'facilities', subcategory: 'Broken Seats/Berths' },
+  'water': { category: 'facilities', subcategory: 'Water Issues' },
+  'electrical': { category: 'facilities', subcategory: 'Electrical Issues' },
+  'staff': { category: 'staff', subcategory: 'Rude Behavior' },
+  'security': { category: 'security', subcategory: 'Safety Concerns' },
+  'reservation': { category: 'facilities', subcategory: 'Booking Issue' },
+  'overcharging': { category: 'food', subcategory: 'Overcharging' },
+  'medical': { category: 'security', subcategory: 'Emergency' },
+  'pnr': { category: 'facilities', subcategory: 'Booking Issue' },
+};
  
 // Add predefined complaint categories
 const complaintCategories = [
@@ -28,6 +66,8 @@ const complaintCategories = [
     'Electrical Issues',
     'Water Issues',
     'Broken Seats/Berths',
+    'Schedule Issue',
+    'Booking Issue',
   ]},
   { id: 'staff', title: 'Staff Related', subcategories: [
     'Rude Behavior',
@@ -40,6 +80,7 @@ const complaintCategories = [
     'Harassment',
     'Unauthorized Vendors',
     'Safety Concerns',
+    'Emergency',
   ]},
 ];
  
@@ -64,13 +105,15 @@ const defaultComplaints: Complaint[] = [
  
 const FeedbackForm = () => {
   const { theme } = useTheme();
-  const { complaintId } = useParams<{ complaintId: string }>();
+  const { complaintId: urlComplaintId } = useParams<{ complaintId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const state = location.state as LocationState;
+  
   const [loading, setLoading] = useState(false);
+  const [loadingComplaint, setLoadingComplaint] = useState(false);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState({
-    name: '',
-    email: '',
     rating: 0,
     message: ''
   });
@@ -78,12 +121,70 @@ const FeedbackForm = () => {
   const [selectedComplaintId, setSelectedComplaintId] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSubcategory, setSelectedSubcategory] = useState('');
- 
+  const [complaintType, setComplaintType] = useState('');
+  const [complaintDescription, setComplaintDescription] = useState('');
+  const [isAutoPopulated, setIsAutoPopulated] = useState(false);
+  
+  // Track complaint and staff from navigation state OR URL params
+  const linkedComplaintId = state?.complaintId || (urlComplaintId ? parseInt(urlComplaintId, 10) : undefined);
+  const linkedStaffId = state?.staffId;
+  const linkedStaffName = state?.staffName;
+  
+  // Debug logging
   useEffect(() => {
-    // Initialize with default complaints instead of fetching
+    console.log('📋 FeedbackForm Debug Info:');
+    console.log('  urlComplaintId:', urlComplaintId);
+    console.log('  state:', state);
+    console.log('  linkedComplaintId:', linkedComplaintId);
+    console.log('  linkedStaffId:', linkedStaffId);
+    console.log('  linkedStaffName:', linkedStaffName);
+  }, [urlComplaintId, state, linkedComplaintId, linkedStaffId, linkedStaffName]);
+  
+  // Get user details from localStorage
+  const userName = localStorage.getItem('userName') || localStorage.getItem('userEmail') || 'Anonymous';
+  const userEmail = localStorage.getItem('userEmail') || '';
+ 
+  // Fetch actual complaint data if coming from resolved complaint
+  useEffect(() => {
+    if (linkedComplaintId) {
+      setLoadingComplaint(true);
+      apiClient.get(`/api/complaints/${linkedComplaintId}/`)
+        .then((response: { data: Complaint }) => {
+          const complaintData = response.data;
+          setComplaintType(complaintData.type || '');
+          setComplaintDescription(complaintData.description || '');
+          
+          // Auto-populate category based on complaint type
+          const mapping = (complaintData.type && complaintTypeMapping[complaintData.type]) || 
+             titleToCategoryMap[selectedComplaintId] ||
+             { category: '', subcategory: '' };
+          
+          console.log('📊 Auto-populating complaint:', {
+            type: complaintData.type,
+            mapping,
+            selectedCategory: mapping.category,
+            selectedSubcategory: mapping.subcategory
+          });
+
+          if (mapping.category) {
+            setSelectedCategory(mapping.category);
+            setSelectedSubcategory(mapping.subcategory);
+            setIsAutoPopulated(true);
+          }
+        })
+        .catch((err: Error) => {
+          console.warn('Could not fetch complaint details:', err);
+          // Fall back to manual selection
+        })
+        .finally(() => setLoadingComplaint(false));
+    }
+  }, [linkedComplaintId]);
+
+  // Initialize with default complaints
+  useEffect(() => {
     setComplaints(defaultComplaints);
-    if (defaultComplaints.length > 0) {
-      setSelectedComplaintId(defaultComplaints[0].id);
+    if (defaultComplaints.length > 0 && !selectedComplaintId) {
+      setSelectedComplaintId(String(defaultComplaints[0].id));
     }
   }, []);
  
@@ -107,27 +208,49 @@ const FeedbackForm = () => {
     setLoading(true);
     setError('');
  
-    if (!selectedComplaintId || !selectedCategory || !selectedSubcategory) {
-      setError('Please fill in all required fields');
+    // Validation: check all required fields are filled
+    if (!feedback.rating || !feedback.message) {
+      setError('Please fill in all required fields (Rating and Feedback)');
       setLoading(false);
       return;
     }
+
+    // For auto-populated forms, category/subcategory must be set
+    // For manual forms, they must also be selected
+    if (!selectedCategory || !selectedSubcategory) {
+      console.log('⚠️ Validation failed:', {
+        selectedCategory,
+        selectedSubcategory,
+        feedback
+      });
+      setError('Please ensure complaint category is properly selected');
+      setLoading(false);
+      return;
+    }
+
+    console.log('✅ Form validation passed, submitting with:', {
+      linkedComplaintId,
+      selectedCategory,
+      selectedSubcategory,
+      rating: feedback.rating,
+      messageLength: feedback.message.length
+    });
  
     try {
-      const complaintInfo = complaints.find(c => c.id === selectedComplaintId);
       const feedbackData = {
-        complaint_id: selectedComplaintId,
+        complaint_id: linkedComplaintId ? linkedComplaintId.toString() : selectedComplaintId,
         category: selectedCategory,
         subcategory: selectedSubcategory,
-        feedback_message: `Complaint: ${complaintInfo?.title}\n${feedback.message}`,
+        feedback_message: feedback.message,
         rating: feedback.rating,
-        name: feedback.name,
-        email: feedback.email
+        name: userName,
+        email: userEmail,
+        staff_id: linkedStaffId  // Include staff ID for performance tracking
       };
  
       await feedbackService.submitFeedback(feedbackData);
-      alert('Feedback submitted successfully!');
-      navigate('/');
+      alert('Feedback submitted successfully! Thank you for your input.');
+      navigate('/user-dashboard/track-status');
     } catch (err: any) {
       console.error('Submission error:', err);
       setError(err.message || 'Failed to submit feedback');
@@ -144,6 +267,44 @@ const FeedbackForm = () => {
     <div className="max-w-7xl mx-auto p-6">
       <div className={`${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white'} rounded-lg shadow-lg p-6`}>
         <h1 className="text-3xl font-bold text-center mb-8">Feedback Form</h1>
+        
+        {/* Show complaint context if coming from resolved complaint */}
+        {linkedComplaintId && linkedStaffName && (
+          <div className={`mb-6 p-4 rounded-lg ${theme === 'dark' ? 'bg-indigo-900/30 border border-indigo-700' : 'bg-indigo-50 border border-indigo-200'}`}>
+            <h3 className="font-semibold text-lg mb-3">📋 Feedback for Resolved Complaint</h3>
+            <div className="space-y-2">
+              <p className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                <span className="font-medium">Complaint ID:</span> <span className="font-mono bg-indigo-100 dark:bg-indigo-900 px-2 py-1 rounded">CMP{linkedComplaintId.toString().padStart(3, '0')}</span>
+              </p>
+              {complaintType && (
+                <p className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                  <span className="font-medium">Complaint Type:</span> {complaintType}
+                </p>
+              )}
+              {selectedCategory && (
+                <p className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                  <span className="font-medium">Category:</span> <span className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300 px-2 py-1 rounded text-sm">{complaintCategories.find(c => c.id === selectedCategory)?.title}</span>
+                </p>
+              )}
+              {selectedSubcategory && (
+                <p className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                  <span className="font-medium">Issue:</span> <span className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300 px-2 py-1 rounded text-sm">{selectedSubcategory}</span>
+                </p>
+              )}
+              <p className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                <span className="font-medium">Resolved by:</span> <span className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 px-2 py-1 rounded text-sm">👤 {linkedStaffName}</span>
+              </p>
+            </div>
+            {isAutoPopulated && (
+              <p className={`text-sm mt-3 ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>
+                ✅ Complaint category automatically populated from database
+              </p>
+            )}
+            <p className={`text-sm mt-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+              Please rate your experience and provide feedback on how well this issue was resolved
+            </p>
+          </div>
+        )}
        
         {error && (
           <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
@@ -152,105 +313,90 @@ const FeedbackForm = () => {
         )}
  
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label htmlFor="complaint" className="block mb-2 text-sm font-medium">
-              Select Complaint Type *
-            </label>
-            <select
-              id="complaint"
-              value={selectedComplaintId}
-              onChange={(e) => setSelectedComplaintId(e.target.value)}
-              className={`w-full p-3 rounded-lg border ${inputClass}`}
-              required
-            >
-              <option value="">-- Select Complaint Type --</option>
-              {defaultComplaints.map((complaint) => (
-                <option key={complaint.id} value={complaint.id}>
-                  {complaint.title}
-                </option>
-              ))}
-            </select>
-          </div>
- 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label htmlFor="category" className="block mb-2 text-sm font-medium">
-                Complaint Category
-              </label>
-              <select
-                id="category"
-                value={selectedCategory}
-                onChange={(e) => {
-                  setSelectedCategory(e.target.value);
-                  setSelectedSubcategory('');
-                }}
-                className={`w-full p-3 rounded-lg border ${inputClass}`}
-                required
-              >
-                <option value="">Select Category</option>
-                {complaintCategories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.title}
-                  </option>
-                ))}
-              </select>
-            </div>
- 
-            {selectedCategory && (
+          {/* Only show complaint type selector if not coming from resolved complaint */}
+          {!linkedComplaintId ? (
+            <>
               <div>
-                <label htmlFor="subcategory" className="block mb-2 text-sm font-medium">
-                  Specific Issue
+                <label htmlFor="complaint" className="block mb-2 text-sm font-medium">
+                  Select Complaint Type *
                 </label>
                 <select
-                  id="subcategory"
-                  value={selectedSubcategory}
-                  onChange={(e) => setSelectedSubcategory(e.target.value)}
+                  id="complaint"
+                  value={selectedComplaintId}
+                  onChange={(e) => setSelectedComplaintId(e.target.value)}
                   className={`w-full p-3 rounded-lg border ${inputClass}`}
                   required
                 >
-                  <option value="">Select Specific Issue</option>
-                  {complaintCategories
-                    .find(cat => cat.id === selectedCategory)
-                    ?.subcategories.map((sub) => (
-                      <option key={sub} value={sub}>
-                        {sub}
-                      </option>
+                  <option value="">-- Select Complaint Type --</option>
+                  {defaultComplaints.map((complaint) => (
+                    <option key={complaint.id} value={complaint.id}>
+                      {complaint.title}
+                    </option>
                   ))}
                 </select>
               </div>
-            )}
-          </div>
- 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label htmlFor="name" className="block mb-2 text-sm font-medium">Name</label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={feedback.name}
-                onChange={handleChange}
-                className={`w-full p-3 rounded-lg border ${inputClass}`}
-                required
-              />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label htmlFor="category" className="block mb-2 text-sm font-medium">
+                    Complaint Category *
+                  </label>
+                  <select
+                    id="category"
+                    value={selectedCategory}
+                    onChange={(e) => {
+                      setSelectedCategory(e.target.value);
+                      setSelectedSubcategory('');
+                    }}
+                    className={`w-full p-3 rounded-lg border ${inputClass}`}
+                    required
+                  >
+                    <option value="">Select Category</option>
+                    {complaintCategories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedCategory && (
+                  <div>
+                    <label htmlFor="subcategory" className="block mb-2 text-sm font-medium">
+                      Specific Issue *
+                    </label>
+                    <select
+                      id="subcategory"
+                      value={selectedSubcategory}
+                      onChange={(e) => setSelectedSubcategory(e.target.value)}
+                      className={`w-full p-3 rounded-lg border ${inputClass}`}
+                      required
+                    >
+                      <option value="">Select Specific Issue</option>
+                      {complaintCategories
+                        .find(cat => cat.id === selectedCategory)
+                        ?.subcategories.map((sub) => (
+                          <option key={sub} value={sub}>
+                            {sub}
+                          </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            // When coming from resolved complaint, show simplified message
+            <div className={`p-4 rounded-lg border-2 border-green-400 ${theme === 'dark' ? 'bg-green-900/20' : 'bg-green-50'}`}>
+              <p className={theme === 'dark' ? 'text-green-400' : 'text-green-700'}>
+                <span className="font-semibold">✅ Complaint Details Auto-Populated</span><br/>
+                The complaint category and issue type from your resolved complaint have been automatically filled in
+              </p>
             </div>
- 
-            <div>
-              <label htmlFor="email" className="block mb-2 text-sm font-medium">Email</label>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                value={feedback.email}
-                onChange={handleChange}
-                className={`w-full p-3 rounded-lg border ${inputClass}`}
-                required
-              />
-            </div>
-          </div>
+          )}
  
           <div>
-            <label className="block mb-2 text-sm font-medium">Rate Your Experience</label>
+            <label className="block mb-2 text-sm font-medium">Rate Your Experience *</label>
             <div className="flex items-center space-x-2">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
@@ -269,19 +415,20 @@ const FeedbackForm = () => {
                 </button>
               ))}
               <span className="ml-2 text-sm">
-                {feedback.rating ? `${feedback.rating}/5` : ''}
+                {feedback.rating ? `${feedback.rating}/5` : 'Required'}
               </span>
             </div>
           </div>
  
           <div>
-            <label htmlFor="message" className="block mb-2 text-sm font-medium">Your Feedback</label>
+            <label htmlFor="message" className="block mb-2 text-sm font-medium">Your Feedback *</label>
             <textarea
               id="message"
               name="message"
               rows={5}
               value={feedback.message}
               onChange={handleChange}
+              placeholder="Please share your experience and suggestions..."
               className={`w-full p-3 rounded-lg border ${inputClass}`}
               required
             />
@@ -290,14 +437,14 @@ const FeedbackForm = () => {
           <div className="text-center">
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || loadingComplaint}
               className={`px-8 py-3 rounded-lg font-semibold transition-colors ${
                 theme === 'dark'
                   ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
                   : 'bg-indigo-500 hover:bg-indigo-600 text-white'
-              } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              } ${(loading || loadingComplaint) ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              {loading ? 'Submitting...' : 'Submit Feedback'}
+              {loading ? 'Submitting...' : loadingComplaint ? 'Loading complaint...' : 'Submit Feedback'}
             </button>
           </div>
         </form>

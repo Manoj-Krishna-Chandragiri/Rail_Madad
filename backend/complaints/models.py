@@ -48,6 +48,7 @@ class Complaint(models.Model):
     resolution_notes = models.TextField(blank=True, null=True)
     resolved_by = models.CharField(max_length=255, blank=True, null=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
+    has_feedback = models.BooleanField(default=False)
  
     def save(self, *args, **kwargs):
         # If status is changing to closed, record resolution time
@@ -76,6 +77,9 @@ class Feedback(models.Model):
     # Sentiment analysis fields
     sentiment = models.CharField(max_length=20, blank=True, null=True)
     sentiment_confidence = models.FloatField(blank=True, null=True)
+    
+    # Link to staff who resolved the complaint
+    staff = models.ForeignKey('Staff', on_delete=models.SET_NULL, null=True, blank=True, related_name='feedbacks')
  
     def __str__(self):
         return f"{self.name} - {self.complaint_id}"
@@ -127,6 +131,35 @@ class QuickSolution(models.Model):
 
     class Meta:
         verbose_name_plural = "Quick Solutions"
+
+
+class Notification(models.Model):
+    """
+    Notification model for tracking user notifications
+    """
+    NOTIFICATION_TYPES = (
+        ('complaint_assigned', 'Complaint Assigned'),
+        ('complaint_resolved', 'Complaint Resolved'),
+        ('status_update', 'Status Update'),
+        ('feedback_request', 'Feedback Request'),
+        ('system', 'System Notification'),
+    )
+    
+    user_email = models.EmailField()
+    type = models.CharField(max_length=50, choices=NOTIFICATION_TYPES)
+    title = models.CharField(max_length=200)
+    message = models.TextField()
+    related_id = models.CharField(max_length=100, blank=True, null=True)
+    action_url = models.CharField(max_length=500, blank=True, null=True)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(default=timezone.now)
+    
+    def __str__(self):
+        return f"{self.user_email} - {self.title}"
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name_plural = "Notifications"
 
 
 # Import assignment model so Django recognizes it
