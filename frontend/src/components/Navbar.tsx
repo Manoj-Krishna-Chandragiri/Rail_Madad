@@ -253,16 +253,6 @@ const Navbar = ({ toggleSidebar }: NavbarProps) => {
         </div>
         
         <div className="flex items-center gap-2 sm:gap-4">
-          {/* Translation Test Link (Development) */}
-          {import.meta.env.DEV && (
-            <Link 
-              to="/translation-test" 
-              className={`px-3 py-1 text-xs rounded-lg ${theme === 'dark' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-100 hover:bg-blue-200 text-blue-800'}`}
-            >
-              🔧 Translation Test
-            </Link>
-          )}
-          
           {/* Global Language Selector */}
           <GlobalLanguageSelector />
           

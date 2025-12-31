@@ -39,6 +39,8 @@ interface RecentComplaint {
   priority_level: string;
   status: string;
   created_at: string;
+  passenger_name?: string;
+  passenger_email?: string;
 }
 
 const StaffHome = () => {
@@ -103,23 +105,13 @@ const StaffHome = () => {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-600">
-                Staff Dashboard
-              </h1>
-              <p className={`text-lg ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                Welcome back! Here's your performance overview
-              </p>
-            </div>
-            <div className="relative">
-              <Bell className={`h-8 w-8 ${isDark ? 'text-gray-400' : 'text-gray-600'} cursor-pointer hover:text-indigo-500 transition-colors`} />
-              {notifications > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {notifications}
-                </span>
-              )}
-            </div>
+          <div>
+            <h1 className="text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-600">
+              Staff Dashboard
+            </h1>
+            <p className={`text-lg ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              Welcome back! Here's your performance overview
+            </p>
           </div>
         </div>
 
@@ -325,45 +317,75 @@ const StaffHome = () => {
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {recentComplaints.map((complaint) => (
                 <div 
                   key={complaint.id}
-                  className={`p-4 rounded-lg border ${isDark ? 'border-gray-700 hover:border-indigo-500' : 'border-gray-200 hover:border-indigo-400'} transition-colors cursor-pointer`}
+                  className={`p-5 rounded-xl border-2 ${
+                    isDark 
+                      ? 'bg-gradient-to-r from-gray-800/50 to-gray-800/30 border-gray-700 hover:border-indigo-500 hover:shadow-lg hover:shadow-indigo-500/20' 
+                      : 'bg-gradient-to-r from-white to-gray-50 border-gray-200 hover:border-indigo-400 hover:shadow-lg hover:shadow-indigo-200'
+                  } transition-all duration-300 transform hover:-translate-y-1 cursor-pointer`}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          complaint.priority_level === 'Critical' ? 'bg-red-100 text-red-700' :
-                          complaint.priority_level === 'High' ? 'bg-orange-100 text-orange-700' :
-                          complaint.priority_level === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-green-100 text-green-700'
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-3 flex-wrap">
+                        <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm ${
+                          complaint.priority_level === 'Critical' 
+                            ? 'bg-gradient-to-r from-red-500 to-red-600 text-white' 
+                            : complaint.priority_level === 'High' 
+                            ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' 
+                            : complaint.priority_level === 'Medium' 
+                            ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white' 
+                            : 'bg-gradient-to-r from-green-500 to-green-600 text-white'
                         }`}>
                           {complaint.priority_level}
                         </span>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          complaint.status === 'resolved' ? 'bg-green-100 text-green-700' :
-                          complaint.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
-                          'bg-gray-100 text-gray-700'
+                        <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm ${
+                          complaint.status === 'Closed' 
+                            ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white' 
+                            : complaint.status === 'In Progress' 
+                            ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white' 
+                            : isDark 
+                            ? 'bg-gray-700 text-gray-300' 
+                            : 'bg-gray-200 text-gray-700'
                         }`}>
                           {complaint.status}
                         </span>
-                        <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                          #{complaint.complaint_id}
-                        </span>
+                        {(complaint.complaint_id || complaint.id) && (
+                          <span className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium ${
+                            isDark ? 'bg-indigo-900/30 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
+                          }`}>
+                            #{complaint.complaint_id || complaint.id}
+                          </span>
+                        )}
                       </div>
-                      <p className={`text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-900'}`}>
-                        {complaint.category}
+                      <div className="flex items-center gap-2 mb-2">
+                        <User className="h-4 w-4 text-gray-500" />
+                        <p className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                          {complaint.passenger_name || complaint.passenger_email || 'Unknown Passenger'}
+                        </p>
+                      </div>
+                      <p className={`text-sm font-bold mb-2 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>
+                        {complaint.category?.replace(/_/g, ' ').replace(/-/g, ' ').toUpperCase()}
                       </p>
-                      <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'} line-clamp-2`}>
+                      <p className={`text-sm leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-700'} line-clamp-2`}>
                         {complaint.description}
                       </p>
                     </div>
-                    <div className="text-right ml-4">
-                      <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                        {new Date(complaint.created_at).toLocaleDateString()}
-                      </p>
+                    <div className="text-right flex-shrink-0">
+                      <div className={`px-3 py-2 rounded-lg ${isDark ? 'bg-gray-700/50' : 'bg-gray-100'}`}>
+                        <p className={`text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                          Submitted
+                        </p>
+                        <p className={`text-sm font-bold ${isDark ? 'text-gray-200' : 'text-gray-900'} mt-1`}>
+                          {new Date(complaint.created_at).toLocaleDateString('en-US', { 
+                            day: 'numeric', 
+                            month: 'short', 
+                            year: 'numeric' 
+                          })}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>

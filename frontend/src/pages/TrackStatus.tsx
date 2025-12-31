@@ -82,6 +82,14 @@ const TrackStatus = () => {
       const complaintId = location.state.searchComplaintId;
       setSearchQuery(`CMP${complaintId.toString().padStart(3, '0')}`);
     }
+    
+    // Refresh complaints when page regains focus (e.g., after feedback submission)
+    const handleFocus = () => {
+      fetchComplaints();
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, [location.state]);
 
   const filteredComplaints = complaints.filter((complaint) =>
@@ -213,8 +221,14 @@ const TrackStatus = () => {
                       
                       {complaint.hasFeedback && (
                         <div className="mt-4 pt-4 border-t border-gray-600">
-                          <p className={`text-sm ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>
-                            ✓ Feedback submitted
+                          <div className="flex items-center gap-2">
+                            <MessageSquare className="h-4 w-4 text-green-400" />
+                            <p className={`text-sm font-medium ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>
+                              ✓ Feedback Submitted
+                            </p>
+                          </div>
+                          <p className={`text-xs mt-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                            Thank you for your feedback!
                           </p>
                         </div>
                       )}

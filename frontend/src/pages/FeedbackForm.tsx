@@ -21,30 +21,50 @@ interface LocationState {
  
 // Map complaint types to categories and subcategories
 const complaintTypeMapping: { [key: string]: { category: string; subcategory: string } } = {
+  // AI classification types
+  'coach-cleanliness': { category: 'cleanliness', subcategory: 'Unclean Coaches' },
+  'coach-maintenance': { category: 'facilities', subcategory: 'Broken Seats/Berths' },
+  'catering': { category: 'food', subcategory: 'Poor Food Quality' },
+  'electrical': { category: 'facilities', subcategory: 'Electrical Issues' },
+  'security': { category: 'security', subcategory: 'Safety Concerns' },
+  'staff-behaviour': { category: 'staff', subcategory: 'Rude Behavior' },
+  'ticketing': { category: 'facilities', subcategory: 'Booking Issue' },
+  'punctuality': { category: 'facilities', subcategory: 'Schedule Issue' },
+  'amenities': { category: 'facilities', subcategory: 'Water Issues' },
+  'infrastructure': { category: 'facilities', subcategory: 'Electrical Issues' },
+  'miscellaneous': { category: 'facilities', subcategory: 'Other' },
+  // Legacy types
   'Train_Cleanliness': { category: 'cleanliness', subcategory: 'Unclean Coaches' },
   'Safety_Security': { category: 'security', subcategory: 'Safety Concerns' },
   'Ticketing': { category: 'facilities', subcategory: 'Booking Issue' },
   'Staff_Behavior': { category: 'staff', subcategory: 'Rude Behavior' },
-  'Schedule_Delay': { category: 'facilities', subcategory: 'Other' },
-  // Add more mappings as needed
+  'Schedule_Delay': { category: 'facilities', subcategory: 'Schedule Issue' },
 };
 
-// Default mapping for common complaint titles
+// Default mapping for common complaint titles (fallback)
 const titleToCategoryMap: { [key: string]: { category: string; subcategory: string } } = {
   'delay': { category: 'facilities', subcategory: 'Schedule Issue' },
   'clean-toilet': { category: 'cleanliness', subcategory: 'Unclean Toilets' },
   'clean-coach': { category: 'cleanliness', subcategory: 'Unclean Coaches' },
+  'coach-cleanliness': { category: 'cleanliness', subcategory: 'Unclean Coaches' },
   'ac': { category: 'facilities', subcategory: 'AC Not Working' },
   'food': { category: 'food', subcategory: 'Poor Food Quality' },
+  'catering': { category: 'food', subcategory: 'Poor Food Quality' },
   'bedroll': { category: 'facilities', subcategory: 'Broken Seats/Berths' },
   'water': { category: 'facilities', subcategory: 'Water Issues' },
   'electrical': { category: 'facilities', subcategory: 'Electrical Issues' },
   'staff': { category: 'staff', subcategory: 'Rude Behavior' },
+  'staff-behaviour': { category: 'staff', subcategory: 'Rude Behavior' },
   'security': { category: 'security', subcategory: 'Safety Concerns' },
   'reservation': { category: 'facilities', subcategory: 'Booking Issue' },
+  'ticketing': { category: 'facilities', subcategory: 'Booking Issue' },
   'overcharging': { category: 'food', subcategory: 'Overcharging' },
   'medical': { category: 'security', subcategory: 'Emergency' },
   'pnr': { category: 'facilities', subcategory: 'Booking Issue' },
+  'punctuality': { category: 'facilities', subcategory: 'Schedule Issue' },
+  'amenities': { category: 'facilities', subcategory: 'Water Issues' },
+  'infrastructure': { category: 'facilities', subcategory: 'Electrical Issues' },
+  'miscellaneous': { category: 'facilities', subcategory: 'Other' },
 };
  
 // Add predefined complaint categories
@@ -140,9 +160,9 @@ const FeedbackForm = () => {
     console.log('  linkedStaffName:', linkedStaffName);
   }, [urlComplaintId, state, linkedComplaintId, linkedStaffId, linkedStaffName]);
   
-  // Get user details from localStorage
-  const userName = localStorage.getItem('userName') || localStorage.getItem('userEmail') || 'Anonymous';
+  // Get user details from localStorage (fallback)
   const userEmail = localStorage.getItem('userEmail') || '';
+  const [userName, setUserName] = useState(localStorage.getItem('userName') || userEmail || 'Anonymous');
  
   // Fetch actual complaint data if coming from resolved complaint
   useEffect(() => {
@@ -151,25 +171,53 @@ const FeedbackForm = () => {
       apiClient.get(`/api/complaints/${linkedComplaintId}/`)
         .then((response: { data: Complaint }) => {
           const complaintData = response.data;
-          setComplaintType(complaintData.type || '');
+          const complaintType = complaintData.type || '';
+          setComplaintType(complaintType);
           setComplaintDescription(complaintData.description || '');
           
+          // Set passenger name from complaint data
+          if ((complaintData as any).passenger_name) {
+            setUserName((complaintData as any).passenger_name);
+          }
+          
           // Auto-populate category based on complaint type
-          const mapping = (complaintData.type && complaintTypeMapping[complaintData.type]) || 
-             titleToCategoryMap[selectedComplaintId] ||
-             { category: '', subcategory: '' };
+          // Try exact match first, then lowercase, then title case
+          let mapping = complaintTypeMapping[complaintType];
+          
+          if (!mapping && complaintType) {
+            // Try lowercase match
+            mapping = complaintTypeMapping[complaintType.toLowerCase()];
+          }
+          
+          if (!mapping && complaintType) {
+            // Try title case match
+            const titleCase = complaintType
+              .split('-')
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+              .join('-');
+            mapping = complaintTypeMapping[titleCase];
+          }
+          
+          // Fallback to titleToCategoryMap if still not found
+          if (!mapping) {
+            mapping = titleToCategoryMap[complaintType.toLowerCase()] || 
+                     titleToCategoryMap[complaintType] ||
+                     { category: '', subcategory: '' };
+          }
           
           console.log('📊 Auto-populating complaint:', {
-            type: complaintData.type,
+            type: complaintType,
             mapping,
             selectedCategory: mapping.category,
             selectedSubcategory: mapping.subcategory
           });
 
-          if (mapping.category) {
+          if (mapping && mapping.category) {
             setSelectedCategory(mapping.category);
             setSelectedSubcategory(mapping.subcategory);
             setIsAutoPopulated(true);
+          } else {
+            console.warn('⚠️ No mapping found for complaint type:', complaintType);
           }
         })
         .catch((err: Error) => {

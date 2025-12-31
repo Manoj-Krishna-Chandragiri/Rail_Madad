@@ -499,15 +499,15 @@ const SmartClassification = () => {
                     <td className="px-6 py-4">
                       <div className="flex items-center">
                         <span className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>
-                          {(complaint.confidence * 100).toFixed(1)}%
+                          {complaint.confidence > 1 ? complaint.confidence.toFixed(1) : (complaint.confidence * 100).toFixed(1)}%
                         </span>
                         <div className={`ml-2 w-24 h-2 ${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-200'} rounded-full overflow-hidden`}>
                           <div
                             className={`h-full rounded-full ${
-                              complaint.confidence >= 0.9 ? 'bg-green-500' :
-                              complaint.confidence >= 0.8 ? 'bg-yellow-500' : 'bg-red-500'
+                              complaint.confidence >= 90 || complaint.confidence >= 0.9 ? 'bg-green-500' :
+                              complaint.confidence >= 80 || complaint.confidence >= 0.8 ? 'bg-yellow-500' : 'bg-red-500'
                             }`}
-                            style={{ width: `${complaint.confidence * 100}%` }}
+                            style={{ width: `${complaint.confidence > 1 ? complaint.confidence : complaint.confidence * 100}%` }}
                           ></div>
                         </div>
                       </div>
@@ -678,7 +678,7 @@ const SmartClassification = () => {
                 <div>
                   <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>High Confidence</p>
                   <p className="text-lg font-semibold text-green-500">
-                    {complaints.filter(c => c.confidence >= 0.9).length}
+                    {complaints.filter(c => (c.confidence > 1 ? c.confidence >= 90 : c.confidence >= 0.9)).length}
                   </p>
                 </div>
                 <CheckCircle className="h-8 w-8 text-green-500" />
@@ -690,7 +690,10 @@ const SmartClassification = () => {
                 <div>
                   <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Medium Confidence</p>
                   <p className="text-lg font-semibold text-yellow-500">
-                    {complaints.filter(c => c.confidence >= 0.8 && c.confidence < 0.9).length}
+                    {complaints.filter(c => {
+                      const conf = c.confidence > 1 ? c.confidence : c.confidence * 100;
+                      return conf >= 80 && conf < 90;
+                    }).length}
                   </p>
                 </div>
                 <Clock className="h-8 w-8 text-yellow-500" />
@@ -702,7 +705,7 @@ const SmartClassification = () => {
                 <div>
                   <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Low Confidence</p>
                   <p className="text-lg font-semibold text-red-500">
-                    {complaints.filter(c => c.confidence < 0.8).length}
+                    {complaints.filter(c => (c.confidence > 1 ? c.confidence < 80 : c.confidence < 0.8)).length}
                   </p>
                 </div>
                 <AlertTriangle className="h-8 w-8 text-red-500" />
@@ -715,7 +718,10 @@ const SmartClassification = () => {
                   <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Avg Confidence</p>
                   <p className="text-lg font-semibold text-indigo-500">
                     {complaints.length > 0 
-                      ? (complaints.reduce((sum, c) => sum + c.confidence, 0) / complaints.length * 100).toFixed(1) + '%'
+                      ? (() => {
+                          const sum = complaints.reduce((acc, c) => acc + (c.confidence > 1 ? c.confidence : c.confidence * 100), 0);
+                          return (sum / complaints.length).toFixed(1) + '%';
+                        })()
                       : '0%'
                     }
                   </p>

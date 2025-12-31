@@ -96,10 +96,15 @@ const StaffAnalytics = () => {
 
   useEffect(() => {
     if (staffId) {
-      fetchAnalytics();
       fetchStaffAnalytics();
     }
   }, [staffId]);
+  
+  useEffect(() => {
+    if (staffAnalytics) {
+      fetchAnalytics();
+    }
+  }, [staffAnalytics]);
 
   const fetchStaffId = async (email: string) => {
     try {
@@ -128,23 +133,30 @@ const StaffAnalytics = () => {
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
-      const userEmail = localStorage.getItem('userEmail');
-      const response = await apiClient.get('/api/accounts/staff/performance/', {
-        params: { email: userEmail }
-      });
       
-      if (response.data) {
-        // Transform the data to match our interface
+      // Use staffAnalytics data that we already have
+      if (staffAnalytics) {
+        const complaintStats = staffAnalytics.complaint_stats;
+        const feedbackStats = staffAnalytics.feedback_stats;
+        
+        // Create mock monthly data from current stats
+        const currentMonthData = {
+          tickets_resolved: complaintStats.total_resolved || 0,
+          avg_resolution_time: staffAnalytics.avg_resolution_time_hours || 0,
+          customer_satisfaction: complaintStats.customer_satisfaction || 0,
+          complaints_received: complaintStats.total_assigned || 0
+        };
+        
         setAnalytics({
-          current_month: response.data[0] || {},
-          last_month: response.data[1] || {},
+          current_month: currentMonthData,
+          last_month: {}, // No historical data yet
           yearly_stats: {
-            total_resolved: response.data.reduce((sum: number, m: any) => sum + (m.tickets_resolved || 0), 0),
-            avg_rating: 4.5, // This would come from staff profile
-            avg_satisfaction: response.data.reduce((sum: number, m: any) => sum + (m.customer_satisfaction || 0), 0) / response.data.length,
-            total_complaints: response.data.reduce((sum: number, m: any) => sum + (m.complaints_received || 0), 0)
+            total_resolved: complaintStats.total_resolved || 0,
+            avg_rating: feedbackStats.average_rating || 0,
+            avg_satisfaction: complaintStats.customer_satisfaction || 0,
+            total_complaints: complaintStats.total_assigned || 0
           },
-          monthly_trend: response.data
+          monthly_trend: [currentMonthData]
         });
       }
     } catch (err: any) {

@@ -20,16 +20,18 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000
 
 interface StaffMember {
   id: number;
-  user_id: number;
+  user_id?: number;
   email: string;
-  full_name: string;
+  name?: string;
+  full_name?: string;
   department: string;
   role: string;
   location: string;
   status: string;
   rating: number;
   active_tickets: number;
-  joining_date: string;
+  joining_date?: string;
+  performance?: any;
 }
 
 interface PerformanceMetric {
@@ -63,20 +65,46 @@ const StaffPerformance: React.FC = () => {
   const fetchStaffPerformance = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
 
-      const [staffRes, performanceRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/api/accounts/staff/list/`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axios.get(`${API_BASE_URL}/api/accounts/staff/performance/`, {
-          headers: { Authorization: `Bearer ${token}` },
-          params: { month: selectedMonth, year: selectedYear }
-        })
-      ]);
+      // Try to fetch staff IDs from complaints_staff by querying multiple IDs
+      // Since we don't have a direct endpoint, we'll try IDs 1-20 and collect valid ones
+      const staffPromises = [];
+      for (let staffId = 1; staffId <= 20; staffId++) {
+        staffPromises.push(
+          axios.get(
+            `${API_BASE_URL}/api/complaints/staff/${staffId}/analytics/`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          ).then(response => ({
+            id: staffId,
+            analytics: response.data
+          })).catch(() => null)
+        );
+      }
 
-      setStaffMembers(staffRes.data);
-      setPerformanceData(performanceRes.data);
+      const staffResults = await Promise.all(staffPromises);
+      const validStaff = staffResults.filter(s => s !== null);
+
+      // Build staff list from analytics data
+      const staffList = validStaff.map((staff: any) => {
+        const analytics = staff.analytics;
+        // Use feedback_stats.average_rating as the primary rating (this is the actual staff rating)
+        const staffRating = analytics.feedback_stats?.average_rating || analytics.staff_rating || 0;
+        return {
+          id: staff.id,
+          name: analytics.staff_name || analytics.staff_email || `Staff ${staff.id}`,
+          email: analytics.staff_email || '',
+          department: analytics.department || 'N/A',
+          role: analytics.role || 'Staff Member',
+          location: analytics.location || 'N/A',
+          status: 'active',
+          rating: staffRating,
+          active_tickets: (analytics.complaint_stats?.total_assigned || 0) - (analytics.complaint_stats?.total_resolved || 0),
+          performance: analytics
+        };
+      });
+
+      setStaffMembers(staffList);
     } catch (error) {
       console.error('Error fetching staff performance:', error);
     } finally {
@@ -84,29 +112,34 @@ const StaffPerformance: React.FC = () => {
     }
   };
 
-  const getPerformanceForStaff = (staffId: number) => {
-    return performanceData.find(p => p.staff_id === staffId) || null;
+  const getPerformanceForStaff = (staff: StaffMember) => {
+    return staff.performance || null;
   };
 
   const filteredStaff = staffMembers
     .filter(staff => selectedDepartment === 'all' || staff.department === selectedDepartment)
     .sort((a, b) => {
-      const perfA = getPerformanceForStaff(a.user_id);
-      const perfB = getPerformanceForStaff(b.user_id);
+      const perfA = getPerformanceForStaff(a);
+      const perfB = getPerformanceForStaff(b);
 
       if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0);
-      if (sortBy === 'tickets') return (perfB?.tickets_resolved || 0) - (perfA?.tickets_resolved || 0);
-      if (sortBy === 'satisfaction') return (perfB?.customer_satisfaction || 0) - (perfA?.customer_satisfaction || 0);
+      if (sortBy === 'tickets') return (perfB?.complaint_stats?.total_resolved || 0) - (perfA?.complaint_stats?.total_resolved || 0);
+      if (sortBy === 'satisfaction') return (perfB?.complaint_stats?.customer_satisfaction || 0) - (perfA?.complaint_stats?.customer_satisfaction || 0);
       return 0;
     });
 
   const departments = ['all', ...new Set(staffMembers.map(s => s.department))];
 
   const overallStats = {
-    totalStaff: staffMembers.length,
+    totalStaff: staffMembers.filter(s => s.status === 'active').length,
     avgRating: (staffMembers.reduce((sum, s) => sum + (s.rating || 0), 0) / staffMembers.length || 0).toFixed(1),
-    totalResolved: performanceData.reduce((sum, p) => sum + p.tickets_resolved, 0),
-    avgSatisfaction: (performanceData.reduce((sum, p) => sum + p.customer_satisfaction, 0) / performanceData.length || 0).toFixed(1)
+    totalResolved: staffMembers.reduce((sum, s) => sum + (s.performance?.complaint_stats?.total_resolved || 0), 0),
+    avgSatisfaction: (() => {
+      const validRatings = staffMembers.filter(s => s.performance?.feedback_stats?.average_rating > 0);
+      if (validRatings.length === 0) return '0.0';
+      const avgRating = validRatings.reduce((sum, s) => sum + (s.performance?.feedback_stats?.average_rating || 0), 0) / validRatings.length;
+      return ((avgRating / 5) * 100).toFixed(1);
+    })()
   };
 
   const months = [
@@ -185,7 +218,7 @@ const StaffPerformance: React.FC = () => {
               <div>
                 <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Satisfaction</p>
                 <p className={`text-3xl font-bold mt-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  {overallStats.avgSatisfaction}/5
+                  {overallStats.avgSatisfaction}%
                 </p>
               </div>
               <div className={`p-3 rounded-lg ${isDark ? 'bg-purple-900/30' : 'bg-purple-100'}`}>
@@ -314,7 +347,12 @@ const StaffPerformance: React.FC = () => {
                   </tr>
                 ) : (
                   filteredStaff.map((staff) => {
-                    const performance = getPerformanceForStaff(staff.user_id);
+                    const performance = getPerformanceForStaff(staff);
+                    const staffName = staff.name || staff.full_name || staff.email;
+                    const complaintStats = performance?.complaint_stats;
+                    const feedbackStats = performance?.feedback_stats;
+                    const avgResolutionHours = performance?.avg_resolution_time_hours || 0;
+                    
                     return (
                       <tr key={staff.id} className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -323,12 +361,12 @@ const StaffPerformance: React.FC = () => {
                               isDark ? 'bg-blue-900/30' : 'bg-blue-100'
                             }`}>
                               <span className="text-blue-500 font-medium">
-                                {staff.full_name.split(' ').map(n => n[0]).join('')}
+                                {staffName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                               </span>
                             </div>
                             <div className="ml-4">
                               <div className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                                {staff.full_name}
+                                {staffName}
                               </div>
                               <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                                 {staff.email}
@@ -348,26 +386,26 @@ const StaffPerformance: React.FC = () => {
                           </div>
                         </td>
                         <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-900'}`}>
-                          {performance?.tickets_resolved || 0}
+                          {complaintStats?.total_resolved || 0}
                         </td>
                         <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-900'}`}>
-                          {performance ? `${performance.avg_resolution_time.toFixed(1)}h` : 'N/A'}
+                          {avgResolutionHours > 0 ? `${avgResolutionHours.toFixed(1)}h` : 'N/A'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-900'}`}>
-                              {performance ? `${performance.customer_satisfaction.toFixed(1)}/5` : 'N/A'}
+                              {feedbackStats?.average_rating ? `${((feedbackStats.average_rating / 5) * 100).toFixed(1)}%` : 'N/A'}
                             </span>
-                            {performance && performance.customer_satisfaction >= 4 && (
+                            {feedbackStats?.average_rating >= 4 && (
                               <ArrowUp className="ml-1 text-green-500" size={14} />
                             )}
-                            {performance && performance.customer_satisfaction < 3 && (
+                            {feedbackStats?.average_rating > 0 && feedbackStats?.average_rating < 3 && (
                               <ArrowDown className="ml-1 text-red-500" size={14} />
                             )}
                           </div>
                         </td>
                         <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-900'}`}>
-                          {staff.active_tickets}
+                          {staff.active_tickets || 0}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${

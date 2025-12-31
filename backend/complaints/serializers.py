@@ -4,6 +4,7 @@ from .models import Complaint, Feedback, Staff
 class ComplaintSerializer(serializers.ModelSerializer):
     passenger_name = serializers.SerializerMethodField()
     passenger_email = serializers.SerializerMethodField()
+    staff_id = serializers.SerializerMethodField()
     
     class Meta:
         model = Complaint
@@ -26,6 +27,17 @@ class ComplaintSerializer(serializers.ModelSerializer):
         """Get passenger email from the user relationship"""
         if obj.user:
             return obj.user.email
+        return None
+    
+    def get_staff_id(self, obj):
+        """Get staff ID from staff name"""
+        if obj.staff:
+            try:
+                staff_member = Staff.objects.filter(name=obj.staff).first()
+                if staff_member:
+                    return staff_member.id
+            except:
+                pass
         return None
     
     def validate_photos(self, value):

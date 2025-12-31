@@ -2408,9 +2408,44 @@ def staff_dashboard(request):
         # Serialize complaint data
         serializer = ComplaintSerializer(assigned_complaints, many=True)
         
+        # Get staff rating and satisfaction metrics
+        staff_rating = 0.0
+        customer_satisfaction = 0.0
+        avg_resolution_time = 0.0
+        
+        if staff_member:
+            # Get rating from staff model
+            staff_rating = staff_member.rating or 0.0
+            
+            # Calculate customer satisfaction from feedback
+            from django.db.models import Avg
+            staff_feedbacks = Feedback.objects.filter(staff=staff_member)
+            if staff_feedbacks.exists():
+                avg_rating = staff_feedbacks.aggregate(Avg('rating'))['rating__avg'] or 0
+                customer_satisfaction = (avg_rating / 5.0) * 100  # Convert to percentage
+            
+            # Calculate average resolution time
+            resolved_with_time = assigned_complaints.filter(
+                status='Closed',
+                resolved_at__isnull=False,
+                created_at__isnull=False
+            )
+            
+            if resolved_with_time.exists():
+                time_diffs = []
+                for complaint in resolved_with_time:
+                    time_diff = (complaint.resolved_at - complaint.created_at).total_seconds()
+                    time_diffs.append(time_diff)
+                
+                if time_diffs:
+                    avg_resolution_time_seconds = sum(time_diffs) / len(time_diffs)
+                    avg_resolution_time = avg_resolution_time_seconds / 3600  # Convert to hours
+        
         response_data = {
             'success': True,
             'complaints': serializer.data,
+            'rating': round(staff_rating, 1),
+            'customer_satisfaction': round(customer_satisfaction, 1),
             'stats': {
                 'total_assigned': total_assigned,
                 'pending': open_complaints,
@@ -2418,6 +2453,7 @@ def staff_dashboard(request):
                 'resolved': closed_complaints,
                 'assigned_today': today_assigned,
                 'resolved_today': today_resolved,
+                'avg_resolution_time': f'{avg_resolution_time:.1f} hours' if avg_resolution_time > 0 else '0 hours',
             },
             'statistics': {
                 'total_assigned': total_assigned,

@@ -70,12 +70,21 @@ const StaffProfile = () => {
     try {
       setLoading(true);
       const userEmail = localStorage.getItem('userEmail');
-      const response = await apiClient.get('/api/accounts/profile/', {
+      
+      // Fetch account profile
+      const profileResponse = await apiClient.get('/api/accounts/profile/', {
         params: { email: userEmail }
       });
       
-      if (response.data) {
-        setProfile(response.data);
+      // Fetch staff dashboard data for rating and active_tickets
+      const dashboardResponse = await apiClient.get('/api/complaints/staff/dashboard/');
+      
+      if (profileResponse.data) {
+        setProfile({
+          ...profileResponse.data,
+          rating: dashboardResponse.data?.rating || profileResponse.data.rating || 0,
+          active_tickets: dashboardResponse.data?.active_tickets || profileResponse.data.active_tickets || 0,
+        });
       }
     } catch (err: any) {
       console.error('Failed to fetch profile:', err);
