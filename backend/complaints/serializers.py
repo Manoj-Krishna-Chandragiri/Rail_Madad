@@ -5,6 +5,7 @@ class ComplaintSerializer(serializers.ModelSerializer):
     passenger_name = serializers.SerializerMethodField()
     passenger_email = serializers.SerializerMethodField()
     staff_id = serializers.SerializerMethodField()
+    feedback_submitted_at = serializers.SerializerMethodField()
     
     class Meta:
         model = Complaint
@@ -36,6 +37,17 @@ class ComplaintSerializer(serializers.ModelSerializer):
                 staff_member = Staff.objects.filter(name=obj.staff).first()
                 if staff_member:
                     return staff_member.id
+            except:
+                pass
+        return None
+    
+    def get_feedback_submitted_at(self, obj):
+        """Get feedback submission date if feedback exists"""
+        if obj.has_feedback:
+            try:
+                feedback = Feedback.objects.filter(complaint_id=obj.id).first()
+                if feedback and feedback.submitted_at:
+                    return feedback.submitted_at.isoformat()
             except:
                 pass
         return None

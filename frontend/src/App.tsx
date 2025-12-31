@@ -49,6 +49,7 @@ import RealTimeSupport from './pages/RealTimeSupport';
 import { initializeErrorHandling } from './utils/errorHandling';
 
 import './styles/translate.css';
+import './styles/accessibility.css';
 import './index.css';
 
 const getUserType = (): 'admin' | 'user' | null => {

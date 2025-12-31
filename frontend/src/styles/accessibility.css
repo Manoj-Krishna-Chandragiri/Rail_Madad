@@ -1,0 +1,265 @@
+/* Accessibility Settings Styles */
+
+/* High Contrast Mode */
+.high-contrast {
+  --contrast-boost: 1.5;
+}
+
+.high-contrast * {
+  /* Increase border visibility */
+  border-color: currentColor !important;
+}
+
+.high-contrast button,
+.high-contrast a,
+.high-contrast input,
+.high-contrast select,
+.high-contrast textarea {
+  /* Stronger borders for interactive elements */
+  border-width: 2px !important;
+}
+
+.high-contrast .bg-gray-50 {
+  background-color: #ffffff !important;
+}
+
+.high-contrast .bg-gray-100 {
+  background-color: #f5f5f5 !important;
+}
+
+.high-contrast .bg-gray-800 {
+  background-color: #000000 !important;
+}
+
+.high-contrast .bg-gray-900 {
+  background-color: #0a0a0a !important;
+}
+
+.high-contrast .text-gray-400 {
+  color: #666666 !important;
+}
+
+.high-contrast .text-gray-500 {
+  color: #555555 !important;
+}
+
+.high-contrast .text-gray-600 {
+  color: #333333 !important;
+}
+
+/* Increase contrast for text on colored backgrounds */
+.high-contrast .bg-indigo-600,
+.high-contrast .bg-blue-600,
+.high-contrast .bg-purple-600 {
+  filter: saturate(1.5) brightness(0.9);
+}
+
+/* Large Text Mode */
+.large-text {
+  font-size: 18px !important;
+}
+
+.large-text * {
+  line-height: 1.6 !important;
+}
+
+.large-text h1 {
+  font-size: 3rem !important;
+}
+
+.large-text h2 {
+  font-size: 2.5rem !important;
+}
+
+.large-text h3 {
+  font-size: 2rem !important;
+}
+
+.large-text .text-xs {
+  font-size: 0.875rem !important;
+}
+
+.large-text .text-sm {
+  font-size: 1rem !important;
+}
+
+.large-text .text-base {
+  font-size: 1.125rem !important;
+}
+
+.large-text .text-lg {
+  font-size: 1.25rem !important;
+}
+
+.large-text .text-xl {
+  font-size: 1.5rem !important;
+}
+
+.large-text .text-2xl {
+  font-size: 1.875rem !important;
+}
+
+.large-text .text-3xl {
+  font-size: 2.5rem !important;
+}
+
+.large-text .text-4xl {
+  font-size: 3.5rem !important;
+}
+
+/* Increase button and input sizes */
+.large-text button,
+.large-text input,
+.large-text select,
+.large-text textarea {
+  padding: 0.75rem 1.25rem !important;
+  font-size: 1.125rem !important;
+}
+
+/* Increase icon sizes */
+.large-text svg {
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+}
+
+/* Reduce Motion Mode */
+.reduce-motion * {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+.reduce-motion .animate-spin,
+.reduce-motion .animate-pulse,
+.reduce-motion .animate-bounce,
+.reduce-motion .animate-ping {
+  animation: none !important;
+}
+
+.reduce-motion .transition-all,
+.reduce-motion .transition-colors,
+.reduce-motion .transition-transform,
+.reduce-motion .transition-opacity {
+  transition: none !important;
+}
+
+/* Disable transform effects */
+.reduce-motion .hover\:scale-105:hover,
+.reduce-motion .hover\:scale-110:hover,
+.reduce-motion .hover\:-translate-y-1:hover {
+  transform: none !important;
+}
+
+/* Screen Reader Optimized Mode */
+.screen-reader-optimized {
+  /* Ensure focus is always visible */
+  --focus-ring-width: 3px;
+}
+
+.screen-reader-optimized *:focus {
+  outline: 3px solid #3b82f6 !important;
+  outline-offset: 2px !important;
+}
+
+.screen-reader-optimized button:focus,
+.screen-reader-optimized a:focus,
+.screen-reader-optimized input:focus,
+.screen-reader-optimized select:focus,
+.screen-reader-optimized textarea:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5) !important;
+}
+
+/* Ensure all interactive elements have visible focus */
+.screen-reader-optimized button,
+.screen-reader-optimized a,
+.screen-reader-optimized input,
+.screen-reader-optimized select,
+.screen-reader-optimized textarea {
+  position: relative;
+}
+
+/* Skip to content link (for screen readers) */
+.screen-reader-optimized .skip-to-content {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #3b82f6;
+  color: white;
+  padding: 8px;
+  text-decoration: none;
+  z-index: 100;
+}
+
+.screen-reader-optimized .skip-to-content:focus {
+  top: 0;
+}
+
+/* Ensure proper heading hierarchy is clear */
+.screen-reader-optimized h1,
+.screen-reader-optimized h2,
+.screen-reader-optimized h3,
+.screen-reader-optimized h4,
+.screen-reader-optimized h5,
+.screen-reader-optimized h6 {
+  font-weight: 700 !important;
+  margin-bottom: 0.5em !important;
+}
+
+/* Combined Settings - High Contrast + Large Text */
+.high-contrast.large-text button,
+.high-contrast.large-text a {
+  font-weight: 600 !important;
+}
+
+/* Combined Settings - Reduce Motion + Screen Reader */
+.reduce-motion.screen-reader-optimized *:focus {
+  transition: none !important;
+}
+
+/* Fade-in animation for save success message (respects reduce-motion) */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.reduce-motion .animate-fade-in {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* Ensure minimum touch target sizes (44x44px) */
+.screen-reader-optimized button,
+.screen-reader-optimized a,
+.screen-reader-optimized input[type="checkbox"],
+.screen-reader-optimized input[type="radio"] {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+
+/* Improve table accessibility */
+.screen-reader-optimized table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.screen-reader-optimized th {
+  font-weight: 700 !important;
+  text-align: left;
+}
+
+.screen-reader-optimized td,
+.screen-reader-optimized th {
+  padding: 12px !important;
+}

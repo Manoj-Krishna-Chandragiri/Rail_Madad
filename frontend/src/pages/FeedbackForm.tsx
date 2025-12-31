@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
-import { Star } from 'lucide-react';
+import { Star, Mic } from 'lucide-react';
 import { feedbackService } from '../services/feedbackService';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import apiClient from '../utils/api';
@@ -133,6 +133,7 @@ const FeedbackForm = () => {
   const [loading, setLoading] = useState(false);
   const [loadingComplaint, setLoadingComplaint] = useState(false);
   const [error, setError] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
   const [feedback, setFeedback] = useState({
     rating: 0,
     message: ''
@@ -243,6 +244,40 @@ const FeedbackForm = () => {
       [name]: value
     }));
   };
+
+  const handleVoiceInput = () => {
+    if ('webkitSpeechRecognition' in window) {
+      const recognition = new (window as any).webkitSpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsRecording(true);
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setFeedback(prev => ({
+          ...prev,
+          message: prev.message + ' ' + transcript
+        }));
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsRecording(false);
+      };
+
+      recognition.start();
+    } else {
+      alert('Speech recognition is not supported in your browser. Please use Chrome or Edge.');
+    }
+  };
  
   const handleStarClick = (rating: number) => {
     setFeedback(prev => ({
@@ -298,7 +333,7 @@ const FeedbackForm = () => {
  
       await feedbackService.submitFeedback(feedbackData);
       alert('Feedback submitted successfully! Thank you for your input.');
-      navigate('/user-dashboard/track-status');
+      navigate('/user-dashboard/track-status', { state: { refreshTimestamp: Date.now() } });
     } catch (err: any) {
       console.error('Submission error:', err);
       setError(err.message || 'Failed to submit feedback');
@@ -470,16 +505,33 @@ const FeedbackForm = () => {
  
           <div>
             <label htmlFor="message" className="block mb-2 text-sm font-medium">Your Feedback *</label>
-            <textarea
-              id="message"
-              name="message"
-              rows={5}
-              value={feedback.message}
-              onChange={handleChange}
-              placeholder="Please share your experience and suggestions..."
-              className={`w-full p-3 rounded-lg border ${inputClass}`}
-              required
-            />
+            <div className="relative">
+              <textarea
+                id="message"
+                name="message"
+                rows={5}
+                value={feedback.message}
+                onChange={handleChange}
+                placeholder="Please share your experience and suggestions..."
+                className={`w-full p-3 pr-12 rounded-lg border ${inputClass}`}
+                required
+              />
+              <button
+                type="button"
+                onClick={handleVoiceInput}
+                className={`absolute right-2 bottom-2 p-2 rounded-full transition-colors ${
+                  isRecording
+                    ? 'bg-red-500 text-white animate-pulse'
+                    : theme === 'dark'
+                    ? 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                }`}
+                title={isRecording ? 'Recording...' : 'Voice Input'}
+                aria-label={isRecording ? 'Recording voice input' : 'Start voice input'}
+              >
+                <Mic className="h-5 w-5" />
+              </button>
+            </div>
           </div>
  
           <div className="text-center">

@@ -16,6 +16,7 @@ interface ComplaintStatus {
   staffId?: number;
   resolvedAt?: string;
   hasFeedback?: boolean;
+  feedbackSubmittedAt?: string;
 }
 
 const TrackStatus = () => {
@@ -63,6 +64,7 @@ const TrackStatus = () => {
           staffId: item.staff_id,
           resolvedAt: item.resolved_at,
           hasFeedback: item.has_feedback || false,
+          feedbackSubmittedAt: item.feedback_submitted_at,
         }));
 
         setComplaints(formatted);
@@ -90,7 +92,7 @@ const TrackStatus = () => {
     
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
-  }, [location.state]);
+  }, [location.state, location.state?.refreshTimestamp]);
 
   const filteredComplaints = complaints.filter((complaint) =>
     complaint.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -227,6 +229,17 @@ const TrackStatus = () => {
                               ✓ Feedback Submitted
                             </p>
                           </div>
+                          {complaint.feedbackSubmittedAt && (
+                            <p className={`text-xs mt-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                              Submitted on: {new Date(complaint.feedbackSubmittedAt).toLocaleString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          )}
                           <p className={`text-xs mt-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                             Thank you for your feedback!
                           </p>
