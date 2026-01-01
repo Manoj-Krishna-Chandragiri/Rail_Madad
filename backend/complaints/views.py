@@ -9,7 +9,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
-from .models import Complaint, QuickSolution  # Staff not imported here - imported locally in functions
+from .models import Complaint, QuickSolution, Notification, NotificationPreference  # Import Notification models
 from .serializers import ComplaintSerializer  # StaffSerializer not imported here
 import os
 from rest_framework import status
@@ -28,6 +28,65 @@ logger = logging.getLogger(__name__)
 
 # Global classifier instance (singleton pattern)
 _classifier_instance = None
+
+def create_notification(user_email, notification_type, title, message, related_id=None, action_url=None):
+    """
+    Helper function to create notifications for users
+    Respects user notification preferences
+    """
+    try:
+        # Get user notification preferences
+        preferences, _ = NotificationPreference.objects.get_or_create(user_email=user_email)
+        
+        # Check if user has this notification type enabled
+        should_notify = True
+        if notification_type == 'complaint_assigned' and not preferences.assignment_notifications:
+            should_notify = False
+        elif notification_type == 'complaint_resolved' and not preferences.resolution_notifications:
+            should_notify = False
+        elif notification_type == 'status_update' and not preferences.status_updates:
+            should_notify = False
+        elif notification_type == 'feedback_request' and not preferences.feedback_notifications:
+            should_notify = False
+        
+        if not should_notify:
+            logger.info(f"Notification skipped for {user_email} - preference disabled: {notification_type}")
+            return None
+        
+        # Create notification
+        notification = Notification.objects.create(
+            user_email=user_email,
+            type=notification_type,
+            title=title,
+            message=message,
+            related_id=str(related_id) if related_id else None,
+            action_url=action_url,
+            is_read=False
+        )
+        
+        logger.info(f"✅ Notification created for {user_email}: {title}")
+        
+        # Send email if user has email_alerts enabled
+        if preferences.email_alerts:
+            try:
+                from django.core.mail import send_mail
+                send_mail(
+                    subject=f"Rail Madad: {title}",
+                    message=message,
+                    from_email=settings.DEFAULT_FROM_EMAIL if hasattr(settings, 'DEFAULT_FROM_EMAIL') else 'noreply@railmadad.in',
+                    recipient_list=[user_email],
+                    fail_silently=True
+                )
+                logger.info(f"📧 Email sent to {user_email}")
+            except Exception as e:
+                logger.error(f"Failed to send email to {user_email}: {e}")
+        
+        return notification
+        
+    except Exception as e:
+        logger.error(f"Failed to create notification: {e}")
+        return None
+
 
 def get_ai_classifier():
     """
@@ -329,6 +388,52 @@ def file_complaint(request):
         if serializer.is_valid():
             complaint = serializer.save()
             
+            # Create notification for passenger about complaint submission
+            if complaint.user and complaint.user.email:
+                create_notification(
+                    user_email=complaint.user.email,
+                    notification_type='status_update',
+                    title='Complaint Submitted Successfully',
+                    message=f'Your complaint #{complaint.id} regarding {complaint.type} has been submitted and is being reviewed. We will keep you updated on the progress.',
+                    related_id=complaint.id,
+                    action_url=f'/user-dashboard/complaints/{complaint.id}'
+                )
+            
+            # Create notification for assigned staff member
+            if data.get('staff') and data.get('staff') != 'Unassigned':
+                try:
+                    from .models import Staff
+                    staff_member = Staff.objects.filter(name=data.get('staff')).first()
+                    if staff_member and staff_member.email:
+                        create_notification(
+                            user_email=staff_member.email,
+                            notification_type='complaint_assigned',
+                            title='New Complaint Assigned',
+                            message=f'Complaint #{complaint.id} ({complaint.type}) has been assigned to you. Priority: {complaint.priority}, Severity: {complaint.severity}',
+                            related_id=complaint.id,
+                            action_url=f'/staff-dashboard/complaints/{complaint.id}'
+                        )
+                        logger.info(f"📧 Notification sent to staff {staff_member.email} for new complaint #{complaint.id}")
+                except Exception as e:
+                    logger.error(f"Failed to notify staff: {e}")
+            
+            # Create notification for admin on new high/critical priority complaints
+            if complaint.priority in ['High', 'Critical']:
+                try:
+                    admin_emails = ['adm.railmadad@gmail.com', 'admin@railmadad.in']
+                    for admin_email in admin_emails:
+                        create_notification(
+                            user_email=admin_email,
+                            notification_type='system',
+                            title=f'{complaint.priority} Priority Complaint Received',
+                            message=f'New {complaint.priority} priority complaint #{complaint.id} ({complaint.type}) requires attention. Severity: {complaint.severity}',
+                            related_id=complaint.id,
+                            action_url=f'/admin-dashboard/complaints/{complaint.id}'
+                        )
+                    logger.info(f"📧 Admin notified about {complaint.priority} priority complaint #{complaint.id}")
+                except Exception as e:
+                    logger.error(f"Failed to notify admin: {e}")
+            
             # 🚨 Send urgent notification if critical case detected
             if data.get('is_urgent'):
                 try:
@@ -423,6 +528,9 @@ def complaint_detail(request, complaint_id):
         if not (request.is_admin or request.is_staff):
             return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
             
+        # Track old staff assignment for notification comparison
+        old_staff = complaint.staff
+        
         # If status is being changed to closed, record resolution details
         if 'status' in request.data and request.data['status'].lower() == 'closed':
             request.data['resolved_at'] = timezone.now()
@@ -431,7 +539,27 @@ def complaint_detail(request, complaint_id):
         
         serializer = ComplaintSerializer(complaint, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
+            updated_complaint = serializer.save()
+            
+            # Check if staff was newly assigned or reassigned
+            new_staff = updated_complaint.staff
+            if new_staff and new_staff != 'Unassigned' and new_staff != old_staff:
+                try:
+                    from .models import Staff
+                    staff_member = Staff.objects.filter(name=new_staff).first()
+                    if staff_member and staff_member.email:
+                        create_notification(
+                            user_email=staff_member.email,
+                            notification_type='complaint_assigned',
+                            title='New Complaint Assigned to You',
+                            message=f'Complaint #{updated_complaint.id} ({updated_complaint.type}) has been assigned to you. Priority: {updated_complaint.priority}, Severity: {updated_complaint.severity}',
+                            related_id=updated_complaint.id,
+                            action_url=f'/staff-dashboard/complaints/{updated_complaint.id}'
+                        )
+                        logger.info(f"📧 Notification sent to staff {staff_member.email} for complaint #{updated_complaint.id}")
+                except Exception as e:
+                    logger.error(f"Failed to notify staff on assignment: {e}")
+            
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
  
@@ -2147,6 +2275,18 @@ def submit_feedback(request):
                 staff=staff_instance
             )
             
+            # Create notification for staff member about received feedback
+            if staff_instance and staff_instance.email:
+                sentiment_emoji = '😊' if sentiment == 'POSITIVE' else '😐' if sentiment == 'NEUTRAL' else '😞'
+                create_notification(
+                    user_email=staff_instance.email,
+                    notification_type='feedback_request',
+                    title=f'New Feedback Received {sentiment_emoji}',
+                    message=f'You received feedback for complaint #{feedback.complaint_id}. Rating: {rating}/5, Sentiment: {sentiment}',
+                    related_id=feedback.complaint_id,
+                    action_url=f'/staff-dashboard/complaints/{feedback.complaint_id}'
+                )
+            
             return Response({
                 "message": "Feedback submitted successfully",
                 "feedback_id": feedback.id
@@ -2506,6 +2646,17 @@ def update_complaint_status(request, complaint_id):
         complaint.updated_at = timezone.now()
         complaint.save()
         
+        # Create notification for complaint owner about status change
+        if complaint.user and complaint.user.email:
+            create_notification(
+                user_email=complaint.user.email,
+                notification_type='status_update',
+                title=f'Complaint Status Updated to {new_status}',
+                message=f'Your complaint #{complaint.id} regarding {complaint.type} has been updated to {new_status}. You can track the progress in your dashboard.',
+                related_id=complaint.id,
+                action_url=f'/user-dashboard/complaints/{complaint.id}'
+            )
+        
         logger.info(f"✅ Complaint {complaint_id} status updated to {new_status} by {getattr(request, 'firebase_email', 'Unknown')}")
         
         # Return updated complaint data
@@ -2559,6 +2710,17 @@ def resolve_complaint(request, complaint_id):
                 complaint.resolution_notes = f"[{timezone.now().strftime('%Y-%m-%d %H:%M')}] {resolution_notes}"
         
         complaint.save()
+        
+        # Create notification for complaint owner about resolution
+        if complaint.user and complaint.user.email:
+            create_notification(
+                user_email=complaint.user.email,
+                notification_type='complaint_resolved',
+                title='Complaint Resolved',
+                message=f'Your complaint #{complaint.id} regarding {complaint.type} has been resolved. Please provide your feedback to help us improve our services.',
+                related_id=complaint.id,
+                action_url=f'/user-dashboard/complaints/{complaint.id}'
+            )
         
         # Try to send notification to passenger
         try:

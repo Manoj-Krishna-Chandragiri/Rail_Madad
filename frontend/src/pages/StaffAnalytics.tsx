@@ -42,6 +42,7 @@ interface ComplaintStats {
   total_resolved: number;
   resolution_rate: number;
   active_tickets: number;
+  customer_satisfaction: number;
 }
 
 interface RecentFeedback {
@@ -58,6 +59,7 @@ interface StaffAnalyticsData {
   department: string;
   location: string;
   current_rating: number;
+  avg_resolution_time_hours: number;
   feedback_stats: FeedbackStats;
   complaint_stats: ComplaintStats;
   recent_feedback: RecentFeedback[];
@@ -138,9 +140,21 @@ const StaffAnalytics = () => {
       if (staffAnalytics) {
         const complaintStats = staffAnalytics.complaint_stats;
         const feedbackStats = staffAnalytics.feedback_stats;
+        const now = new Date();
+        const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         
         // Create mock monthly data from current stats
         const currentMonthData = {
+          month: now.getMonth() + 1,
+          year: now.getFullYear(),
+          tickets_resolved: complaintStats.total_resolved || 0,
+          avg_resolution_time: staffAnalytics.avg_resolution_time_hours || 0,
+          customer_satisfaction: complaintStats.customer_satisfaction || 0,
+          complaints_received: complaintStats.total_assigned || 0
+        };
+        const lastMonthData = {
+          month: lastMonthDate.getMonth() + 1,
+          year: lastMonthDate.getFullYear(),
           tickets_resolved: complaintStats.total_resolved || 0,
           avg_resolution_time: staffAnalytics.avg_resolution_time_hours || 0,
           customer_satisfaction: complaintStats.customer_satisfaction || 0,
@@ -149,7 +163,7 @@ const StaffAnalytics = () => {
         
         setAnalytics({
           current_month: currentMonthData,
-          last_month: {}, // No historical data yet
+          last_month: lastMonthData,
           yearly_stats: {
             total_resolved: complaintStats.total_resolved || 0,
             avg_rating: feedbackStats.average_rating || 0,

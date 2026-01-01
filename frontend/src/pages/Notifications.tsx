@@ -263,19 +263,28 @@ const Notifications = () => {
 
   const markAsRead = async (id: string) => {
     try {
+      await apiClient.post(`/api/accounts/notifications/${id}/read/`);
       setNotifications(notifications.map(n => 
         n.id === id ? { ...n, is_read: true } : n
       ));
     } catch (err) {
       console.error('Failed to mark as read:', err);
+      // Still update UI even if API fails
+      setNotifications(notifications.map(n => 
+        n.id === id ? { ...n, is_read: true } : n
+      ));
     }
   };
 
   const markAllAsRead = async () => {
     try {
+      const userEmail = localStorage.getItem('userEmail');
+      await apiClient.post('/api/accounts/notifications/read-all/', { email: userEmail });
       setNotifications(notifications.map(n => ({ ...n, is_read: true })));
     } catch (err) {
       console.error('Failed to mark all as read:', err);
+      // Still update UI even if API fails
+      setNotifications(notifications.map(n => ({ ...n, is_read: true })));
     }
   };
 

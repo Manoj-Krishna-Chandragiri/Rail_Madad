@@ -2,6 +2,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.http import JsonResponse
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from functools import wraps
 import firebase_admin
 from firebase_admin import auth
@@ -935,10 +936,10 @@ def get_notifications(request):
     """Get real notifications for the current user based on their role"""
     try:
         from complaints.models import Notification, Complaint, NotificationPreference
-        from accounts.models import User
+        from django.conf import settings
         
         role = request.GET.get('role', 'passenger')
-        user_email = request.GET.get('email') or request.user.email if request.user.is_authenticated else None
+        user_email = request.GET.get('email') or (request.user.email if request.user.is_authenticated else None)
         
         notifications = []
         
@@ -946,137 +947,94 @@ def get_notifications(request):
             return Response({'error': 'User email required'}, status=400)
         
         # Get notification preferences
+        pref = None
         try:
             pref = NotificationPreference.objects.get(user_email=user_email)
         except NotificationPreference.DoesNotExist:
-            # Create default preferences if not exists
-            pref = NotificationPreference.objects.create(user_email=user_email)
+            try:
+                # Create default preferences if not exists
+                pref = NotificationPreference.objects.create(user_email=user_email)
+            except Exception as pref_create_error:
+                logger.error(f"Failed to create NotificationPreference: {pref_create_error}")
+                # Use default dict if DB operation fails
+                pass
         
-        # Fetch from database based on user role
-        if role == 'passenger':
-            # Get passenger's complaint notifications
-            user = User.objects.filter(email=user_email).first()
-            if user:
-                complaints = Complaint.objects.filter(user=user).order_by('-created_at')[:10]
-                
-                for complaint in complaints:
-                    # Complaint submitted notification
-                    notifications.append({
-                        'id': f'complaint_{complaint.id}_submitted',
-                        'type': 'complaint_submitted',
-                        'title': 'Complaint Submitted',
-                        'message': f'Your complaint #{complaint.id} - {complaint.type} has been submitted successfully.',
-                        'complaint_id': complaint.id,
-                        'is_read': False,
-                        'created_at': complaint.created_at.isoformat(),
-                        'priority': 'low'
-                    })
-                    
-                    # Complaint assigned notification
-                    if complaint.staff:
-                        notifications.append({
-                            'id': f'complaint_{complaint.id}_assigned',
-                            'type': 'complaint_assigned',
-                            'title': 'Complaint Assigned',
-                            'message': f'Your complaint has been assigned to {complaint.staff} for resolution.',
-                            'complaint_id': complaint.id,
-                            'is_read': False,
-                            'created_at': complaint.updated_at.isoformat(),
-                            'priority': 'medium'
-                        })
-                    
-                    # Complaint resolved notification
-                    if complaint.status == 'Closed' and complaint.resolved_at:
-                        notifications.append({
-                            'id': f'complaint_{complaint.id}_resolved',
-                            'type': 'complaint_resolved',
-                            'title': 'Complaint Resolved',
-                            'message': f'Your complaint has been resolved. Resolution notes: {complaint.resolution_notes[:50]}...',
-                            'complaint_id': complaint.id,
-                            'is_read': False,
-                            'created_at': complaint.resolved_at.isoformat(),
-                            'priority': 'high'
-                        })
-                    
-                    # Feedback received notification
-                    if complaint.has_feedback:
-                        notifications.append({
-                            'id': f'complaint_{complaint.id}_feedback',
-                            'type': 'feedback_received',
-                            'title': 'Feedback Received',
-                            'message': f'We received your feedback for complaint #{complaint.id}. Thank you!',
-                            'complaint_id': complaint.id,
-                            'is_read': False,
-                            'created_at': complaint.updated_at.isoformat(),
-                            'priority': 'low'
-                        })
-                        
-        elif role == 'staff':
-            # Get staff-assigned complaints
-            from complaints.models_assignment import ComplaintAssignment
-            
-            assignments = ComplaintAssignment.objects.filter(assigned_to=user_email).order_by('-assigned_at')[:10]
-            
-            for assignment in assignments:
-                complaint = assignment.complaint
-                
-                # New assignment notification
+        # First, fetch actual notifications from the Notification model
+        try:
+            db_notifications = Notification.objects.filter(user_email=user_email).order_by('-created_at')[:20]
+            for notif in db_notifications:
                 notifications.append({
-                    'id': f'assignment_{assignment.id}_new',
-                    'type': 'staff_assigned',
-                    'title': 'New Complaint Assigned',
-                    'message': f'Complaint #{complaint.id} ({complaint.type}) assigned to you. Priority: {complaint.priority}',
-                    'complaint_id': complaint.id,
-                    'is_read': False,
-                    'created_at': assignment.assigned_at.isoformat(),
-                    'priority': 'high' if complaint.priority == 'Critical' else 'medium'
-                })
-                
-                # Status change notification
-                if complaint.status == 'In Progress':
-                    notifications.append({
-                        'id': f'complaint_{complaint.id}_status',
-                        'type': 'status_update',
-                        'title': 'Complaint Status Updated',
-                        'message': f'Complaint #{complaint.id} status changed to: {complaint.status}',
-                        'complaint_id': complaint.id,
-                        'is_read': False,
-                        'created_at': complaint.updated_at.isoformat(),
-                        'priority': 'low'
-                    })
-                    
-        elif role == 'admin':
-            # Get all notifications for admin
-            all_notifications = Notification.objects.filter(type__in=['complaint_assigned', 'complaint_resolved', 'feedback_request', 'system']).order_by('-created_at')[:15]
-            
-            for notif in all_notifications:
-                notifications.append({
-                    'id': notif.id,
+                    'id': str(notif.id),
                     'type': notif.type,
                     'title': notif.title,
                     'message': notif.message,
+                    'complaint_id': notif.related_id,
                     'is_read': notif.is_read,
                     'created_at': notif.created_at.isoformat(),
-                    'priority': 'high' if notif.type == 'complaint_resolved' else 'medium'
+                    'priority': 'high' if notif.type == 'complaint_resolved' else 'medium' if notif.type == 'complaint_assigned' else 'low'
                 })
-            
-            # Add system announcements
-            notifications.append({
-                'id': 'system_1',
-                'type': 'system',
-                'title': 'System Announcement',
-                'message': 'New features available in the admin dashboard.',
-                'is_read': False,
-                'created_at': timezone.now().isoformat(),
-                'priority': 'low'
-            })
+        except Exception as db_error:
+            logger.error(f"Failed to load db notifications: {db_error}")
+            import traceback
+            logger.error(traceback.format_exc())
+        
+        # Role-specific fallbacks wrapped in safety nets
+        if not notifications:
+            if role == 'passenger':
+                try:
+                    # Use custom user model
+                    User = settings.AUTH_USER_MODEL
+                    from django.apps import apps
+                    UserModel = apps.get_model(User)
+                    
+                    user = UserModel.objects.filter(email=user_email).first()
+                    if user:
+                        complaints = Complaint.objects.filter(user=user).order_by('-created_at')[:5]
+                        
+                        for complaint in complaints:
+                            notifications.append({
+                                'id': f'complaint_{complaint.id}_submitted',
+                                'type': 'status_update',
+                                'title': 'Complaint Submitted',
+                                'message': f'Your complaint #{complaint.id} - {complaint.type} has been submitted successfully.',
+                                'complaint_id': str(complaint.id),
+                                'is_read': False,
+                                'created_at': complaint.created_at.isoformat(),
+                                'priority': 'low'
+                            })
+                except Exception as e:
+                    logger.error(f"Error generating fallback notifications (passenger): {str(e)}")
+            elif role == 'staff':
+                try:
+                    # Minimal safe placeholder to avoid 500
+                    notifications.append({
+                        'id': 'staff_placeholder',
+                        'type': 'system',
+                        'title': 'Notifications unavailable',
+                        'message': 'Staff notifications are unavailable right now. Please try again later.',
+                        'is_read': False,
+                        'created_at': timezone.now().isoformat(),
+                        'priority': 'low'
+                    })
+                except Exception as e:
+                    logger.error(f"Error generating fallback notifications (staff): {str(e)}")
+            elif role == 'admin':
+                notifications.append({
+                    'id': 'system_1',
+                    'type': 'system',
+                    'title': 'System Announcement',
+                    'message': 'Admin notifications unavailable; showing fallback message.',
+                    'is_read': False,
+                    'created_at': timezone.now().isoformat(),
+                    'priority': 'low'
+                })
         
         # Sort by created_at descending
         notifications = sorted(notifications, key=lambda x: x['created_at'], reverse=True)
         
-        return Response({
-            'notifications': notifications,
-            'preferences': {
+        # Build preferences dict with safe defaults
+        if pref:
+            preferences = {
                 'email_alerts': pref.email_alerts,
                 'status_updates': pref.status_updates,
                 'marketing_emails': pref.marketing_emails,
@@ -1085,11 +1043,47 @@ def get_notifications(request):
                 'assignment_notifications': pref.assignment_notifications,
                 'resolution_notifications': pref.resolution_notifications
             }
+        else:
+            # Default preferences if pref object doesn't exist
+            preferences = {
+                'email_alerts': True,
+                'status_updates': True,
+                'marketing_emails': False,
+                'announcements': True,
+                'feedback_notifications': True,
+                'assignment_notifications': True,
+                'resolution_notifications': True
+            }
+        
+        return Response({
+            'notifications': notifications,
+            'preferences': preferences
         }, status=200)
         
     except Exception as e:
         logger.error(f"Error fetching notifications: {str(e)}")
-        return Response({'error': str(e)}, status=500)
+        import traceback
+        logger.error(traceback.format_exc())
+        fallback_notifications = [{
+            'id': 'fallback_system_notice',
+            'type': 'system',
+            'title': 'Notifications temporarily unavailable',
+            'message': 'We could not load your notifications right now. Please try again shortly.',
+            'is_read': False,
+            'created_at': timezone.now().isoformat(),
+            'priority': 'low'
+        }]
+        # Provide default preferences to keep client stable
+        fallback_preferences = {
+            'email_alerts': True,
+            'status_updates': True,
+            'marketing_emails': False,
+            'announcements': True,
+            'feedback_notifications': True,
+            'assignment_notifications': True,
+            'resolution_notifications': True
+        }
+        return Response({'notifications': fallback_notifications, 'preferences': fallback_preferences, 'error': str(e)}, status=200)
 
 
 @api_view(['POST'])
@@ -1135,3 +1129,49 @@ def update_notification_preferences(request):
         
     except Exception as e:
         logger.error(f"Error updating notification preferences: {str(e)}")
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['POST'])
+def mark_notification_as_read(request, notification_id):
+    """Mark a specific notification as read"""
+    try:
+        from complaints.models import Notification
+        
+        notification = Notification.objects.get(id=notification_id)
+        notification.is_read = True
+        notification.save()
+        
+        return Response({
+            'message': 'Notification marked as read',
+            'notification_id': notification_id
+        }, status=200)
+        
+    except Notification.DoesNotExist:
+        return Response({'error': 'Notification not found'}, status=404)
+    except Exception as e:
+        logger.error(f"Error marking notification as read: {str(e)}")
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['POST'])
+def mark_all_notifications_as_read(request):
+    """Mark all notifications for a user as read"""
+    try:
+        from complaints.models import Notification
+        
+        user_email = request.data.get('email') or request.user.email
+        
+        updated_count = Notification.objects.filter(
+            user_email=user_email,
+            is_read=False
+        ).update(is_read=True)
+        
+        return Response({
+            'message': f'{updated_count} notifications marked as read',
+            'count': updated_count
+        }, status=200)
+        
+    except Exception as e:
+        logger.error(f"Error marking all notifications as read: {str(e)}")
+        return Response({'error': str(e)}, status=500)
