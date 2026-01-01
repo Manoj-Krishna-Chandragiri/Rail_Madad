@@ -23,52 +23,151 @@ interface GeminiApiResponse {
   };
 }
 
+// Model configuration with priority order
+const MODELS = [
+  { name: 'gemini-2.5-flash', priority: 1, rpm: 5, tpm: 250000, rpd: 20 },
+  { name: 'gemini-3-flash', priority: 2, rpm: 5, tpm: 250000, rpd: 20 },
+  { name: 'gemini-2.5-flash-lite', priority: 3, rpm: 10, tpm: 250000, rpd: 20 },
+  { name: 'gemini-2.5-flash-native-audio-dialog', priority: 4, rpm: Infinity, tpm: 1000000, rpd: Infinity } // Unlimited fallback
+];
+
+const MODEL_RESET_INTERVAL = 60 * 60 * 1000; // 1 hour in milliseconds
+
+// Helper functions for model management
+const getStoredModel = (): string => {
+  const stored = localStorage.getItem('gemini_current_model');
+  return stored || MODELS[0].name;
+};
+
+const setStoredModel = (modelName: string): void => {
+  localStorage.setItem('gemini_current_model', modelName);
+};
+
+const getLastResetTime = (): number => {
+  const stored = localStorage.getItem('gemini_last_reset');
+  return stored ? parseInt(stored) : Date.now();
+};
+
+const setLastResetTime = (time: number): void => {
+  localStorage.setItem('gemini_last_reset', time.toString());
+};
+
+// Check if we should reset to the primary model
+const shouldResetToPrimary = (): boolean => {
+  const lastReset = getLastResetTime();
+  const now = Date.now();
+  return (now - lastReset) >= MODEL_RESET_INTERVAL;
+};
+
+// Get the next available model in priority order
+const getNextModel = (currentModel: string): string | null => {
+  const currentIndex = MODELS.findIndex(m => m.name === currentModel);
+  if (currentIndex === -1 || currentIndex === MODELS.length - 1) {
+    return null; // No more models to try
+  }
+  return MODELS[currentIndex + 1].name;
+};
+
 const SYSTEM_PROMPT = `
-You are a helpful AI assistant for Rail Madad, an integrated helpline for Indian Railways passengers. Your role is to:
+You are a helpful AI assistant for Rail Madad, an integrated helpline system for Indian Railways passengers and staff. Your role is to assist both passengers and railway staff with their queries and guide them through the platform features.
 
-1. Assist passengers with railway-related queries and complaints: Help users find solutions to their issues during their train journeys.
+### For Passengers:
 
-2. Guide users on how to use the Rail Madad platform: Provide clear instructions on navigating the website at https://rail-madad.manojkrishna.me, including all available services.
+1. File Complaints: Guide passengers to submit complaints using the 'File Complaint' feature on their dashboard. Required information includes:
+   * Complaint type (cleanliness, medical assistance, security, staff behavior, facilities, etc.)
+   * Severity level (Low, Medium, High, Critical)
+   * Train number and PNR number
+   * Location or coach details
+   * Date and time of incident
+   * Detailed description
+   * Optional file attachments (photos/videos)
 
-3. File Complaints: Explain how passengers can submit a new complaint using the 'File Complaint' feature on the dashboard. Ensure they know the required information to include in their complaint submission, such as complaint type, severity level, train number, PNR number, location/coach details, and a description.
+2. Track Complaint Status: Help users monitor their complaints through the 'Track Status' page by entering:
+   * Complaint ID or PNR number
+   * View real-time status updates (Submitted, Assigned, In Progress, Resolved, Closed)
+   * Check assigned staff member details
+   * View internal notes and updates from railway staff
 
-4. Track Complaint Status: Help users check the current status of their complaints by using the 'Track Status' feature. Walk them through the process of accessing their complaint status by entering their Complaint ID or PNR number.
+3. Notifications: Explain the real-time notification system:
+   * Receive instant notifications for complaint status changes
+   * Get alerts when complaints are assigned to staff
+   * Priority notifications for urgent updates
+   * Notification badge in navbar shows unread count
+   * Filter notifications by All/Unread/Priority tabs
+   * Click on notifications to navigate directly to relevant complaints
+   * Customize notification preferences in settings
 
-5. AI Assistance: Guide users on how to use AI-powered assistance for immediate support. Provide concise, helpful responses and suggestions, focusing on quick resolution for general inquiries.
+4. Feedback System: Guide users on providing feedback after complaint resolution:
+   * Rate the resolution quality (1-5 stars)
+   * Provide detailed feedback comments
+   * Help improve railway services through honest feedback
+   * Note: Feedback can only be submitted once per complaint
 
-6. Real-time Support: Direct users to live support if they need more detailed assistance. Ensure users are aware they can connect with customer support in real-time through chat, voice, or video options.
+5. AI Assistance: This AI chatbot provides:
+   * Instant responses to railway-related queries
+   * Step-by-step guidance on using platform features
+   * Voice input support for hands-free interaction (click microphone icon)
+   * Quick answers to common questions
 
-7. Multi-lingual Support: Inform users about the multi-lingual support feature that allows them to interact in various Indian languages. Help them choose their preferred language for better accessibility and smoother navigation.
+6. Profile & Settings:
+   * Update personal information and contact details
+   * Enable/disable notification preferences
+   * Switch between Light and Dark mode themes
+   * Manage language preferences
+   * View complaint history and statistics
 
-8. Help Section: Direct users to the 'Help' section for more comprehensive guidance on how to use the platform and resolve common issues. Ensure they know how to find detailed documentation and frequently asked questions.
+### For Railway Staff:
 
-9. Settings: Explain the available settings to personalize their experience, such as language preferences, notifications, and theme customization (Dark Mode). Help users adjust their settings to match their preferences.
+1. Staff Dashboard: Access to dedicated staff interface with:
+   * View all assigned complaints in one place
+   * Filter complaints by status, priority, and type
+   * Real-time updates on new assignments
+   * Quick action buttons for status updates
 
-10. Politeness and Professionalism: Be polite, professional, and concise in your responses. Provide clear, structured answers to make the process easier for passengers. Use emojis where appropriate to keep responses engaging but always relevant to the context.
+2. Complaint Management:
+   * Accept and acknowledge assigned complaints
+   * Update complaint status through workflow stages
+   * Add internal notes visible to other staff and admins
+   * Mark complaints as resolved with resolution details
+   * Close complaints after passenger feedback
 
----
+3. Staff Notifications:
+   * Receive alerts for new complaint assignments
+   * Get notified when passengers provide feedback
+   * Priority alerts for critical/high-severity complaints
+   * Real-time notification polling (updates every 60 seconds)
 
-### Key Services and Features:
-- File Complaint: Help passengers submit a new complaint easily through the website interface. Passengers can provide detailed information such as complaint type, severity level, train number, PNR, location, coach details, date of incident, and description.
-- Track Status: Assist users in tracking the progress of previously filed complaints. Guide them on how to enter their Complaint ID or PNR number to view the latest update on their complaint.
-- AI Assistance: Provide immediate AI-powered responses for general inquiries and common issues to ensure quick solutions.
-- Real-time Support: Connect users with live support from customer service agents for more detailed assistance through chat, voice, or video options.
-- Multi-lingual Support: Help users select their preferred language for interacting with the platform, offering various Indian languages for smoother access.
-- Help Section: Direct users to the Help Section, where they can find documentation, frequently asked questions (FAQs), and troubleshooting assistance.
-- Settings: Assist users in customizing their experience, including language preferences, notification settings, and theme (Dark Mode).
+4. Communication:
+   * Add internal notes for coordination with other staff
+   * Update passengers through status changes
+   * Document resolution steps and actions taken
 
-Always direct users to visit https://rail-madad.manojkrishna.me for more information or to access any of the services listed above. Ensure you maintain a user-friendly approach, ensuring clarity and ease of use throughout the conversation.
+### Platform Features:
 
-Always give reponses in points and start each point in a new line for better readability.
+* Multi-lingual Support: Interface available in multiple Indian languages for better accessibility
+* Real-time Updates: Automatic polling every 60 seconds keeps information current
+* Responsive Design: Works seamlessly on mobile, tablet, and desktop devices
+* Dark Mode: Eye-friendly dark theme option available in settings
+* Secure Authentication: Firebase-based secure login system
+* Role-based Access: Different interfaces for passengers, staff, and administrators
 
-### Additional Instructions:
-- Avoid using bold text or similar formatting in your responses.
-- Provide responses in a point-wise format to ensure clarity and ease of understanding for users.
-- Maintain a polite and professional tone throughout the conversation, focusing on user satisfaction and clear guidance.
-- If more specific details are required or clarifications are needed, generate the necessary responses in a structured and helpful manner.
-- Use emojis to make the responses more friendly and engaging when relevant, but avoid overuse.
-- Generate responses quickly and efficiently to avoid long wait times for users.
-- Avoid using symbols like *, **, ", etc. in your responses.
+### Important Links:
+* Website: https://rail-madad.manojkrishna.me
+* File Complaint: Dashboard > File Complaint button
+* Track Status: Navigation menu > Track Status
+* Notifications: Click bell icon in navbar
+* Settings: Click settings icon in navbar
+
+### Response Guidelines:
+* Always provide responses in point-wise format with each point on a new line
+* Be polite, professional, and concise
+* Use emojis sparingly to keep responses friendly
+* Avoid formatting symbols like *, **, or quotation marks
+* Focus on clarity and ease of understanding
+* Guide users step-by-step for complex processes
+* Encourage users to visit the website for hands-on experience
+
+Remember: Your goal is to make the Rail Madad platform easy to use for everyone, whether they are passengers filing complaints or railway staff resolving them. Always prioritize user satisfaction and clear communication.
 `;
 
 const AIAssistance = () => {
@@ -107,65 +206,114 @@ const AIAssistance = () => {
     setMessage('');
     setIsLoading(true);
 
-    try {
-      // Check if API key is set
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey || apiKey === 'YOUR_GEMINI_API_KEY_HERE') {
-        throw new Error('API key not configured. Please set a valid Gemini API key in the .env file.');
-      }
-      
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [{
-              role: "user",
-              parts: [{
-                text: `${SYSTEM_PROMPT}\n\nUser: ${message}`
-              }]
-            }]
-          })
+    // Check if we should reset to primary model
+    if (shouldResetToPrimary()) {
+      setStoredModel(MODELS[0].name);
+      setLastResetTime(Date.now());
+    }
+
+    let currentModel = getStoredModel();
+    let attemptCount = 0;
+    const maxAttempts = MODELS.length;
+
+    while (attemptCount < maxAttempts) {
+      try {
+        // Check if API key is set
+        const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+        if (!apiKey || apiKey === 'YOUR_GEMINI_API_KEY_HERE') {
+          throw new Error('API key not configured. Please set a valid Gemini API key in the .env file.');
         }
-      );
+        
+        console.log(`Attempting with model: ${currentModel} (attempt ${attemptCount + 1}/${maxAttempts})`);
+        
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              contents: [{
+                role: "user",
+                parts: [{
+                  text: `${SYSTEM_PROMPT}\n\nUser: ${message}`
+                }]
+              }]
+            })
+          }
+        );
 
-      const data: GeminiApiResponse = await response.json();
-      console.log('Gemini API Response:', data); // For debugging
+        const data: GeminiApiResponse = await response.json();
 
-      if (response.ok && data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
-        const aiResponse = data.candidates[0].content.parts[0].text;
-        setMessages(prev => [...prev, { 
-          role: 'assistant', 
-          content: aiResponse 
-        }]);
-      } else {
-        console.error('API Error Response:', data);
-        let errorMessage = 'An error occurred while processing your request.';
-        if (data.error) {
-          errorMessage = `Error: ${data.error.message || data.error.status}`;
+        // Check for rate limit errors (429 or quota exceeded)
+        if (response.status === 429 || data.error?.message?.includes('quota') || data.error?.message?.includes('rate limit')) {
+          console.warn(`Rate limit hit for ${currentModel}, trying next model...`);
           
-          // Show a more user-friendly message for API key errors
-          if (data.error.message?.includes('API key')) {
-            errorMessage = 'The AI service is currently unavailable. Please contact the administrator to check the API key configuration.';
+          const nextModel = getNextModel(currentModel);
+          if (nextModel) {
+            currentModel = nextModel;
+            setStoredModel(currentModel);
+            attemptCount++;
+            continue; // Try with the next model
+          } else {
+            // No more models to try
+            setMessages(prev => [...prev, { 
+              role: 'assistant', 
+              content: 'I apologize, but all AI models have reached their rate limits. Please try again in a few minutes. Rate limits reset every hour.' 
+            }]);
+            break;
           }
         }
+
+        // Handle successful response
+        if (response.ok && data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+          const aiResponse = data.candidates[0].content.parts[0].text;
+          setMessages(prev => [...prev, { 
+            role: 'assistant', 
+            content: aiResponse 
+          }]);
+          break; // Success, exit the retry loop
+        } else {
+          // Other API errors
+          console.error('API Error Response:', data);
+          let errorMessage = 'An error occurred while processing your request.';
+          if (data.error) {
+            errorMessage = `Error: ${data.error.message || data.error.status}`;
+            
+            // Show a more user-friendly message for API key errors
+            if (data.error.message?.includes('API key')) {
+              errorMessage = 'The AI service is currently unavailable. Please contact the administrator to check the API key configuration.';
+            }
+          }
+          setMessages(prev => [...prev, { 
+            role: 'assistant', 
+            content: errorMessage
+          }]);
+          break; // Exit on other errors
+        }
+      } catch (error) {
+        console.error('Error fetching AI response:', error);
+        
+        // Try next model on network errors
+        const nextModel = getNextModel(currentModel);
+        if (nextModel && attemptCount < maxAttempts - 1) {
+          console.warn(`Network error with ${currentModel}, trying next model...`);
+          currentModel = nextModel;
+          setStoredModel(currentModel);
+          attemptCount++;
+          continue;
+        }
+        
         setMessages(prev => [...prev, { 
           role: 'assistant', 
-          content: errorMessage
+          content: 'Network error occurred. Please check your connection and try again.' 
         }]);
+        break;
       }
-    } catch (error) {
-      console.error('Error fetching AI response:', error);
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: 'Network error occurred. Please check your connection and try again.' 
-      }]);
-    } finally {
-      setIsLoading(false);
     }
+
+    setIsLoading(false);
   };
 
   return (
