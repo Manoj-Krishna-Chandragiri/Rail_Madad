@@ -19,8 +19,6 @@ import {
 import { useTheme } from '../context/ThemeContext';
 import apiClient from '../utils/api';
 import { getAuth } from 'firebase/auth';
-import SimpleGoogleTranslate from '../components/SimpleGoogleTranslate';
-import DirectGoogleTranslate from '../components/DirectGoogleTranslate';
 
 interface SearchResult {
   id: string;
@@ -146,12 +144,6 @@ const Home = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 pb-12">
-      {/* Direct Translation Controls */}
-      <DirectGoogleTranslate />
-      
-      {/* Simple Google Translate Widget for direct user access */}
-      <SimpleGoogleTranslate />
-      
       {/* Enhanced Hero Section with animated train */}
       <div className={`${isDark ? 'bg-gray-800' : 'bg-gradient-to-r from-indigo-50 to-blue-50'} rounded-xl shadow-lg p-8 mb-8 overflow-hidden relative`}>
         {/* Animated track at bottom */}

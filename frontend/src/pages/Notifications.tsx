@@ -54,16 +54,24 @@ const Notifications = () => {
     try {
       setLoading(true);
       
-      // Try to fetch from API
+      // Get user email from localStorage
+      const userEmail = localStorage.getItem('userEmail');
+      
+      // Try to fetch from API with real data
       try {
-        const response = await apiClient.get(`/api/accounts/notifications/?role=${role}`);
-        setNotifications(response.data);
+        const response = await apiClient.get(`/api/accounts/notifications/?role=${role}&email=${userEmail || ''}`);
+        if (response.data.notifications) {
+          setNotifications(response.data.notifications as Notification[]);
+        } else if (Array.isArray(response.data)) {
+          setNotifications(response.data);
+        }
+        setLoading(false);
         return;
       } catch (apiError) {
-        console.log('API not available, using mock data');
+        console.log('API fetch failed, will use fallback data', apiError);
       }
       
-      // Mock data based on role
+      // Fallback: Mock data based on role if API fails
       let mockNotifications: Notification[] = [];
       
       if (role === 'admin') {
@@ -223,9 +231,9 @@ const Notifications = () => {
       }
       
       setNotifications(mockNotifications);
+      setLoading(false);
     } catch (err) {
       console.error('Failed to fetch notifications:', err);
-    } finally {
       setLoading(false);
     }
   };

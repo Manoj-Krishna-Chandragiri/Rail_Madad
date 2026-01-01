@@ -16,6 +16,7 @@ urlpatterns = [
     path('admin/verify/', verify_admin, name='verify-admin'),
     path('admin/profile/', get_admin_profile, name='admin-profile'),
     path('notifications/', views.get_notifications, name='get_notifications'),
+    path('notifications/preferences/', views.update_notification_preferences, name='update_notification_preferences'),
     
     # Facial Authentication endpoints (disabled to prevent TensorFlow hang on startup)
     # path('', include('accounts.face_urls')),

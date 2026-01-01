@@ -119,6 +119,7 @@ const StaffLogin = () => {
   const [forgotPasswordMessage, setForgotPasswordMessage] = useState('');
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [modalType, setModalType] = useState<'terms' | 'privacy'>('terms');
+  const [signupStep, setSignupStep] = useState(1);
   
   const navigate = useNavigate();
   const { theme } = useTheme();
@@ -406,7 +407,7 @@ const StaffLogin = () => {
   return (
     <>
     <div className="min-h-screen flex items-center justify-center bg-[url('https://railmadad-dashboard.web.app/assets/body-bg-BM5rPYaf.jpg')] bg-cover bg-center bg-no-repeat">
-      <div className="container mx-auto px-4 flex">
+      <div className="container mx-auto px-4 flex py-8">
         {/* Left Panel */}
         <div className="hidden lg:flex lg:w-1/2 text-white flex-col justify-center pr-16">
           <div className="flex items-center gap-4 mb-6">
@@ -436,7 +437,7 @@ const StaffLogin = () => {
             <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'} mb-6`}>Access for railway staff members</p>
 
           {!showForgotPassword && !showSignUp ? (
-            <form className="space-y-4" onSubmit={handleSignIn}>
+            <form className="space-y-4 overflow-y-scroll pr-2" style={{scrollbarWidth: 'thin'}} onSubmit={handleSignIn}>
               {errors.general && (
                 <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-md text-sm">
                   {errors.general}
@@ -623,7 +624,12 @@ const StaffLogin = () => {
                 </div>
               )}
 
-              <form onSubmit={handleSignUp} className="space-y-4">
+              <form onSubmit={handleSignUp} className="space-y-4 max-h-[60vh] overflow-y-auto pr-2" style={{scrollbarWidth: 'thin'}}>
+                {signupStep === 1 && (
+                  <>
+                    <div className="text-sm text-indigo-600 dark:text-indigo-400 font-medium mb-2">
+                      Step 1 of 2: Basic Information
+                    </div>
                 <div>
                   <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'} mb-1`}>
                     Full Name
@@ -866,73 +872,137 @@ const StaffLogin = () => {
                   label="Confirm Password"
                   required
                 />
+                </>
+                )}
                 
-                <div className={`p-4 rounded-lg ${
-                  !acceptedTerms 
-                    ? theme === 'dark' ? 'bg-red-900/20 border border-red-800' : 'bg-red-50 border border-red-200'
-                    : theme === 'dark' ? 'bg-green-900/20 border border-green-800' : 'bg-green-50 border border-green-200'
-                }`}>
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      id="acceptTerms"
-                      checked={acceptedTerms}
-                      onChange={(e) => setAcceptedTerms(e.target.checked)}
-                      className="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
-                    />
-                    <label htmlFor="acceptTerms" className={`text-sm cursor-pointer flex-1 ${
-                      theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-                    }`}>
-                      I agree to the{' '}
-                      <button
-                        type="button"
-                        onClick={() => handleTermsClick('terms')}
-                        className="text-indigo-500 hover:text-indigo-400 underline font-medium"
-                      >
-                        Terms of Service
-                      </button>
-                      {' '}and{' '}
-                      <button
-                        type="button"
-                        onClick={() => handleTermsClick('privacy')}
-                        className="text-indigo-500 hover:text-indigo-400 underline font-medium"
-                      >
-                        Privacy Policy
-                      </button>
-                    </label>
-                  </div>
-                  {!acceptedTerms && (
-                    <p className="text-red-600 dark:text-red-400 text-sm font-medium mt-3 flex items-center gap-2">
-                      <span className="text-lg">*</span> Please accept the terms and conditions to continue
-                    </p>
-                  )}
-                  {acceptedTerms && (
-                    <p className="text-green-600 dark:text-green-400 text-sm font-medium mt-2 flex items-center gap-2">
-                      <span>✓</span> Thank you for accepting our terms
-                    </p>
-                  )}
+                {signupStep === 2 && (
+                  <>
+                    <div className="text-sm text-indigo-600 dark:text-indigo-400 font-medium mb-2">
+                      Step 2 of 2: Additional Details
+                    </div>
+                <div>
+                  <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'} mb-1`}>
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={signUpData.phoneNumber}
+                    onChange={(e) => setSignUpData({ ...signUpData, phoneNumber: e.target.value })}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 
+                      ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'} mb-1`}>
+                    Gender *
+                  </label>
+                  <select
+                    value={signUpData.gender}
+                    onChange={(e) => setSignUpData({ ...signUpData, gender: e.target.value as 'male' | 'female' })}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 
+                      ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
+                    required
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'} mb-1`}>
+                    Address
+                  </label>
+                  <textarea
+                    value={signUpData.address}
+                    onChange={(e) => setSignUpData({ ...signUpData, address: e.target.value })}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 
+                      ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
+                    rows={3}
+                  />
                 </div>
 
+                {/* Staff-specific fields */}
+                <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                  <h3 className={`text-sm font-semibold mb-3 ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>
+                    Staff Information
+                  </h3>
+                  <input
+                    type="checkbox"
+                    id="acceptTerms"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    className="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
+                  />
+                  <label htmlFor="acceptTerms" className={`text-xs cursor-pointer flex-1 ${
+                    theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                  }`}>
+                    I agree to the{' '}
+                    <button
+                      type="button"
+                      onClick={() => handleTermsClick('terms')}
+                      className="text-indigo-500 hover:text-indigo-400 underline font-medium"
+                    >
+                      Terms of Service
+                    </button>
+                    {' '}and{' '}
+                    <button
+                      type="button"
+                      onClick={() => handleTermsClick('privacy')}
+                      className="text-indigo-500 hover:text-indigo-400 underline font-medium"
+                    >
+                      Privacy Policy
+                    </button>
+                  </label>
+                </div>
+                {!acceptedTerms && errors.terms && (
+                  <p className="text-red-600 dark:text-red-400 text-xs mt-1">{errors.terms}</p>
+                )}
+                </>
+                )}
+
                 <div className="flex gap-4">
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-                  >
-                    {isLoading ? 'Creating Account...' : 'Sign up'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowSignUp(false);
-                      setAcceptedTerms(false);
-                      setErrors({});
-                    }}
-                    className={`flex-1 border py-2 rounded-lg 
-                      ${theme === 'dark' ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-300 hover:bg-gray-50'}`}
-                  >
-                    Back to Login
-                  </button>
+                  {signupStep === 1 ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setSignupStep(2)}
+                        className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700"
+                      >
+                        Next: Additional Details
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSignUp(false);
+                          setSignupStep(1);
+                          setAcceptedTerms(false);
+                          setErrors({});
+                        }}
+                        className={`flex-1 border py-2 rounded-lg 
+                          ${theme === 'dark' ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-300 hover:bg-gray-50'}`}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setSignupStep(1)}
+                        className={`flex-1 border py-2 rounded-lg 
+                          ${theme === 'dark' ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-300 hover:bg-gray-50'}`}
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                      >
+                        {isLoading ? 'Creating Account...' : 'Sign up'}
+                      </button>
+                    </>
+                  )}
                 </div>
               </form>
             </div>

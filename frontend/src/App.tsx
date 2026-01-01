@@ -5,7 +5,6 @@ import Layout from './components/Layout';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import AdminHome from './pages/AdminHome';
-import Login from './pages/Login'; 
 import AdminLogin from './pages/AdminLogin';
 import StaffLogin from './pages/StaffLogin';
 import PassengerLogin from './pages/PassengerLogin';

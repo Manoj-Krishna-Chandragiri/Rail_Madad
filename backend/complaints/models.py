@@ -162,5 +162,25 @@ class Notification(models.Model):
         verbose_name_plural = "Notifications"
 
 
+class NotificationPreference(models.Model):
+    """Model to store user notification preferences"""
+    user_email = models.EmailField(unique=True)
+    email_alerts = models.BooleanField(default=True)  # Get email notifications for complaint updates
+    status_updates = models.BooleanField(default=True)  # Receive updates when complaint status changes
+    marketing_emails = models.BooleanField(default=False)  # Receive promotional and newsletter emails
+    announcements = models.BooleanField(default=True)  # Get notifications about system announcements
+    feedback_notifications = models.BooleanField(default=True)  # Get feedback received notifications
+    assignment_notifications = models.BooleanField(default=True)  # Get notified when complaint assigned
+    resolution_notifications = models.BooleanField(default=True)  # Get notified when complaint resolved
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Notification Preferences - {self.user_email}"
+    
+    class Meta:
+        verbose_name_plural = "Notification Preferences"
+
+
 # Import assignment model so Django recognizes it
 from .models_assignment import ComplaintAssignment

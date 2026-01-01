@@ -932,47 +932,206 @@ def staff_register(request):
 
 @api_view(['GET'])
 def get_notifications(request):
-    """Get notifications for the current user based on their role"""
+    """Get real notifications for the current user based on their role"""
     try:
+        from complaints.models import Notification, Complaint, NotificationPreference
+        from accounts.models import User
+        
         role = request.GET.get('role', 'passenger')
+        user_email = request.GET.get('email') or request.user.email if request.user.is_authenticated else None
         
-        # Mock notifications data for now
-        notifications = [
-            {
-                'id': 1,
-                'title': 'Welcome to Rail Madad',
-                'message': 'Your account has been created successfully',
-                'type': 'info',
-                'timestamp': '2025-12-27T10:00:00Z',
-                'read': False,
-                'priority': 'low'
-            }
-        ]
+        notifications = []
         
-        # Role-specific notifications
-        if role == 'staff':
-            notifications.append({
-                'id': 2,
-                'title': 'New Complaint Assigned',
-                'message': 'You have been assigned a new complaint to review',
-                'type': 'task',
-                'timestamp': '2025-12-27T11:00:00Z',
-                'read': False,
-                'priority': 'medium'
-            })
+        if not user_email:
+            return Response({'error': 'User email required'}, status=400)
+        
+        # Get notification preferences
+        try:
+            pref = NotificationPreference.objects.get(user_email=user_email)
+        except NotificationPreference.DoesNotExist:
+            # Create default preferences if not exists
+            pref = NotificationPreference.objects.create(user_email=user_email)
+        
+        # Fetch from database based on user role
+        if role == 'passenger':
+            # Get passenger's complaint notifications
+            user = User.objects.filter(email=user_email).first()
+            if user:
+                complaints = Complaint.objects.filter(user=user).order_by('-created_at')[:10]
+                
+                for complaint in complaints:
+                    # Complaint submitted notification
+                    notifications.append({
+                        'id': f'complaint_{complaint.id}_submitted',
+                        'type': 'complaint_submitted',
+                        'title': 'Complaint Submitted',
+                        'message': f'Your complaint #{complaint.id} - {complaint.type} has been submitted successfully.',
+                        'complaint_id': complaint.id,
+                        'is_read': False,
+                        'created_at': complaint.created_at.isoformat(),
+                        'priority': 'low'
+                    })
+                    
+                    # Complaint assigned notification
+                    if complaint.staff:
+                        notifications.append({
+                            'id': f'complaint_{complaint.id}_assigned',
+                            'type': 'complaint_assigned',
+                            'title': 'Complaint Assigned',
+                            'message': f'Your complaint has been assigned to {complaint.staff} for resolution.',
+                            'complaint_id': complaint.id,
+                            'is_read': False,
+                            'created_at': complaint.updated_at.isoformat(),
+                            'priority': 'medium'
+                        })
+                    
+                    # Complaint resolved notification
+                    if complaint.status == 'Closed' and complaint.resolved_at:
+                        notifications.append({
+                            'id': f'complaint_{complaint.id}_resolved',
+                            'type': 'complaint_resolved',
+                            'title': 'Complaint Resolved',
+                            'message': f'Your complaint has been resolved. Resolution notes: {complaint.resolution_notes[:50]}...',
+                            'complaint_id': complaint.id,
+                            'is_read': False,
+                            'created_at': complaint.resolved_at.isoformat(),
+                            'priority': 'high'
+                        })
+                    
+                    # Feedback received notification
+                    if complaint.has_feedback:
+                        notifications.append({
+                            'id': f'complaint_{complaint.id}_feedback',
+                            'type': 'feedback_received',
+                            'title': 'Feedback Received',
+                            'message': f'We received your feedback for complaint #{complaint.id}. Thank you!',
+                            'complaint_id': complaint.id,
+                            'is_read': False,
+                            'created_at': complaint.updated_at.isoformat(),
+                            'priority': 'low'
+                        })
+                        
+        elif role == 'staff':
+            # Get staff-assigned complaints
+            from complaints.models_assignment import ComplaintAssignment
+            
+            assignments = ComplaintAssignment.objects.filter(assigned_to=user_email).order_by('-assigned_at')[:10]
+            
+            for assignment in assignments:
+                complaint = assignment.complaint
+                
+                # New assignment notification
+                notifications.append({
+                    'id': f'assignment_{assignment.id}_new',
+                    'type': 'staff_assigned',
+                    'title': 'New Complaint Assigned',
+                    'message': f'Complaint #{complaint.id} ({complaint.type}) assigned to you. Priority: {complaint.priority}',
+                    'complaint_id': complaint.id,
+                    'is_read': False,
+                    'created_at': assignment.assigned_at.isoformat(),
+                    'priority': 'high' if complaint.priority == 'Critical' else 'medium'
+                })
+                
+                # Status change notification
+                if complaint.status == 'In Progress':
+                    notifications.append({
+                        'id': f'complaint_{complaint.id}_status',
+                        'type': 'status_update',
+                        'title': 'Complaint Status Updated',
+                        'message': f'Complaint #{complaint.id} status changed to: {complaint.status}',
+                        'complaint_id': complaint.id,
+                        'is_read': False,
+                        'created_at': complaint.updated_at.isoformat(),
+                        'priority': 'low'
+                    })
+                    
         elif role == 'admin':
+            # Get all notifications for admin
+            all_notifications = Notification.objects.filter(type__in=['complaint_assigned', 'complaint_resolved', 'feedback_request', 'system']).order_by('-created_at')[:15]
+            
+            for notif in all_notifications:
+                notifications.append({
+                    'id': notif.id,
+                    'type': notif.type,
+                    'title': notif.title,
+                    'message': notif.message,
+                    'is_read': notif.is_read,
+                    'created_at': notif.created_at.isoformat(),
+                    'priority': 'high' if notif.type == 'complaint_resolved' else 'medium'
+                })
+            
+            # Add system announcements
             notifications.append({
-                'id': 3,
-                'title': 'System Update',
-                'message': 'Dashboard analytics have been updated',
-                'type': 'update',
-                'timestamp': '2025-12-27T12:00:00Z',
-                'read': False,
-                'priority': 'high'
+                'id': 'system_1',
+                'type': 'system',
+                'title': 'System Announcement',
+                'message': 'New features available in the admin dashboard.',
+                'is_read': False,
+                'created_at': timezone.now().isoformat(),
+                'priority': 'low'
             })
         
-        return Response(notifications, status=200)
+        # Sort by created_at descending
+        notifications = sorted(notifications, key=lambda x: x['created_at'], reverse=True)
+        
+        return Response({
+            'notifications': notifications,
+            'preferences': {
+                'email_alerts': pref.email_alerts,
+                'status_updates': pref.status_updates,
+                'marketing_emails': pref.marketing_emails,
+                'announcements': pref.announcements,
+                'feedback_notifications': pref.feedback_notifications,
+                'assignment_notifications': pref.assignment_notifications,
+                'resolution_notifications': pref.resolution_notifications
+            }
+        }, status=200)
         
     except Exception as e:
         logger.error(f"Error fetching notifications: {str(e)}")
         return Response({'error': str(e)}, status=500)
+
+
+@api_view(['POST'])
+def update_notification_preferences(request):
+    """Update user notification preferences"""
+    try:
+        from complaints.models import NotificationPreference
+        
+        user_email = request.data.get('email') or request.user.email
+        
+        pref, created = NotificationPreference.objects.get_or_create(user_email=user_email)
+        
+        # Update preferences
+        if 'email_alerts' in request.data:
+            pref.email_alerts = request.data['email_alerts']
+        if 'status_updates' in request.data:
+            pref.status_updates = request.data['status_updates']
+        if 'marketing_emails' in request.data:
+            pref.marketing_emails = request.data['marketing_emails']
+        if 'announcements' in request.data:
+            pref.announcements = request.data['announcements']
+        if 'feedback_notifications' in request.data:
+            pref.feedback_notifications = request.data['feedback_notifications']
+        if 'assignment_notifications' in request.data:
+            pref.assignment_notifications = request.data['assignment_notifications']
+        if 'resolution_notifications' in request.data:
+            pref.resolution_notifications = request.data['resolution_notifications']
+        
+        pref.save()
+        
+        return Response({
+            'message': 'Notification preferences updated successfully',
+            'preferences': {
+                'email_alerts': pref.email_alerts,
+                'status_updates': pref.status_updates,
+                'marketing_emails': pref.marketing_emails,
+                'announcements': pref.announcements,
+                'feedback_notifications': pref.feedback_notifications,
+                'assignment_notifications': pref.assignment_notifications,
+                'resolution_notifications': pref.resolution_notifications
+            }
+        }, status=200)
+        
+    except Exception as e:
+        logger.error(f"Error updating notification preferences: {str(e)}")

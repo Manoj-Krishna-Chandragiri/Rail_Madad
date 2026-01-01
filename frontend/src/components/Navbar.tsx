@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bell, User, CheckCircle, X, MessageSquare, Clock, TrendingUp, Users, FileText } from 'lucide-react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Bell, User, CheckCircle, MessageSquare, Clock, TrendingUp, Users, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import GlobalLanguageSelector from './GlobalLanguageSelector';
 import apiClient from '../utils/api';
@@ -24,7 +24,6 @@ const Navbar = ({ toggleSidebar }: NavbarProps) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [userRole, setUserRole] = useState<string>('passenger');
   const notificationsRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -32,7 +31,6 @@ const Navbar = ({ toggleSidebar }: NavbarProps) => {
 
   useEffect(() => {
     const role = localStorage.getItem('userRole') || 'passenger';
-    setUserRole(role);
     fetchNotifications(role);
   }, []);
 
@@ -54,8 +52,14 @@ const Navbar = ({ toggleSidebar }: NavbarProps) => {
 
   const fetchNotifications = async (role: string) => {
     try {
-      const response = await apiClient.get(`/api/accounts/notifications/?role=${role}`);
-      setNotifications(response.data.slice(0, 5)); // Only show 5 recent notifications
+      const userEmail = localStorage.getItem('userEmail');
+      const response = await apiClient.get(`/api/accounts/notifications/?role=${role}&email=${userEmail || ''}`);
+      
+      if (response.data.notifications) {
+        setNotifications(response.data.notifications.slice(0, 5)); // Only show 5 recent notifications
+      } else if (Array.isArray(response.data)) {
+        setNotifications(response.data.slice(0, 5));
+      }
     } catch (error) {
       // Use mock data if API fails
       const mockData = getMockNotifications(role);
