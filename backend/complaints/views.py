@@ -2275,6 +2275,29 @@ def submit_feedback(request):
                 staff=staff_instance
             )
             
+            # Mark the complaint as having feedback
+            complaint_id = feedback.complaint_id
+            if complaint_id:
+                try:
+                    complaint = Complaint.objects.get(id=complaint_id)
+                    complaint.has_feedback = True
+                    complaint.save()
+                    logger.info(f"✓ Marked complaint #{complaint_id} as having feedback")
+                except Complaint.DoesNotExist:
+                    logger.warning(f"Complaint {complaint_id} not found when marking has_feedback")
+            
+            # Update staff rating if linked
+            if staff_instance:
+                try:
+                    # Calculate new average rating for staff
+                    staff_feedbacks = Feedback.objects.filter(staff=staff_instance)
+                    avg_rating = staff_feedbacks.aggregate(models.Avg('rating'))['rating__avg'] or 0
+                    staff_instance.rating = round(avg_rating, 2)
+                    staff_instance.save()
+                    logger.info(f"✓ Updated staff rating: {staff_instance.name} -> {staff_instance.rating}")
+                except Exception as e:
+                    logger.error(f"Error updating staff metrics: {str(e)}")
+            
             # Create notification for staff member about received feedback
             if staff_instance and staff_instance.email:
                 sentiment_emoji = '😊' if sentiment == 'POSITIVE' else '😐' if sentiment == 'NEUTRAL' else '😞'
