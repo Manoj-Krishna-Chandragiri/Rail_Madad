@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import GoogleIcon from '../components/icons/GoogleIcon';
 import { useTheme } from '../context/ThemeContext';
 import FaceAuthModal from '../components/FaceAuthModal';
+import TermsModal from '../components/TermsModal';
 import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { auth, db } from '../config/firebase';
 import { fetchAndStoreUserProfile } from '../utils/auth-helpers';
@@ -116,6 +117,8 @@ const StaffLogin = () => {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
   const [forgotPasswordMessage, setForgotPasswordMessage] = useState('');
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [modalType, setModalType] = useState<'terms' | 'privacy'>('terms');
   
   const navigate = useNavigate();
   const { theme } = useTheme();
@@ -135,8 +138,17 @@ const StaffLogin = () => {
       newErrors.password = 'Password is required';
     }
 
+    if (!acceptedTerms) {
+      newErrors.terms = 'Please accept the Terms of Service and Privacy Policy to continue';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handleTermsClick = (type: 'terms' | 'privacy') => {
+    setModalType(type);
+    setShowTermsModal(true);
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -495,6 +507,52 @@ const StaffLogin = () => {
                 {isLoading ? 'Signing In...' : 'Sign In as Staff'}
               </button>
 
+              <div className={`mt-6 p-4 rounded-lg ${
+                !acceptedTerms 
+                  ? theme === 'dark' ? 'bg-red-900/20 border border-red-800' : 'bg-red-50 border border-red-200'
+                  : theme === 'dark' ? 'bg-green-900/20 border border-green-800' : 'bg-green-50 border border-green-200'
+              }`}>
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="acceptTerms"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    className="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
+                  />
+                  <label htmlFor="acceptTerms" className={`text-sm cursor-pointer flex-1 ${
+                    theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    I agree to the{' '}
+                    <button
+                      type="button"
+                      onClick={() => handleTermsClick('terms')}
+                      className="text-indigo-500 hover:text-indigo-400 underline font-medium"
+                    >
+                      Terms of Service
+                    </button>
+                    {' '}and{' '}
+                    <button
+                      type="button"
+                      onClick={() => handleTermsClick('privacy')}
+                      className="text-indigo-500 hover:text-indigo-400 underline font-medium"
+                    >
+                      Privacy Policy
+                    </button>
+                  </label>
+                </div>
+                {!acceptedTerms && (
+                  <p className="text-red-600 dark:text-red-400 text-sm font-medium mt-3 flex items-center gap-2">
+                    <span className="text-lg">*</span> Please accept the terms and conditions to continue
+                  </p>
+                )}
+                {acceptedTerms && (
+                  <p className="text-green-600 dark:text-green-400 text-sm font-medium mt-2 flex items-center gap-2">
+                    <span>✓</span> Thank you for accepting our terms
+                  </p>
+                )}
+              </div>
+
               <div className="my-6 flex items-center">
                 <div className={`flex-1 border-t ${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}`}></div>
                 <span className={`px-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Or continue with</span>
@@ -809,17 +867,50 @@ const StaffLogin = () => {
                   required
                 />
                 
-                <div className="flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    id="acceptTerms"
-                    checked={acceptedTerms}
-                    onChange={(e) => setAcceptedTerms(e.target.checked)}
-                    className="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="acceptTerms" className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
-                    I agree to the Terms of Service and Privacy Policy
-                  </label>
+                <div className={`p-4 rounded-lg ${
+                  !acceptedTerms 
+                    ? theme === 'dark' ? 'bg-red-900/20 border border-red-800' : 'bg-red-50 border border-red-200'
+                    : theme === 'dark' ? 'bg-green-900/20 border border-green-800' : 'bg-green-50 border border-green-200'
+                }`}>
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="acceptTerms"
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      className="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
+                    />
+                    <label htmlFor="acceptTerms" className={`text-sm cursor-pointer flex-1 ${
+                      theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                    }`}>
+                      I agree to the{' '}
+                      <button
+                        type="button"
+                        onClick={() => handleTermsClick('terms')}
+                        className="text-indigo-500 hover:text-indigo-400 underline font-medium"
+                      >
+                        Terms of Service
+                      </button>
+                      {' '}and{' '}
+                      <button
+                        type="button"
+                        onClick={() => handleTermsClick('privacy')}
+                        className="text-indigo-500 hover:text-indigo-400 underline font-medium"
+                      >
+                        Privacy Policy
+                      </button>
+                    </label>
+                  </div>
+                  {!acceptedTerms && (
+                    <p className="text-red-600 dark:text-red-400 text-sm font-medium mt-3 flex items-center gap-2">
+                      <span className="text-lg">*</span> Please accept the terms and conditions to continue
+                    </p>
+                  )}
+                  {acceptedTerms && (
+                    <p className="text-green-600 dark:text-green-400 text-sm font-medium mt-2 flex items-center gap-2">
+                      <span>✓</span> Thank you for accepting our terms
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex gap-4">
@@ -900,6 +991,13 @@ const StaffLogin = () => {
     onClose={() => setShowFaceAuthModal(false)}
     onSuccess={handleFaceAuthSuccess}
     mode="login"
+  />
+
+  {/* Terms Modal */}
+  <TermsModal
+    isOpen={showTermsModal}
+    onClose={() => setShowTermsModal(false)}
+    type={modalType}
   />
   </>
   );

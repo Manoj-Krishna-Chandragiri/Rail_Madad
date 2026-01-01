@@ -1093,6 +1093,51 @@ const handleGoogleSignIn = async () => {
                     label="Confirm Password"
                     required
                   />
+                  <div className={`p-4 rounded-lg ${
+                    !acceptedTerms 
+                      ? theme === 'dark' ? 'bg-red-900/20 border border-red-800' : 'bg-red-50 border border-red-200'
+                      : theme === 'dark' ? 'bg-green-900/20 border border-green-800' : 'bg-green-50 border border-green-200'
+                  }`}>
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        id="acceptTerms"
+                        checked={acceptedTerms}
+                        onChange={(e) => setAcceptedTerms(e.target.checked)}
+                        className="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
+                      />
+                      <label htmlFor="acceptTerms" className={`text-sm cursor-pointer flex-1 ${
+                        theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                      }`}>
+                        I agree to the{' '}
+                        <button
+                          type="button"
+                          onClick={() => handleTermsClick('terms')}
+                          className="text-indigo-500 hover:text-indigo-400 underline font-medium"
+                        >
+                          Terms of Service
+                        </button>
+                        {' '}and{' '}
+                        <button
+                          type="button"
+                          onClick={() => handleTermsClick('privacy')}
+                          className="text-indigo-500 hover:text-indigo-400 underline font-medium"
+                        >
+                          Privacy Policy
+                        </button>
+                      </label>
+                    </div>
+                    {!acceptedTerms && (
+                      <p className="text-red-600 dark:text-red-400 text-sm font-medium mt-3 flex items-center gap-2">
+                        <span className="text-lg">*</span> Please accept the terms and conditions to continue
+                      </p>
+                    )}
+                    {acceptedTerms && (
+                      <p className="text-green-600 dark:text-green-400 text-sm font-medium mt-2 flex items-center gap-2">
+                        <span>✓</span> Thank you for accepting our terms
+                      </p>
+                    )}
+                  </div>
                   <div className="flex gap-4">
                     <button
                       type="submit"
@@ -1152,21 +1197,27 @@ const handleGoogleSignIn = async () => {
               </>
             )}
 
-            <div className="mt-6">
+            <div className={`mt-6 p-4 rounded-lg ${
+              !acceptedTerms 
+                ? theme === 'dark' ? 'bg-red-900/20 border border-red-800' : 'bg-red-50 border border-red-200'
+                : theme === 'dark' ? 'bg-green-900/20 border border-green-800' : 'bg-green-50 border border-green-200'
+            }`}>
               <div className="flex items-start gap-3">
                 <input
                   type="checkbox"
                   id="acceptTerms"
                   checked={acceptedTerms}
                   onChange={(e) => setAcceptedTerms(e.target.checked)}
-                  className="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  className="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
                 />
-                <label htmlFor="acceptTerms" className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
+                <label htmlFor="acceptTerms" className={`text-sm cursor-pointer flex-1 ${
+                  theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}>
                   I agree to the{' '}
                   <button
                     type="button"
                     onClick={() => handleTermsClick('terms')}
-                    className="text-indigo-500 hover:text-indigo-400 underline"
+                    className="text-indigo-500 hover:text-indigo-400 underline font-medium"
                   >
                     Terms of Service
                   </button>
@@ -1174,15 +1225,20 @@ const handleGoogleSignIn = async () => {
                   <button
                     type="button"
                     onClick={() => handleTermsClick('privacy')}
-                    className="text-indigo-500 hover:text-indigo-400 underline"
+                    className="text-indigo-500 hover:text-indigo-400 underline font-medium"
                   >
                     Privacy Policy
                   </button>
                 </label>
               </div>
               {!acceptedTerms && (
-                <p className="text-red-500 text-xs mt-2">
-                  * Please accept the terms and conditions to continue
+                <p className="text-red-600 dark:text-red-400 text-sm font-medium mt-3 flex items-center gap-2">
+                  <span className="text-lg">*</span> Please accept the terms and conditions to continue
+                </p>
+              )}
+              {acceptedTerms && (
+                <p className="text-green-600 dark:text-green-400 text-sm font-medium mt-2 flex items-center gap-2">
+                  <span>✓</span> Thank you for accepting our terms
                 </p>
               )}
             </div>
