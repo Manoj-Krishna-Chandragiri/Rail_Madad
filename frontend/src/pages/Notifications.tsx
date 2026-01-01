@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { 
   Bell,
@@ -12,7 +13,8 @@ import {
   Search,
   Users,
   TrendingUp,
-  FileText
+  FileText,
+  ExternalLink
 } from 'lucide-react';
 import apiClient from '../utils/api';
 
@@ -30,12 +32,14 @@ interface Notification {
 
 const Notifications = () => {
   const { theme } = useTheme();
+  const navigate = useNavigate();
   const isDark = theme === 'dark';
   
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filteredNotifications, setFilteredNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'priority'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [userRole, setUserRole] = useState<string>('passenger');
 
@@ -44,11 +48,18 @@ const Notifications = () => {
     const role = localStorage.getItem('userRole') || 'passenger';
     setUserRole(role);
     fetchNotifications(role);
+    
+    // Set up polling to fetch notifications every 60 seconds
+    const pollInterval = setInterval(() => {
+      fetchNotifications(role);
+    }, 60000); // 60 seconds
+    
+    return () => clearInterval(pollInterval);
   }, []);
 
   useEffect(() => {
     filterNotifications();
-  }, [notifications, filterType, searchTerm]);
+  }, [notifications, filterType, searchTerm, activeTab]);
 
   const fetchNotifications = async (role: string) => {
     try {
@@ -241,13 +252,16 @@ const Notifications = () => {
   const filterNotifications = () => {
     let filtered = notifications;
 
+    // Tab filter (All/Unread/Priority)
+    if (activeTab === 'unread') {
+      filtered = filtered.filter(n => !n.is_read);
+    } else if (activeTab === 'priority') {
+      filtered = filtered.filter(n => n.priority === 'high' || n.priority === 'medium');
+    }
+
     // Type filter
     if (filterType !== 'all') {
-      if (filterType === 'unread') {
-        filtered = filtered.filter(n => !n.is_read);
-      } else {
-        filtered = filtered.filter(n => n.type === filterType);
-      }
+      filtered = filtered.filter(n => n.type === filterType);
     }
 
     // Search filter
@@ -293,6 +307,27 @@ const Notifications = () => {
       setNotifications(notifications.filter(n => n.id !== id));
     } catch (err) {
       console.error('Failed to delete notification:', err);
+    }
+  };
+
+  const handleNotificationClick = (notification: Notification) => {
+    // Mark as read when clicked
+    if (!notification.is_read) {
+      markAsRead(notification.id);
+    }
+    
+    // Navigate based on role and complaint_id
+    if (notification.complaint_id && notification.complaint_id !== 'Multiple') {
+      if (userRole === 'admin') {
+        // Admin: go to dashboard which shows all complaints
+        navigate('/admin-dashboard/dashboard');
+      } else if (userRole === 'staff') {
+        // Staff: go to assigned complaints
+        navigate('/staff-dashboard/assigned-complaints');
+      } else {
+        // Passenger: go to track status where they can see their complaint
+        navigate('/user-dashboard/track-status');
+      }
     }
   };
 
@@ -383,6 +418,46 @@ const Notifications = () => {
           </div>
         </div>
 
+        {/* Tabs */}
+        <div className="flex gap-4 mb-6">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'all'
+                ? 'bg-indigo-600 text-white'
+                : isDark
+                ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                : 'bg-white text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setActiveTab('unread')}
+            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'unread'
+                ? 'bg-indigo-600 text-white'
+                : isDark
+                ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                : 'bg-white text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            Unread {unreadCount > 0 && `(${unreadCount})`}
+          </button>
+          <button
+            onClick={() => setActiveTab('priority')}
+            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'priority'
+                ? 'bg-indigo-600 text-white'
+                : isDark
+                ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                : 'bg-white text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            Priority
+          </button>
+        </div>
+
         {/* Filters */}
         <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6 mb-8`}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -402,7 +477,7 @@ const Notifications = () => {
               />
             </div>
 
-            {/* Filter */}
+            {/* Type Filter */}
             <div className="flex items-center gap-2">
               <Filter className={`h-5 w-5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`} />
               <select
@@ -414,8 +489,7 @@ const Notifications = () => {
                     : 'bg-white border-gray-300 text-gray-900'
                 } focus:ring-2 focus:ring-indigo-500 focus:border-transparent`}
               >
-                <option value="all">All Notifications</option>
-                <option value="unread">Unread Only</option>
+                <option value="all">All Types</option>
                 <option value="complaint_update">Complaint Updates</option>
                 {userRole !== 'admin' && <option value="assignment">Assignments</option>}
                 <option value="resolution">Resolutions</option>
@@ -441,8 +515,13 @@ const Notifications = () => {
             filteredNotifications.map((notification) => (
               <div
                 key={notification.id}
+                onClick={() => handleNotificationClick(notification)}
                 className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6 transition-all hover:shadow-xl ${
                   !notification.is_read ? 'border-l-4 border-indigo-500' : ''
+                } ${
+                  notification.complaint_id && notification.complaint_id !== 'Multiple' 
+                    ? 'cursor-pointer hover:scale-[1.02]' 
+                    : ''
                 }`}
               >
                 <div className="flex items-start gap-4">
@@ -486,8 +565,11 @@ const Notifications = () => {
                         {getTimeAgo(notification.created_at)}
                       </span>
                       {notification.complaint_id && (
-                        <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded flex items-center gap-1">
                           #{notification.complaint_id}
+                          {notification.complaint_id !== 'Multiple' && (
+                            <ExternalLink className="h-3 w-3" />
+                          )}
                         </span>
                       )}
                       <span className={`px-2 py-1 text-xs font-medium rounded ${

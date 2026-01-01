@@ -32,6 +32,13 @@ const Navbar = ({ toggleSidebar }: NavbarProps) => {
   useEffect(() => {
     const role = localStorage.getItem('userRole') || 'passenger';
     fetchNotifications(role);
+    
+    // Set up polling to fetch notifications every 60 seconds
+    const pollInterval = setInterval(() => {
+      fetchNotifications(role);
+    }, 60000); // 60 seconds
+    
+    return () => clearInterval(pollInterval);
   }, []);
 
   useEffect(() => {
