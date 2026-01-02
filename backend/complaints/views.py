@@ -2381,101 +2381,104 @@ def feedback_view(request):
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(['POST'])
-def translate_text(request):
-    """
-    Translate text using GoogleTrans service
-    """
-    try:
-        from .translation_service import translation_service
-        
-        text = request.data.get('text', '')
-        target_language = request.data.get('target_language', 'en')
-        source_language = request.data.get('source_language', 'auto')
-        
-        if not text:
-            return Response({'error': 'Text is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Validate target language
-        supported_languages = translation_service.get_supported_languages()
-        if target_language not in supported_languages and target_language != 'auto':
-            return Response({
-                'error': f'Unsupported language: {target_language}',
-                'supported_languages': list(supported_languages.keys())
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Perform translation
-        result = translation_service.translate_text(
-            text=text,
-            target_language=target_language,
-            source_language=source_language
-        )
-        
-        return Response(result, status=status.HTTP_200_OK)
-        
-    except Exception as e:
-        logger.error(f"Error in translate_text: {str(e)}")
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+# COMMENTED OUT - Using Google Translate client-side instead for better performance
+# @api_view(['POST'])
+# def translate_text(request):
+#     """
+#     Translate text using GoogleTrans service
+#     """
+#     try:
+#         from .translation_service import translation_service
+#         
+#         text = request.data.get('text', '')
+#         target_language = request.data.get('target_language', 'en')
+#         source_language = request.data.get('source_language', 'auto')
+#         
+#         if not text:
+#             return Response({'error': 'Text is required'}, status=status.HTTP_400_BAD_REQUEST)
+#         
+#         # Validate target language
+#         supported_languages = translation_service.get_supported_languages()
+#         if target_language not in supported_languages and target_language != 'auto':
+#             return Response({
+#                 'error': f'Unsupported language: {target_language}',
+#                 'supported_languages': list(supported_languages.keys())
+#             }, status=status.HTTP_400_BAD_REQUEST)
+#         
+#         # Perform translation
+#         result = translation_service.translate_text(
+#             text=text,
+#             target_language=target_language,
+#             source_language=source_language
+#         )
+#         
+#         return Response(result, status=status.HTTP_200_OK)
+#         
+#     except Exception as e:
+#         logger.error(f"Error in translate_text: {str(e)}")
+#         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(['POST'])  
-def detect_language(request):
-    """
-    Detect language of given text
-    """
-    try:
-        from .translation_service import translation_service
-        
-        text = request.data.get('text', '')
-        
-        if not text:
-            return Response({'error': 'Text is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Perform language detection
-        result = translation_service.detect_language(text)
-        
-        return Response(result, status=status.HTTP_200_OK)
-        
-    except Exception as e:
-        logger.error(f"Error in detect_language: {str(e)}")
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+# COMMENTED OUT - Using Google Translate client-side instead
+# @api_view(['POST'])  
+# def detect_language(request):
+#     """
+#     Detect language of given text
+#     """
+#     try:
+#         from .translation_service import translation_service
+#         
+#         text = request.data.get('text', '')
+#         
+#         if not text:
+#             return Response({'error': 'Text is required'}, status=status.HTTP_400_BAD_REQUEST)
+#         
+#         # Perform language detection
+#         result = translation_service.detect_language(text)
+#         
+#         return Response(result, status=status.HTTP_200_OK)
+#         
+#     except Exception as e:
+#         logger.error(f"Error in detect_language: {str(e)}")
+#         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(['GET'])
-def supported_languages(request):
-    """
-    Get list of supported languages for translation
-    """
-    try:
-        from .translation_service import translation_service
-        
-        languages = translation_service.get_supported_languages()
-        
-        return Response({
-            'supported_languages': languages,
-            'total_count': len(languages)
-        }, status=status.HTTP_200_OK)
-        
-    except Exception as e:
-        logger.error(f"Error in supported_languages: {str(e)}")
-        # Return a fallback list of languages instead of 500 error
-        fallback_languages = {
-            'en': 'English',
-            'hi': 'Hindi',
-            'bn': 'Bengali',
-            'te': 'Telugu',
-            'ta': 'Tamil',
-            'mr': 'Marathi',
-            'gu': 'Gujarati',
-            'kn': 'Kannada',
-            'ml': 'Malayalam',
-            'pa': 'Punjabi',
-            'ur': 'Urdu'
-        }
-        return Response({
-            'supported_languages': fallback_languages,
-            'total_count': len(fallback_languages)
-        }, status=status.HTTP_200_OK)
+# COMMENTED OUT - Using Google Translate client-side instead
+# @api_view(['GET'])
+# def supported_languages(request):
+#     """
+#     Get list of supported languages for translation
+#     """
+#     try:
+#         from .translation_service import translation_service
+#         
+#         languages = translation_service.get_supported_languages()
+#         
+#         return Response({
+#             'supported_languages': languages,
+#             'total_count': len(languages)
+#         }, status=status.HTTP_200_OK)
+#         
+#     except Exception as e:
+#         logger.error(f"Error in supported_languages: {str(e)}")
+#         # Return a fallback list of languages instead of 500 error
+#         fallback_languages = {
+#             'en': 'English',
+#             'hi': 'Hindi',
+#             'bn': 'Bengali',
+#             'te': 'Telugu',
+#             'ta': 'Tamil',
+#             'mr': 'Marathi',
+#             'gu': 'Gujarati',
+#             'kn': 'Kannada',
+#             'ml': 'Malayalam',
+#             'pa': 'Punjabi',
+#             'ur': 'Urdu'
+#         }
+#         return Response({
+#             'supported_languages': fallback_languages,
+#             'total_count': len(fallback_languages)
+#         }, status=status.HTTP_200_OK)
 
 
 # Staff Dashboard Views

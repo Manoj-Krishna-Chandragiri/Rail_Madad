@@ -8,9 +8,9 @@ from .views import (
     submit_feedback,  
     feedback_view,
     feedback_sentiment_stats,
-    translate_text,
-    detect_language,
-    supported_languages
+    # translate_text,  # Commented out - Using Google Translate client-side instead
+    # detect_language,  # Commented out - Using Google Translate client-side instead
+    # supported_languages  # Commented out - Using Google Translate client-side instead
 )
 from . import views
 from .ai_classification_views import (
@@ -51,10 +51,10 @@ urlpatterns = [
     # Search endpoint
     path('search/', views.search_user_complaints, name='search_user_complaints'),
     
-    # Translation endpoints
-    path('translate/', translate_text, name='translate_text'),
-    path('detect-language/', detect_language, name='detect_language'),
-    path('supported-languages/', supported_languages, name='supported_languages'),
+    # Translation endpoints - Commented out - Using Google Translate client-side instead
+    # path('translate/', translate_text, name='translate_text'),
+    # path('detect-language/', detect_language, name='detect_language'),
+    # path('supported-languages/', supported_languages, name='supported_languages'),
     
     # AI-powered endpoints
     path('ai/categorize/', views.categorize_complaint, name='categorize_complaint'),

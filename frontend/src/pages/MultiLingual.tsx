@@ -1,18 +1,24 @@
-import { Globe, ChevronDown } from 'lucide-react';
+import { Globe, ChevronDown, CheckCircle } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useState, useEffect, useRef } from 'react';
-import backendTranslationService from '../utils/backendTranslation';
+
+declare global {
+  interface Window {
+    google: any;
+    googleTranslateElementInit?: () => void;
+  }
+}
 
 const MultiLingual = () => {
   const { theme } = useTheme();
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [showDropdown, setShowDropdown] = useState(false);
-  const [translationStatus, setTranslationStatus] = useState('idle');
-  const [translatedElements, setTranslatedElements] = useState<Record<string, string>>({});
-  const [errorMessage, setErrorMessage] = useState('');
+  const [isTranslateReady, setIsTranslateReady] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  
-  // List of supported languages
+  const scriptLoadedRef = useRef(false);
+  const translateIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   const languages = [
     { code: 'en', name: 'English', native: 'English' },
     { code: 'hi', name: 'Hindi', native: 'हिंदी' },
@@ -43,107 +49,250 @@ const MultiLingual = () => {
 
   // Load saved language preference
   useEffect(() => {
-    const savedLanguage = localStorage.getItem('selectedLanguage');
-    if (savedLanguage && languages.find(lang => lang.code === savedLanguage)) {
-      setSelectedLanguage(savedLanguage);
-      if (savedLanguage !== 'en') {
-        translatePage(savedLanguage);
-      }
+    const savedLang = localStorage.getItem('preferred_language');
+    if (savedLang && languages.find(l => l.code === savedLang)) {
+      setSelectedLanguage(savedLang);
     }
   }, []);
 
-  // Function to translate a single text element
-  const translateText = async (text: string, targetLanguage: string) => {
-    if (!text || targetLanguage === 'en') return text;
+  // Sync with Google Translate widget's actual current language
+  useEffect(() => {
+    const syncWithWidget = () => {
+      const selectElement = document.querySelector('.goog-te-combo') as HTMLSelectElement;
+      if (selectElement && selectElement.value) {
+        const currentLang = selectElement.value;
+        if (currentLang !== selectedLanguage) {
+          console.log(`🔄 MultiLingual: Syncing dropdown to widget's language: ${currentLang}`);
+          setSelectedLanguage(currentLang);
+        }
+      }
+    };
+
+    // Sync immediately when component mounts
+    syncWithWidget();
+
+    // Monitor for changes to the widget's select element
+    const intervalId = setInterval(syncWithWidget, 500);
+
+    // Also listen for storage changes (when language is changed from another tab/component)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'preferred_language' && e.newValue) {
+        console.log(`📦 MultiLingual: Storage change detected: ${e.newValue}`);
+        setSelectedLanguage(e.newValue);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [selectedLanguage]);
+
+  // Custom language switcher function
+  const changeLanguage = (langCode: string) => {
+    setSelectedLanguage(langCode);
+    setShowDropdown(false);
+    localStorage.setItem('preferred_language', langCode);
     
-    try {
-      const result = await backendTranslationService.translateText(text, targetLanguage);
-      return result.translated_text;
-    } catch (error) {
-      console.error('Translation error:', error);
-      return text; // Return original text on error
+    // Wait for Google Translate to be ready, then change language
+    const attemptTranslate = () => {
+      const selectElement = document.querySelector('.goog-te-combo') as HTMLSelectElement;
+      if (selectElement) {
+        selectElement.value = langCode;
+        selectElement.dispatchEvent(new Event('change', { bubbles: true }));
+        
+        // Clear the interval once successful
+        if (translateIntervalRef.current) {
+          clearInterval(translateIntervalRef.current);
+          translateIntervalRef.current = null;
+        }
+      }
+    };
+
+    // Try immediately
+    attemptTranslate();
+    
+    // If not immediately available, keep trying for a few seconds
+    if (!translateIntervalRef.current) {
+      let attempts = 0;
+      translateIntervalRef.current = setInterval(() => {
+        attempts++;
+        attemptTranslate();
+        
+        // Stop after 20 attempts (10 seconds)
+        if (attempts >= 20 && translateIntervalRef.current) {
+          clearInterval(translateIntervalRef.current);
+          translateIntervalRef.current = null;
+        }
+      }, 500);
     }
   };
 
-  // Function to translate the entire page
-  const translatePage = async (langCode: string) => {
-    if (langCode === 'en') {
-      // Reset to original English content
-      setTranslatedElements({});
-      setSelectedLanguage('en');
-      localStorage.setItem('selectedLanguage', 'en');
+  useEffect(() => {
+    console.log('Setting up Google Translate...');
+    let pollInterval: NodeJS.Timeout | null = null;
+
+    // Check if widget already exists from previous initialization (e.g., from Navbar)
+    const checkExistingWidget = () => {
+      const existingWidget = document.querySelector('.goog-te-combo');
+      if (existingWidget) {
+        console.log('✅ Found existing Google Translate widget!');
+        setIsTranslateReady(true);
+        setLoadError(false); // Clear any error state
+        
+        // Sync with widget's current language
+        const select = existingWidget as HTMLSelectElement;
+        if (select.value) {
+          setSelectedLanguage(select.value);
+        }
+        return true;
+      }
+      return false;
+    };
+
+    // Check immediately
+    if (checkExistingWidget()) {
       return;
     }
 
-    setTranslationStatus('loading');
-    setErrorMessage('');
-    
-    try {
-      // Get all text elements on the page that need translation
-      const textElements = document.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, button, a, li, label');
-      const newTranslatedElements: Record<string, string> = {};
-      
-      // Store original text content if not already stored
-      textElements.forEach((element, index) => {
-        const originalText = element.textContent?.trim();
-        if (originalText && originalText.length > 0) {
-          const elementId = `elem-${index}`;
-          
-          // Add a data attribute to track this element
-          element.setAttribute('data-translate-id', elementId);
-          
-          // Store original text if we don't have it yet
-          if (!element.getAttribute('data-original-text')) {
-            element.setAttribute('data-original-text', originalText);
-          }
+    // Poll for widget existence (in case it's still initializing)
+    pollInterval = setInterval(() => {
+      if (checkExistingWidget()) {
+        if (pollInterval) clearInterval(pollInterval);
+      }
+    }, 300);
+
+    // Stop polling after 3 seconds and proceed to load script
+    const timeoutId = setTimeout(() => {
+      if (pollInterval) clearInterval(pollInterval);
+      const existingWidget = document.querySelector('.goog-te-combo');
+      if (existingWidget) {
+        setIsTranslateReady(true);
+        setLoadError(false);
+        return; // Widget found, no need to load script
+      }
+      loadGoogleTranslateScript();
+    }, 3000);
+
+    const loadGoogleTranslateScript = () => {
+
+      // Initialize Google Translate - SET THIS FIRST before loading script
+      window.googleTranslateElementInit = () => {
+      console.log('✅ googleTranslateElementInit callback triggered!');
+      try {
+        if (!window.google?.translate?.TranslateElement) {
+          console.error('❌ Google Translate API not available on window object');
+          setLoadError(true);
+          return;
         }
-      });
-      
-      // Translate elements in batches to avoid overwhelming the API
-      const batchSize = 10;
-      const elementsArray = Array.from(textElements);
-      
-      for (let i = 0; i < elementsArray.length; i += batchSize) {
-        const batch = elementsArray.slice(i, i + batchSize);
+
+        console.log('Creating TranslateElement...');
         
-        await Promise.all(batch.map(async (element) => {
-          const elementId = element.getAttribute('data-translate-id');
-          const originalText = element.getAttribute('data-original-text');
+        // Clear the container first
+        const container = document.getElementById('google_translate_element');
+        if (container) {
+          container.innerHTML = '';
+        }
+        
+        new window.google.translate.TranslateElement(
+          {
+            pageLanguage: 'en',
+            includedLanguages: 'en,hi,bn,te,ta,mr,gu,kn,ml,pa,ur',
+            layout: window.google.translate.TranslateElement.InlineLayout.VERTICAL,
+            autoDisplay: false,
+            multilanguagePage: true,
+          },
+          'google_translate_element'
+        );
+        
+        console.log('TranslateElement created, waiting for widget...');
+        
+        // Wait for widget to be fully initialized with longer checks
+        let attempts = 0;
+        const checkInterval = setInterval(() => {
+          attempts++;
           
-          if (elementId && originalText && originalText.length > 0) {
-            try {
-              const translatedText = await translateText(originalText, langCode);
-              newTranslatedElements[elementId] = translatedText;
-              
-              // Update the element text
-              element.textContent = translatedText;
-            } catch (error) {
-              console.error(`Error translating element ${elementId}:`, error);
+          // Check multiple possible selectors
+          const selectElement = document.querySelector('.goog-te-combo') || 
+                               document.querySelector('select.goog-te-combo') ||
+                               document.querySelector('#google_translate_element select');
+          
+          if (selectElement) {
+            console.log('✅ Google Translate widget ready!');
+            console.log('Widget element:', selectElement);
+            clearInterval(checkInterval);
+            setIsTranslateReady(true);
+            
+            // Apply saved language preference
+            const savedLang = localStorage.getItem('preferred_language');
+            if (savedLang && savedLang !== 'en') {
+              console.log(`Applying saved language: ${savedLang}`);
+              changeLanguage(savedLang);
+            }
+          } else if (attempts >= 20) {
+            // Stop after 20 attempts (10 seconds)
+            console.warn('⏰ Google Translate widget not found after 10 seconds');
+            console.log('Checking container contents:', document.getElementById('google_translate_element')?.innerHTML);
+            clearInterval(checkInterval);
+            setLoadError(true);
+          } else {
+            if (attempts % 5 === 0) {
+              console.log(`⏳ Still waiting... (attempt ${attempts}/20)`);
             }
           }
-        }));
+        }, 500);
+        
+      } catch (error) {
+        console.error('❌ Error initializing Google Translate:', error);
+        setLoadError(true);
       }
-      
-      setTranslatedElements(newTranslatedElements);
-      setTranslationStatus('success');
-      setSelectedLanguage(langCode);
-      localStorage.setItem('selectedLanguage', langCode);
-      
-    } catch (error) {
-      console.error('Page translation error:', error);
-      setErrorMessage('Failed to translate page. Please try again later.');
-      setTranslationStatus('error');
-    }
-  };
+    };
 
-  // Function to change the language
-  const changeLanguage = (langCode: string) => {
-    setShowDropdown(false);
+    // Check if script already exists
+    const existingScript = document.querySelector('script[src*="translate.google.com"]');
+    if (existingScript) {
+      console.log('Script already exists, checking if we need to reinitialize...');
+      
+      // Try to trigger the callback if Google is already loaded
+      if (window.google?.translate?.TranslateElement) {
+        console.log('Google Translate API already loaded, initializing now...');
+        window.googleTranslateElementInit();
+      } else {
+        console.log('Waiting for existing script to load...');
+      }
+      return;
+    }
+
+    // Add Google Translate script
+    console.log('📥 Loading Google Translate script...');
+    const script = document.createElement('script');
+    script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+    script.async = true;
     
-    if (langCode === selectedLanguage) return;
+    script.onerror = (error) => {
+      console.error('❌ Failed to load Google Translate script:', error);
+      setLoadError(true);
+    };
     
-    translatePage(langCode);
-  };
+    script.onload = () => {
+      console.log('✅ Google Translate script loaded successfully');
+    };
+    
+      document.body.appendChild(script);
+      console.log('Script tag added to document');
+    };
+
+    // Cleanup
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+      if (timeoutId) clearTimeout(timeoutId);
+      if (translateIntervalRef.current) {
+        clearInterval(translateIntervalRef.current);
+      }
+    };
+  }, []);
 
   const getSelectedLanguageName = () => {
     const lang = languages.find(lang => lang.code === selectedLanguage);
@@ -154,7 +303,7 @@ const MultiLingual = () => {
     <div className="max-w-4xl mx-auto p-6">
       <div className={`${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white'} rounded-lg shadow-lg p-6`}>
         <div className="flex items-center gap-3 mb-8">
-          <Globe className="h-8 w-8 text-indigo-400" />
+          <Globe className={`h-8 w-8 ${theme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'}`} />
           <h1 className="text-2xl font-semibold">Language Settings</h1>
         </div>
 
@@ -162,54 +311,77 @@ const MultiLingual = () => {
           <div className={`p-6 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
             <h2 className="text-lg font-semibold mb-4">Select Your Preferred Language</h2>
             <p className={`mb-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
-              Choose from a variety of Indian languages to view the website in your preferred language.
+              Choose from a variety of Indian languages to view the website in your preferred language. The entire website will be translated.
             </p>
             
-            {/* Error message display */}
-            {errorMessage && (
-              <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
-                {errorMessage}
+            {/* Status indicators */}
+            {!isTranslateReady && !loadError && (
+              <div className={`mb-4 p-3 rounded ${theme === 'dark' ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'}`}>
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                  <span>Loading translation service...</span>
+                </div>
+              </div>
+            )}
+            
+            {isTranslateReady && (
+              <div className={`mb-4 p-3 rounded ${theme === 'dark' ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-700'}`}>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  <span>Translation service ready!</span>
+                </div>
+              </div>
+            )}
+            
+            {loadError && (
+              <div className={`mb-4 p-3 rounded ${theme === 'dark' ? 'bg-red-900 text-red-200' : 'bg-red-100 text-red-700'}`}>
+                Unable to load translation service. Please check your internet connection and refresh the page.
               </div>
             )}
             
             {/* Custom language selector dropdown */}
-            <div className="relative mb-4" ref={dropdownRef}>
+            <div className="relative mb-4 notranslate" ref={dropdownRef}>
               <div 
-                className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer ${
+                className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors notranslate ${
                   theme === 'dark' 
                     ? 'bg-gray-800 border-gray-600 hover:bg-gray-750' 
                     : 'bg-white border-gray-300 hover:bg-gray-50'
-                }`}
-                onClick={() => setShowDropdown(!showDropdown)}
+                } ${!isTranslateReady ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => isTranslateReady && setShowDropdown(!showDropdown)}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 notranslate">
                   <Globe className="h-5 w-5 text-indigo-500" />
-                  <span>{getSelectedLanguageName()}</span>
+                  <span className="font-medium notranslate">{getSelectedLanguageName()}</span>
                 </div>
                 <ChevronDown className={`h-4 w-4 transition-transform ${showDropdown ? 'transform rotate-180' : ''}`} />
               </div>
               
-              {showDropdown && (
-                <div className={`absolute z-10 mt-1 w-full rounded-lg border shadow-lg ${
+              {showDropdown && isTranslateReady && (
+                <div className={`absolute z-10 mt-1 w-full rounded-lg border shadow-lg notranslate ${
                   theme === 'dark' 
                     ? 'bg-gray-800 border-gray-600' 
                     : 'bg-white border-gray-200'
                 }`}>
-                  <div className={`max-h-60 overflow-y-auto ${theme === 'dark' ? 'scrollbar-dark' : 'scrollbar-light'}`}>
+                  <div className={`max-h-60 overflow-y-auto notranslate ${theme === 'dark' ? 'scrollbar-dark' : 'scrollbar-light'}`}>
                     {languages.map(lang => (
                       <div
                         key={lang.code}
-                        className={`p-3 flex items-center gap-2 cursor-pointer ${
+                        className={`p-3 flex items-center justify-between cursor-pointer transition-colors notranslate ${
                           selectedLanguage === lang.code
                             ? theme === 'dark' ? 'bg-indigo-900' : 'bg-indigo-50'
                             : theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
                         }`}
                         onClick={() => changeLanguage(lang.code)}
                       >
-                        <span className="font-medium">{lang.name}</span>
-                        <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                          {lang.native}
-                        </span>
+                        <div className="notranslate">
+                          <span className="font-medium notranslate">{lang.name}</span>
+                          <span className={`ml-2 text-sm notranslate ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                            {lang.native}
+                          </span>
+                        </div>
+                        {selectedLanguage === lang.code && (
+                          <CheckCircle className="h-5 w-5 text-indigo-500" />
+                        )}
                       </div>
                     ))}
                   </div>
@@ -217,35 +389,8 @@ const MultiLingual = () => {
               )}
             </div>
             
-            {/* Translation status */}
-            <div className="mb-4">
-              <div className="flex items-center">
-                {translationStatus === 'loading' ? (
-                  <div className="flex items-center text-blue-500">
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span>Translating page...</span>
-                  </div>
-                ) : translationStatus === 'success' && selectedLanguage !== 'en' ? (
-                  <div className="text-green-500 flex items-center">
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                    <span>Page translated to {getSelectedLanguageName()}</span>
-                  </div>
-                ) : translationStatus === 'error' ? (
-                  <div className="text-red-500">
-                    Translation failed. Please try again.
-                  </div>
-                ) : (
-                  <div className="text-gray-500">
-                    {selectedLanguage === 'en' ? 'Currently viewing in English' : 'Select a language to translate the page'}
-                  </div>
-                )}
-              </div>
-            </div>
+            {/* Hidden Google Translate element */}
+            <div id="google_translate_element" style={{ position: 'absolute', left: '-9999px' }}></div>
           </div>
 
           <div className={`p-6 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
@@ -275,31 +420,40 @@ const MultiLingual = () => {
                 </ul>
               </div>
               <div>
-                <h3 className="font-medium mb-2">Other Indian Languages</h3>
+                <h3 className="font-medium mb-2">East & West Indian Languages</h3>
                 <ul className={`list-disc list-inside ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
-                  <li>Assamese (অসমীয়া)</li>
-                  <li>Odia (ଓଡ଼ିଆ)</li>
-                  <li>Sanskrit (संस्कृतम्)</li>
-                  <li>Nepali (नेपाली)</li>
-                  <li>Sindhi (سنڌي)</li>
+                  <li>Bengali (বাংলা)</li>
+                  <li>Marathi (मराठी)</li>
+                  <li>Gujarati (ગુજરાતી)</li>
                 </ul>
               </div>
             </div>
           </div>
 
           <div className={`p-6 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
-            <h2 className="text-lg font-semibold mb-4">Language Support Information</h2>
+            <h2 className="text-lg font-semibold mb-4">Translation Information</h2>
             <ul className={`space-y-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
-              <li>• Translations are provided through our backend translation service</li>
-              <li>• Some technical terms may remain in English</li>
-              <li>• Your language preference will be saved for future visits</li>
-              <li>• For best results, ensure your browser is up to date</li>
+              <li>✓ Powered by Google Translate for accurate translations</li>
+              <li>✓ Entire website content is translated in real-time</li>
+              <li>✓ Your language preference is saved automatically</li>
+              <li>✓ Switch languages anytime without losing your progress</li>
+              <li>✓ Some technical terms may remain in English for clarity</li>
+              <li>✓ Works on all pages including forms and notifications</li>
             </ul>
           </div>
         </div>
       </div>
       
       <style>{`
+        /* Hide Google Translate toolbar */
+        .goog-te-banner-frame.skiptranslate {
+          display: none !important;
+        }
+        body {
+          top: 0px !important;
+        }
+        
+        /* Custom scrollbar styling */
         .scrollbar-dark::-webkit-scrollbar {
           width: 8px;
         }
@@ -322,6 +476,20 @@ const MultiLingual = () => {
         }
         .bg-gray-750 {
           background-color: #1e293b;
+        }
+        
+        /* Hide Google Translate branding */
+        .goog-te-gadget {
+          color: transparent !important;
+        }
+        .goog-te-gadget .goog-te-combo {
+          margin: 0px 0 !important;
+        }
+        .goog-logo-link {
+          display: none !important;
+        }
+        .goog-te-gadget span {
+          display: none !important;
         }
       `}</style>
     </div>
