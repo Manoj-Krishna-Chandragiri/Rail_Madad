@@ -39,7 +39,19 @@ class Complaint(models.Model):
     date_of_incident = models.DateField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Open')
     staff = models.CharField(max_length=255, blank=True, null=True)
-    photos = models.CharField(max_length=255, blank=True, null=True)  # Increased max_length
+    
+    # Media files - Store Cloudinary URLs as JSON
+    photos = models.TextField(blank=True, null=True)  # JSON array of image URLs
+    videos = models.TextField(blank=True, null=True)  # JSON array of video URLs
+    audio_files = models.TextField(blank=True, null=True)  # JSON array of audio URLs
+    
+    # AI-extracted fields from multimedia
+    ai_extracted_description = models.TextField(blank=True, null=True)
+    ai_confidence = models.FloatField(blank=True, null=True)
+    ai_detected_train = models.CharField(max_length=20, blank=True, null=True)
+    ai_detected_coach = models.CharField(max_length=20, blank=True, null=True)
+    ai_detected_location = models.CharField(max_length=255, blank=True, null=True)
+    
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)

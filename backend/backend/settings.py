@@ -5,11 +5,12 @@ import firebase_admin
 from firebase_admin import credentials, auth
 from corsheaders.defaults import default_headers
 
-# Load environment variables from .env file
-load_dotenv()
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env file in the backend directory
+dotenv_path = BASE_DIR / '.env'
+load_dotenv(dotenv_path=dotenv_path)
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'change_this_in_production')
@@ -196,6 +197,11 @@ CSRF_TRUSTED_ORIGINS = [
     "https://rail-madad-backend.onrender.com",
     "https://rail-madad.manojkrishna.me",
 ]
+
+# Cloudinary Configuration for Media Storage
+CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME')
+CLOUDINARY_API_KEY = os.getenv('CLOUDINARY_API_KEY')
+CLOUDINARY_API_SECRET = os.getenv('CLOUDINARY_API_SECRET')
 
 # Firebase Configuration - Secure Environment Variable Based Setup
 if not firebase_admin._apps:

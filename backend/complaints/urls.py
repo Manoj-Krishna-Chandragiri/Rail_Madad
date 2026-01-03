@@ -13,6 +13,7 @@ from .views import (
     # supported_languages  # Commented out - Using Google Translate client-side instead
 )
 from . import views
+from .multimedia_views import file_complaint_with_multimedia
 from .ai_classification_views import (
     classify_complaint_view,
     classify_batch_complaints_view,
@@ -22,7 +23,12 @@ from .ai_classification_views import (
 )
 
 urlpatterns = [
+    # Multimedia complaint filing (NEW - with Gemini AI)
+    path('file/multimedia/', file_complaint_with_multimedia, name='file_complaint_multimedia'),
+    
+    # Legacy complaint filing (backward compatibility)
     path('file/', file_complaint, name='file_complaint'),
+    
     path('user/', user_complaints, name='user_complaints'),
     path('<int:complaint_id>/', complaint_detail, name='complaint_detail'),
     path('', complaint_list, name='complaint_list'),

@@ -39,6 +39,7 @@ import SignUpStaff from './pages/SignUpStaff';
 import AIAssistance from './pages/AIAssistance';
 import FileComplaint from './pages/FileComplaint';
 import FileComplaintWithAI from './pages/FileComplaintWithAI';  
+import FileComplaintMultimedia from './pages/FileComplaintMultimedia';
 import MultiLingual from './pages/MultiLingual';
 import TrackStatus from './pages/TrackStatus';
 import Help from './pages/Help';
@@ -244,8 +245,9 @@ const App = () => {
               }
             >
               <Route index element={<Home />} />
-              <Route path="file-complaint" element={<FileComplaintWithAI />} />
+              <Route path="file-complaint" element={<FileComplaintMultimedia />} />
               <Route path="file-complaint-basic" element={<FileComplaint />} />
+              <Route path="file-complaint-ai" element={<FileComplaintWithAI />} />
               <Route path="track-status" element={<TrackStatus />} />
               <Route path="ai-assistance" element={<AIAssistance />} />
               <Route path="real-time-support" element={<RealTimeSupport />} />
