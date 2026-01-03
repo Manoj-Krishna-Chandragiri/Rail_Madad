@@ -960,19 +960,63 @@ def get_notifications(request):
                 pass
         
         # First, fetch actual notifications from the Notification model
+        # Filter by role-appropriate notification types
         try:
-            db_notifications = Notification.objects.filter(user_email=user_email).order_by('-created_at')[:20]
-            for notif in db_notifications:
-                notifications.append({
-                    'id': str(notif.id),
-                    'type': notif.type,
-                    'title': notif.title,
-                    'message': notif.message,
-                    'complaint_id': notif.related_id,
-                    'is_read': notif.is_read,
-                    'created_at': notif.created_at.isoformat(),
-                    'priority': 'high' if notif.type == 'complaint_resolved' else 'medium' if notif.type == 'complaint_assigned' else 'low'
-                })
+            db_notifications_query = Notification.objects.filter(user_email=user_email)
+            
+            # Filter based on role
+            if role == 'staff':
+                # Staff should only see assignment, resolution, and staff-specific notifications
+                staff_notification_types = ['complaint_assigned', 'status_update', 'feedback_received', 'system']
+                db_notifications_query = db_notifications_query.filter(type__in=staff_notification_types)
+                
+                # Additionally filter out passenger-specific messages by checking message content
+                db_notifications = db_notifications_query.order_by('-created_at')[:20]
+                for notif in db_notifications:
+                    # Skip notifications with passenger-specific wording
+                    if any(phrase in notif.message.lower() for phrase in ['your complaint #', 'please provide feedback', 'you can track']):
+                        continue
+                    
+                    notifications.append({
+                        'id': str(notif.id),
+                        'type': notif.type,
+                        'title': notif.title,
+                        'message': notif.message,
+                        'complaint_id': notif.related_id,
+                        'is_read': notif.is_read,
+                        'created_at': notif.created_at.isoformat(),
+                        'priority': 'high' if notif.type == 'complaint_assigned' else 'medium' if notif.type == 'status_update' else 'low'
+                    })
+            elif role == 'passenger':
+                # Passengers see complaint updates, resolutions, and feedback requests
+                passenger_notification_types = ['complaint_resolved', 'status_update', 'feedback_request', 'system']
+                db_notifications_query = db_notifications_query.filter(type__in=passenger_notification_types)
+                db_notifications = db_notifications_query.order_by('-created_at')[:20]
+                for notif in db_notifications:
+                    notifications.append({
+                        'id': str(notif.id),
+                        'type': notif.type,
+                        'title': notif.title,
+                        'message': notif.message,
+                        'complaint_id': notif.related_id,
+                        'is_read': notif.is_read,
+                        'created_at': notif.created_at.isoformat(),
+                        'priority': 'high' if notif.type == 'complaint_resolved' else 'medium' if notif.type == 'status_update' else 'low'
+                    })
+            elif role == 'admin':
+                # Admins see everything
+                db_notifications = db_notifications_query.order_by('-created_at')[:20]
+                for notif in db_notifications:
+                    notifications.append({
+                        'id': str(notif.id),
+                        'type': notif.type,
+                        'title': notif.title,
+                        'message': notif.message,
+                        'complaint_id': notif.related_id,
+                        'is_read': notif.is_read,
+                        'created_at': notif.created_at.isoformat(),
+                        'priority': 'high' if notif.type in ['complaint_resolved', 'complaint_assigned'] else 'medium' if notif.type == 'status_update' else 'low'
+                    })
         except Exception as db_error:
             logger.error(f"Failed to load db notifications: {db_error}")
             import traceback
