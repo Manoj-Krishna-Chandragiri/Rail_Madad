@@ -33,6 +33,7 @@ const complaintTypeMapping: { [key: string]: { category: string; subcategory: st
   'amenities': { category: 'facilities', subcategory: 'Water Issues' },
   'infrastructure': { category: 'facilities', subcategory: 'Electrical Issues' },
   'miscellaneous': { category: 'facilities', subcategory: 'Other' },
+  'other': { category: 'facilities', subcategory: 'Other' }, // Add support for 'other' category
   // Legacy types
   'Train_Cleanliness': { category: 'cleanliness', subcategory: 'Unclean Coaches' },
   'Safety_Security': { category: 'security', subcategory: 'Safety Concerns' },
@@ -65,6 +66,7 @@ const titleToCategoryMap: { [key: string]: { category: string; subcategory: stri
   'amenities': { category: 'facilities', subcategory: 'Water Issues' },
   'infrastructure': { category: 'facilities', subcategory: 'Electrical Issues' },
   'miscellaneous': { category: 'facilities', subcategory: 'Other' },
+  'other': { category: 'facilities', subcategory: 'Other' }, // Add support for 'other' category
 };
  
 // Add predefined complaint categories
