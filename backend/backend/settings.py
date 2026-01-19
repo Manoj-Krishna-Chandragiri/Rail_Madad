@@ -13,13 +13,29 @@ dotenv_path = BASE_DIR / '.env'
 load_dotenv(dotenv_path=dotenv_path)
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'change_this_in_production')
+if not os.getenv('DJANGO_SECRET_KEY'):
+    raise ValueError('DJANGO_SECRET_KEY environment variable is not set. This is required for production.')
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
+DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() == 'true'
 
-# Allowed hosts with comma-separated values from environment
-ALLOWED_HOSTS = [host.strip() for host in os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,rail-madad-backend.onrender.com,rail-madad.manojkrishna.me').split(',')]
+# Environment detection
+IS_PRODUCTION = not DEBUG and os.getenv('ENVIRONMENT') == 'production'
+
+# Allowed hosts configuration - production-safe
+DEFAULT_ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+if IS_PRODUCTION or os.getenv('ENVIRONMENT') in ['staging', 'production']:
+    DEFAULT_ALLOWED_HOSTS.extend([
+        'api.rail-madad.manojkrishna.me',
+        'rail-madad.manojkrishna.me',
+    ])
+    # Add EC2 instance IP if provided (for fallback access)
+    ec2_ip = os.getenv('EC2_PUBLIC_IP')
+    if ec2_ip:
+        DEFAULT_ALLOWED_HOSTS.append(ec2_ip)
+
+ALLOWED_HOSTS = [host.strip() for host in os.getenv('DJANGO_ALLOWED_HOSTS', ','.join(DEFAULT_ALLOWED_HOSTS)).split(',') if host.strip()]
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -143,23 +159,34 @@ os.makedirs(MEDIA_ROOT, exist_ok=True)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# CORS Configuration
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Vite default port
-    "http://localhost:5174",  # Local development
-    "http://localhost:5175",  # Local development alternative port
-    "http://localhost:5176",  # Local development alternative port
-    "http://127.0.0.1:8000",
-    "http://127.0.0.1:8001",
-    "https://main.dhpx91sx6cx3f.amplifyapp.com",  # Your AWS Amplify frontend
-    "https://rail-madad-backend.onrender.com",  # Your backend domain
-    "https://rail-madad.manojkrishna.me",  # Your custom domain
+# CORS Configuration - Production-safe with explicit origins
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:5173",  # Vite default port (dev only)
+    "http://localhost:5174",  # Local development (dev only)
+    "http://127.0.0.1:5173",  # Local dev fallback (dev only)
+    "http://127.0.0.1:5174",  # Local dev fallback (dev only)
 ]
 
+if IS_PRODUCTION or os.getenv('ENVIRONMENT') in ['staging', 'production']:
+    DEFAULT_CORS_ORIGINS.extend([
+        "https://rail-madad.manojkrishna.me",      # Custom frontend domain
+        "https://main.dhpx91sx6cx3f.amplifyapp.com",  # AWS Amplify frontend
+    ])
+
+CORS_ALLOWED_ORIGINS = [
+    origin.strip() for origin in os.getenv(
+        'CORS_ALLOWED_ORIGINS',
+        ','.join(DEFAULT_CORS_ORIGINS)
+    ).split(',') if origin.strip()
+]
+
+# CORS configuration
+CORS_ALLOW_ALL_ORIGINS = False  # NEVER use * in production
+CORS_ALLOW_CREDENTIALS = True  # Allow cookies/credentials
+
 # Add Cloudinary domains for image uploads
-CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://.*\.cloudinary\.com$",
+    r"^https://.*\.cloudinary\.com$",  # Cloudinary CDN
 ]
 
 CORS_ALLOW_METHODS = [
@@ -169,34 +196,41 @@ CORS_ALLOW_METHODS = [
     'PATCH',
     'POST',
     'PUT',
+    'HEAD',
 ]
 
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
+CORS_ALLOW_HEADERS = list(default_headers) + [
     'x-csrftoken',
-    'x-requested-with',
-    'X-CSRFToken',
-    'Authorization',
-    'Content-Type',
-    'X-Requested-With',
     'x-admin-access',
+    'x-dev-user-email',  # Development-only header
 ]
 
-CORS_ALLOW_CREDENTIALS = True
+# CSRF Configuration - Production-safe
+DEFAULT_CSRF_ORIGINS = [
+    "http://localhost:5173",   # Dev only
+    "http://localhost:5174",   # Dev only
+    "http://127.0.0.1:5173",   # Dev only
+    "http://127.0.0.1:5174",   # Dev only
+]
+
+if IS_PRODUCTION or os.getenv('ENVIRONMENT') in ['staging', 'production']:
+    DEFAULT_CSRF_ORIGINS.extend([
+        "https://rail-madad.manojkrishna.me",       # Custom frontend domain
+        "https://main.dhpx91sx6cx3f.amplifyapp.com",  # AWS Amplify frontend
+    ])
 
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "https://main.dhpx91sx6cx3f.amplifyapp.com",
-    "https://rail-madad-backend.onrender.com",
-    "https://rail-madad.manojkrishna.me",
+    origin.strip() for origin in os.getenv(
+        'CSRF_TRUSTED_ORIGINS',
+        ','.join(DEFAULT_CSRF_ORIGINS)
+    ).split(',') if origin.strip()
 ]
+
+# CSRF Cookie settings (secure in production)
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'  # Allow cross-site form submissions
+if IS_PRODUCTION:
+    CSRF_COOKIE_SECURE = True  # HTTPS only in production
 
 # Cloudinary Configuration for Media Storage
 CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME')
@@ -254,8 +288,11 @@ if not firebase_admin._apps:
 
 # Development mode flag for bypassing Firebase when not configured
 DEVELOPMENT_MODE = DEBUG and not firebase_admin._apps
-print(f"[CONFIG] DEVELOPMENT_MODE set to: {DEVELOPMENT_MODE} (DEBUG={DEBUG}, firebase_apps={len(firebase_admin._apps)})")
-
+if DEBUG:
+    print(f"[CONFIG] DEVELOPMENT_MODE set to: {DEVELOPMENT_MODE} (DEBUG={DEBUG}, firebase_apps={len(firebase_admin._apps)})")
+    print(f"[CONFIG] Environment: {'development' if not IS_PRODUCTION else 'production'}")
+    print(f"[CONFIG] ALLOWED_HOSTS: {ALLOWED_HOSTS}")
+    print(f"[CONFIG] CORS_ALLOWED_ORIGINS: {CORS_ALLOWED_ORIGINS[:2]}...")
 # Logging Configuration
 LOGGING = {
     'version': 1,
@@ -299,13 +336,29 @@ STORAGES = {
 }
 
 # Production Security Settings
-if not DEBUG:
+if IS_PRODUCTION:
+    # HTTPS & SSL Configuration
     SECURE_SSL_REDIRECT = True
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    SECURE_HSTS_SECONDS = 31536000
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # For Nginx/Gunicorn
+    
+    # HSTS (HTTP Strict Transport Security)
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+    
+    # Content Security Headers
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_BROWSER_XSS_FILTER = True
+    X_FRAME_OPTIONS = 'DENY'
+    
+    # Cookie Security
     SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    
+    # Additional security headers
+    SECURE_REFERRER_POLICY = 'same-origin'
+else:
+    # Development settings
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False

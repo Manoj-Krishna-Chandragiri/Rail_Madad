@@ -1040,7 +1040,33 @@ def admin_staff_detail(request, pk):
     elif request.method == 'PUT':
         print(f"PUT request data: {request.data}")
         print(f"PUT request FILES: {request.FILES}")
-        serializer = StaffSerializer(staff, data=request.data, partial=True, context={'request': request})
+        
+        # Extract data from QueryDict properly
+        # QueryDict stores values as lists, we need to extract them
+        data = {}
+        for key, value in request.data.items():
+            # QueryDict.items() gives us the key and a list of values
+            # For single values, extract the first item
+            if hasattr(request.data, 'getlist'):
+                value_list = request.data.getlist(key)
+                data[key] = value_list[0] if len(value_list) == 1 else value_list
+            else:
+                data[key] = value
+        
+        # Debug: Print what we're sending to serializer
+        print(f"[DEBUG] Data being sent to serializer: {data}")
+        for key in ['expertise', 'languages', 'communication_preferences']:
+            if key in data:
+                print(f"[DEBUG] {key} = {data[key]} (type: {type(data[key])})")
+        
+        if 'avatar' in request.FILES:
+            # Handle file upload - you might want to save it and store the path
+            avatar_file = request.FILES['avatar']
+            print(f"Received avatar file: {avatar_file.name}")
+            # For now, we'll just use the filename; in production, save to media folder
+            data['avatar'] = f"media/avatars/{avatar_file.name}"
+        
+        serializer = StaffSerializer(staff, data=data, partial=True, context={'request': request})
         if serializer.is_valid():
             updated_staff = serializer.save()
             print(f"Staff updated successfully: {updated_staff.full_name}")
@@ -1050,7 +1076,8 @@ def admin_staff_detail(request, pk):
         # Return detailed error information
         return Response({
             'error': 'Validation failed',
-            'details': serializer.errors
+            'details': serializer.errors,
+            'received_data': {k: str(v)[:100] for k, v in data.items()}  # Show what was received
         }, status=status.HTTP_400_BAD_REQUEST)
     
     elif request.method == 'DELETE':

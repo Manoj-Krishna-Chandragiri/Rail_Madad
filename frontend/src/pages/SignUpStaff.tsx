@@ -1,5 +1,26 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
+
+interface FormData {
+  name: string;
+  email: string;
+  phone: string;
+  gender: string;
+  address: string;
+  employee_id: string;
+  department: string;
+  role: string;
+  location: string;
+  expertise: string[];
+  languages: string[];
+  communication_preferences: string[];
+  password: string;
+  confirmPassword: string;
+}
+
+interface FormErrors {
+  [key: string]: string;
+}
 
 const expertiseOptions = [
   'Technical Support',
@@ -47,7 +68,7 @@ const roleOptions = [
 ];
 
 const SignUpStaff = () => {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<FormData>({
     name: '',
     email: '',
     phone: '',
@@ -63,18 +84,18 @@ const SignUpStaff = () => {
     password: '',
     confirmPassword: ''
   });
-  const [formErrors, setFormErrors] = useState({});
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
 
 
-  const handleChange = (e) => {
-    const { name, value, type } = e.target;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
     setForm({ ...form, [name]: value });
   };
 
-  const handleCheckboxGroupChange = (name, option) => {
+  const handleCheckboxGroupChange = (name: keyof FormData, option: string) => {
     setForm((prev) => {
-      const arr = prev[name] || [];
+      const arr = (prev[name] as string[]) || [];
       if (arr.includes(option)) {
         return { ...prev, [name]: arr.filter((v) => v !== option) };
       } else {
@@ -84,7 +105,7 @@ const SignUpStaff = () => {
   };
 
   const validate = () => {
-    const errors = {};
+    const errors: FormErrors = {};
     if (!form.name) errors.name = 'Full Name is required';
     if (!form.email) errors.email = 'Email is required';
     if (!form.phone) errors.phone = 'Phone Number is required';
@@ -98,7 +119,7 @@ const SignUpStaff = () => {
     return errors;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errors = validate();
     setFormErrors(errors);

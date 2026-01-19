@@ -622,7 +622,25 @@ const Staff = () => {
       setShowEditModal(false);
     } catch (err) {
       console.error('Error updating staff member:', err);
-      alert('Failed to update staff member. Please try again.');
+      
+      // Show detailed error information
+      const error = err as any;
+      if (error.response && error.response.data) {
+        console.error('Backend error details:', error.response.data);
+        console.error('Validation errors:', error.response.data.details);
+        
+        // Format validation errors nicely
+        const details = error.response.data.details || {};
+        const errorMessages = Object.entries(details).map(([field, msgs]) => {
+          const message = Array.isArray(msgs) ? msgs.join(', ') : msgs;
+          return `${field}: ${message}`;
+        }).join('\n');
+        
+        const errorMsg = errorMessages || error.response.data.error || 'Unknown validation error';
+        alert(`Failed to update staff member:\n\n${errorMsg}`);
+      } else {
+        alert('Failed to update staff member. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

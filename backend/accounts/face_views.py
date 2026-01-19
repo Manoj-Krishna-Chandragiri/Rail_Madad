@@ -161,7 +161,6 @@ def enroll_face(request):
             filename = f"face_{user.id}_{uuid.uuid4().hex[:8]}.jpg"
             
             # Save image to buffer
-            import io
             buffer = io.BytesIO()
             image.save(buffer, format='JPEG', quality=95)
             image_file = ContentFile(buffer.getvalue(), name=filename)
@@ -358,7 +357,6 @@ def face_auth_login(request):
         verification_result = verify_face_against_database(temp_path, user_embeddings)
         
         # Save captured image for logging
-        import io
         image = decode_base64_image(image_base64)
         buffer = io.BytesIO()
         image.save(buffer, format='JPEG', quality=85)

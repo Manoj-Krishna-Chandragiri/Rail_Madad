@@ -20,8 +20,8 @@ urlpatterns = [
     path('notifications/<int:notification_id>/read/', views.mark_notification_as_read, name='mark_notification_as_read'),
     path('notifications/read-all/', views.mark_all_notifications_as_read, name='mark_all_notifications_as_read'),
     
-    # Facial Authentication endpoints (disabled to prevent TensorFlow hang on startup)
-    # path('', include('accounts.face_urls')),
+    # Facial Authentication endpoints
+    path('', include('accounts.face_urls')),
     
     # Development endpoints
     path('dev/users/', views.dev_list_users, name='dev_list_users'),

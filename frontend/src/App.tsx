@@ -39,7 +39,6 @@ import SignUpStaff from './pages/SignUpStaff';
 import AIAssistance from './pages/AIAssistance';
 import FileComplaint from './pages/FileComplaint';
 import FileComplaintWithAI from './pages/FileComplaintWithAI';  
-import FileComplaintMultimedia from './pages/FileComplaintMultimedia';
 import MultiLingual from './pages/MultiLingual';
 import TrackStatus from './pages/TrackStatus';
 import Help from './pages/Help';
@@ -49,7 +48,6 @@ import RealTimeSupport from './pages/RealTimeSupport';
 import { initializeErrorHandling } from './utils/errorHandling';
 
 import './styles/translate.css';
-import './styles/accessibility.css';
 import './index.css';
 
 const getUserType = (): 'admin' | 'user' | null => {
@@ -245,9 +243,8 @@ const App = () => {
               }
             >
               <Route index element={<Home />} />
-              <Route path="file-complaint" element={<FileComplaintMultimedia />} />
+              <Route path="file-complaint" element={<FileComplaintWithAI />} />
               <Route path="file-complaint-basic" element={<FileComplaint />} />
-              <Route path="file-complaint-ai" element={<FileComplaintWithAI />} />
               <Route path="track-status" element={<TrackStatus />} />
               <Route path="ai-assistance" element={<AIAssistance />} />
               <Route path="real-time-support" element={<RealTimeSupport />} />
@@ -255,7 +252,6 @@ const App = () => {
               <Route path="multi-lingual" element={<MultiLingual />} />
               <Route path="help" element={<Help />} />
               <Route path="feedback-form" element={<FeedbackForm />} />
-              <Route path="feedback-form/:complaintId" element={<FeedbackForm />} />
               <Route path="notifications" element={<Notifications />} />
               <Route path="settings" element={<Settings />} />
               <Route path="profile" element={<Profile />} />

@@ -5,6 +5,13 @@ import json
 class StaffSerializer(serializers.ModelSerializer):
     """Serializer for Staff model (accounts_staff table)"""
     user_id = serializers.IntegerField(source='user.id', read_only=True)
+    avatar = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    rating = serializers.FloatField(required=False, default=0.0)
+    active_tickets = serializers.IntegerField(required=False, default=0)
+    employee_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    location = serializers.CharField(required=False, allow_blank=True)
+    shift_timings = serializers.JSONField(required=False, default=dict)
+    reporting_to_id = serializers.IntegerField(required=False, allow_null=True)
     
     class Meta:
         model = Staff
@@ -23,13 +30,28 @@ class StaffSerializer(serializers.ModelSerializer):
         
         # Handle JSON string fields from FormData
         for field in ['expertise', 'languages', 'communication_preferences', 'shift_timings']:
-            if field in data and isinstance(data.get(field), str):
-                try:
-                    parsed = json.loads(data[field])
-                    data[field] = parsed
-                except (json.JSONDecodeError, ValueError):
-                    # If it's not valid JSON, leave it as is and let validation catch it
-                    pass
+            if field in data:
+                value = data.get(field)
+                
+                # QueryDict returns values as lists, extract the first element
+                if isinstance(value, list) and len(value) > 0:
+                    value = value[0]
+                
+                # If it's already a list/dict (parsed), keep it
+                if isinstance(value, (list, dict)):
+                    data[field] = value
+                # If it's a string, try to parse it as JSON
+                elif isinstance(value, str):
+                    try:
+                        parsed = json.loads(value)
+                        data[field] = parsed
+                    except (json.JSONDecodeError, ValueError) as e:
+                        print(f"[SERIALIZER] Failed to parse {field}: {value} - Error: {e}")
+                        # If it's not valid JSON, set to empty list/dict
+                        data[field] = [] if field != 'shift_timings' else {}
+                # If it's None or empty, set default
+                else:
+                    data[field] = [] if field != 'shift_timings' else {}
         
         return super().to_internal_value(data)
     
@@ -55,17 +77,31 @@ class StaffSerializer(serializers.ModelSerializer):
     def validate_email(self, value):
         """Validate email is unique (excluding current instance during update)"""
         instance = getattr(self, 'instance', None)
-        # If updating, exclude the current instance from uniqueness check
+        
+        print(f"[EMAIL_VALIDATION] Validating email: {value}")
+        print(f"[EMAIL_VALIDATION] Instance: {instance}")
         if instance:
-            if instance.email == value:
-                return value
-            # Check if another staff member has this email
-            if Staff.objects.filter(email=value).exclude(pk=instance.pk).exists():
+            print(f"[EMAIL_VALIDATION] Instance email: {instance.email}")
+            print(f"[EMAIL_VALIDATION] Instance user_id: {instance.user_id}")
+        
+        # If updating and email hasn't changed, no need to validate
+        if instance and instance.email == value:
+            print(f"[EMAIL_VALIDATION] Email unchanged, skipping validation")
+            return value
+        
+        # Check uniqueness
+        if instance:
+            # For updates, exclude the current instance using user_id (the primary key)
+            existing = Staff.objects.filter(email=value).exclude(user_id=instance.user_id)
+            print(f"[EMAIL_VALIDATION] Existing staff with this email (excluding current): {existing.count()}")
+            if existing.exists():
                 raise serializers.ValidationError("Staff member with this email already exists")
         else:
             # For new staff, just check uniqueness
             if Staff.objects.filter(email=value).exists():
                 raise serializers.ValidationError("Staff member with this email already exists")
+        
+        print(f"[EMAIL_VALIDATION] Email validation passed")
         return value
 
 class FirebaseUserSerializer(serializers.ModelSerializer):
