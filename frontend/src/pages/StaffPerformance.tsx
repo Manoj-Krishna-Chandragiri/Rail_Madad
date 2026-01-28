@@ -66,21 +66,33 @@ const StaffPerformance: React.FC = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('authToken');
+      const headers = { Authorization: `Bearer ${token}` };
 
-      // Try to fetch staff IDs from complaints_staff by querying multiple IDs
-      // Since we don't have a direct endpoint, we'll try IDs 1-20 and collect valid ones
-      const staffPromises = [];
-      for (let staffId = 1; staffId <= 20; staffId++) {
-        staffPromises.push(
-          axios.get(
-            `${API_BASE_URL}/api/complaints/staff/${staffId}/analytics/`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          ).then(response => ({
-            id: staffId,
-            analytics: response.data
-          })).catch(() => null)
+      // First, fetch the staff list from the admin endpoint
+      let staffIds: number[] = [];
+      try {
+        const staffListResponse = await axios.get(
+          `${API_BASE_URL}/api/complaints/admin/staff/`,
+          { headers }
         );
+        // Extract staff IDs from the list (user_id is the primary key for staff)
+        staffIds = (staffListResponse.data || []).map((s: { user_id?: number }) => s.user_id).filter(Boolean);
+      } catch (err) {
+        console.error('Failed to fetch staff list, trying ID range:', err);
+        // Fallback: try IDs 1-20 if staff list endpoint fails
+        staffIds = Array.from({ length: 20 }, (_, i) => i + 1);
       }
+
+      // Fetch analytics for each staff member
+      const staffPromises = staffIds.map(staffId =>
+        axios.get(
+          `${API_BASE_URL}/api/complaints/staff/${staffId}/analytics/`,
+          { headers }
+        ).then(response => ({
+          id: staffId,
+          analytics: response.data
+        })).catch(() => null)
+      );
 
       const staffResults = await Promise.all(staffPromises);
       const validStaff = staffResults.filter(s => s !== null);

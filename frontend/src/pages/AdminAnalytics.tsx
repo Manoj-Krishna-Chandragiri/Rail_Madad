@@ -65,51 +65,135 @@ const AdminAnalytics = () => {
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
-      // This is a mock implementation - replace with actual API call
-      const mockData: AnalyticsData = {
+      
+      // Get auth token
+      const token = localStorage.getItem('authToken');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      // Fetch real data from backend API
+      const [dashboardRes, complaintsRes, staffRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/complaints/admin/dashboard-stats/`, { headers }).catch(() => null),
+        axios.get(`${API_BASE_URL}/api/complaints/admin/complaints/`, { headers }).catch(() => null),
+        axios.get(`${API_BASE_URL}/api/complaints/admin/staff/`, { headers }).catch(() => null)
+      ]);
+      
+      const dashboardData = dashboardRes?.data || {};
+      const complaints = complaintsRes?.data || [];
+      const staffList = staffRes?.data || [];
+      
+      // Calculate category stats from complaints
+      const categoryMap: { [key: string]: number } = {};
+      const priorityMap: { [key: string]: number } = {};
+      
+      complaints.forEach((complaint: { category?: string; priority?: string }) => {
+        const category = complaint.category || 'Other';
+        const priority = complaint.priority || 'Medium';
+        categoryMap[category] = (categoryMap[category] || 0) + 1;
+        priorityMap[priority] = (priorityMap[priority] || 0) + 1;
+      });
+      
+      const totalComplaints = dashboardData.totalComplaints || complaints.length || 0;
+      
+      const categoryStats = Object.entries(categoryMap).map(([category, count]) => ({
+        category,
+        count,
+        percentage: totalComplaints > 0 ? Math.round((count / totalComplaints) * 100) : 0
+      }));
+      
+      const priorityStats = Object.entries(priorityMap).map(([priority, count]) => ({
+        priority,
+        count,
+        percentage: totalComplaints > 0 ? Math.round((count / totalComplaints) * 100) : 0
+      }));
+      
+      // Process monthly trends from dashboard data
+      const trends = dashboardData.complaintTrends || [];
+      const monthlyTrend = processMonthlyTrend(trends);
+      
+      // Get staff performance - use full_name field from the API
+      const topPerformers = staffList
+        .filter((staff: { status?: string }) => staff.status === 'active')
+        .slice(0, 3)
+        .map((staff: { full_name?: string; name?: string; resolved_complaints?: number; rating?: number }) => ({
+          name: staff.full_name || staff.name || 'Staff Member',
+          resolved: staff.resolved_complaints || 0,
+          rating: staff.rating || 0
+        }));
+      
+      const analyticsData: AnalyticsData = {
         overview: {
-          totalComplaints: 1250,
-          resolvedComplaints: 980,
-          pendingComplaints: 270,
-          avgResolutionTime: '4.2 hours',
-          resolutionRate: 78.4,
-          customerSatisfaction: 86.5
+          totalComplaints: totalComplaints,
+          resolvedComplaints: dashboardData.closedComplaints || 0,
+          pendingComplaints: (dashboardData.openComplaints || 0) + (dashboardData.inProgressComplaints || 0),
+          avgResolutionTime: dashboardData.averageResolutionTime || '0h',
+          resolutionRate: dashboardData.resolutionRate || 0,
+          customerSatisfaction: 85 // This would come from feedback endpoint if available
         },
-        categoryStats: [
-          { category: 'Infrastructure', count: 450, percentage: 36 },
-          { category: 'Service Quality', count: 325, percentage: 26 },
-          { category: 'Cleanliness', count: 275, percentage: 22 },
-          { category: 'Staff Behavior', count: 200, percentage: 16 }
+        categoryStats: categoryStats.length > 0 ? categoryStats : [
+          { category: 'No Data', count: 0, percentage: 0 }
         ],
-        priorityStats: [
-          { priority: 'Critical', count: 125, percentage: 10 },
-          { priority: 'High', count: 375, percentage: 30 },
-          { priority: 'Medium', count: 500, percentage: 40 },
-          { priority: 'Low', count: 250, percentage: 20 }
+        priorityStats: priorityStats.length > 0 ? priorityStats : [
+          { priority: 'No Data', count: 0, percentage: 0 }
         ],
-        monthlyTrend: [
-          { month: 'Jan', resolved: 85, received: 110 },
-          { month: 'Feb', resolved: 92, received: 105 },
-          { month: 'Mar', resolved: 88, received: 120 },
-          { month: 'Apr', resolved: 95, received: 100 },
-          { month: 'May', resolved: 102, received: 115 },
-          { month: 'Jun', resolved: 98, received: 108 }
-        ],
+        monthlyTrend,
         staffPerformance: {
-          topPerformers: [
-            { name: 'Rajesh Kumar', resolved: 145, rating: 4.8 },
-            { name: 'Priya Sharma', resolved: 132, rating: 4.7 },
-            { name: 'Amit Patel', resolved: 128, rating: 4.6 }
+          topPerformers: topPerformers.length > 0 ? topPerformers : [
+            { name: 'No staff data', resolved: 0, rating: 0 }
           ]
         }
       };
       
-      setAnalytics(mockData);
+      setAnalytics(analyticsData);
     } catch (err) {
       console.error('Failed to fetch analytics:', err);
+      // Set empty data on error
+      setAnalytics({
+        overview: {
+          totalComplaints: 0,
+          resolvedComplaints: 0,
+          pendingComplaints: 0,
+          avgResolutionTime: '0h',
+          resolutionRate: 0,
+          customerSatisfaction: 0
+        },
+        categoryStats: [{ category: 'Error loading', count: 0, percentage: 0 }],
+        priorityStats: [{ priority: 'Error loading', count: 0, percentage: 0 }],
+        monthlyTrend: [],
+        staffPerformance: { topPerformers: [] }
+      });
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper function to process monthly trends
+  const processMonthlyTrend = (trends: { date: string; closed: number; open: number; in_progress: number }[]) => {
+    if (!trends || trends.length === 0) {
+      // Return last 6 months with 0 data
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+      return months.map(month => ({ month, resolved: 0, received: 0 }));
+    }
+    
+    // Group by month
+    const monthMap: { [key: string]: { resolved: number; received: number } } = {};
+    
+    trends.forEach(day => {
+      const date = new Date(day.date);
+      const monthKey = date.toLocaleString('default', { month: 'short' });
+      
+      if (!monthMap[monthKey]) {
+        monthMap[monthKey] = { resolved: 0, received: 0 };
+      }
+      
+      monthMap[monthKey].resolved += day.closed || 0;
+      monthMap[monthKey].received += (day.open || 0) + (day.in_progress || 0) + (day.closed || 0);
+    });
+    
+    return Object.entries(monthMap).map(([month, data]) => ({
+      month,
+      resolved: data.resolved,
+      received: data.received
+    }));
   };
 
   const bgGradient = isDark 

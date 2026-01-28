@@ -41,6 +41,8 @@ const UserManagement = () => {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [error, setError] = useState<string | null>(null);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
@@ -122,13 +124,39 @@ const UserManagement = () => {
     if (!confirm('Are you sure you want to delete this user?')) return;
 
     try {
-      await apiClient.delete('/api/accounts/delete/', {
-        data: { user_id: userId }
-      });
+      await apiClient.delete(`/api/accounts/users/${userId}/delete/`);
       fetchUsers();
     } catch (err) {
       console.error('Failed to delete user:', err);
       alert('Failed to delete user');
+    }
+  };
+
+  const handleEditUser = (user: User) => {
+    setEditingUser(user);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingUser) return;
+
+    try {
+      // Update user via backend API
+      await apiClient.put(`/api/accounts/users/${editingUser.id}/update/`, {
+        full_name: editingUser.full_name,
+        phone_number: editingUser.phone_number,
+        role: editingUser.role,
+        status: editingUser.status
+      });
+      
+      // Refresh user list from server
+      await fetchUsers();
+      setShowEditModal(false);
+      setEditingUser(null);
+      alert('User details updated successfully!');
+    } catch (err) {
+      console.error('Failed to update user:', err);
+      alert('Failed to update user. Please try again.');
     }
   };
 
@@ -374,7 +402,10 @@ const UserManagement = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button className="p-2 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-600 transition-colors">
+                        <button 
+                          onClick={() => handleEditUser(user)}
+                          className="p-2 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-600 transition-colors"
+                        >
                           <Edit2 className="h-4 w-4" />
                         </button>
                         <button 
@@ -392,6 +423,113 @@ const UserManagement = () => {
           </div>
         </div>
       </div>
+
+      {/* Edit User Modal */}
+      {showEditModal && editingUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`${isDark ? 'bg-gray-800 text-white' : 'bg-white'} rounded-lg shadow-xl p-6 max-w-md w-full`}>
+            <h2 className="text-xl font-semibold mb-4">Edit User</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  value={editingUser.full_name || ''}
+                  onChange={(e) => setEditingUser({...editingUser, full_name: e.target.value})}
+                  className={`w-full px-3 py-2 border rounded-lg ${
+                    isDark ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={editingUser.email}
+                  disabled
+                  className={`w-full px-3 py-2 border rounded-lg opacity-50 cursor-not-allowed ${
+                    isDark ? 'bg-gray-700 border-gray-600 text-white' : 'bg-gray-100 border-gray-300'
+                  }`}
+                />
+                <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  value={editingUser.phone_number || ''}
+                  onChange={(e) => setEditingUser({...editingUser, phone_number: e.target.value})}
+                  className={`w-full px-3 py-2 border rounded-lg ${
+                    isDark ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Role
+                </label>
+                <select
+                  value={editingUser.role}
+                  onChange={(e) => setEditingUser({...editingUser, role: e.target.value as any})}
+                  className={`w-full px-3 py-2 border rounded-lg ${
+                    isDark ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                  }`}
+                >
+                  <option value="passenger">Passenger</option>
+                  <option value="staff">Staff</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Status
+                </label>
+                <select
+                  value={editingUser.status}
+                  onChange={(e) => setEditingUser({...editingUser, status: e.target.value as any})}
+                  className={`w-full px-3 py-2 border rounded-lg ${
+                    isDark ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                  }`}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingUser(null);
+                }}
+                className={`px-4 py-2 rounded-lg border ${
+                  isDark ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateUser}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

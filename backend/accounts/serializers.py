@@ -24,14 +24,13 @@ class StaffSerializer(serializers.ModelSerializer):
     
     def to_internal_value(self, data):
         """Convert incoming data, handling JSON string fields from FormData"""
-        # Make a mutable copy if it's a QueryDict
-        if hasattr(data, '_mutable'):
-            data._mutable = True
+        # Create a mutable copy of the data
+        mutable_data = dict(data)
         
         # Handle JSON string fields from FormData
         for field in ['expertise', 'languages', 'communication_preferences', 'shift_timings']:
-            if field in data:
-                value = data.get(field)
+            if field in mutable_data:
+                value = mutable_data.get(field)
                 
                 # QueryDict returns values as lists, extract the first element
                 if isinstance(value, list) and len(value) > 0:
@@ -39,25 +38,28 @@ class StaffSerializer(serializers.ModelSerializer):
                 
                 # If it's already a list/dict (parsed), keep it
                 if isinstance(value, (list, dict)):
-                    data[field] = value
+                    mutable_data[field] = value
                 # If it's a string, try to parse it as JSON
                 elif isinstance(value, str):
                     try:
                         parsed = json.loads(value)
-                        data[field] = parsed
+                        mutable_data[field] = parsed
                     except (json.JSONDecodeError, ValueError) as e:
                         print(f"[SERIALIZER] Failed to parse {field}: {value} - Error: {e}")
                         # If it's not valid JSON, set to empty list/dict
-                        data[field] = [] if field != 'shift_timings' else {}
+                        mutable_data[field] = [] if field != 'shift_timings' else {}
                 # If it's None or empty, set default
                 else:
-                    data[field] = [] if field != 'shift_timings' else {}
+                    mutable_data[field] = [] if field != 'shift_timings' else {}
         
-        return super().to_internal_value(data)
+        return super().to_internal_value(mutable_data)
     
     def validate_employee_id(self, value):
         """Validate employee_id is unique (excluding current instance during update)"""
-        if not value:  # Allow empty employee_id
+        # Convert empty string to None for unique constraint
+        if value == '':
+            return None
+        if not value:  # Allow None/empty employee_id
             return value
             
         instance = getattr(self, 'instance', None)

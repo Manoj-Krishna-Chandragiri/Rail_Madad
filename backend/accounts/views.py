@@ -731,6 +731,105 @@ def delete_user_account(request):
         return Response({'error': str(e)}, status=500)
 
 
+@api_view(['DELETE'])
+def admin_delete_user(request, user_id):
+    """Admin endpoint to delete any user by ID"""
+    try:
+        # Check if requester is admin
+        is_admin = getattr(request, 'is_admin', False)
+        if not is_admin:
+            return Response({'error': 'Admin access required'}, status=403)
+        
+        # Find the user by ID
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
+        
+        # Don't allow deleting yourself
+        requesting_user_id = getattr(request, 'user_id', None)
+        if requesting_user_id and int(requesting_user_id) == int(user_id):
+            return Response({'error': 'Cannot delete your own account from admin panel'}, status=400)
+        
+        user_email = user.email
+        user.delete()
+        
+        logger.info(f"Admin deleted user: {user_email} (ID: {user_id})")
+        
+        return Response({
+            'message': 'User deleted successfully',
+            'deleted_user_id': user_id
+        }, status=200)
+        
+    except Exception as e:
+        logger.error(f"Error in admin_delete_user: {str(e)}")
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['PUT'])
+def admin_update_user(request, user_id):
+    """Admin endpoint to update user details"""
+    try:
+        # Check if requester is admin
+        is_admin = getattr(request, 'is_admin', False)
+        if not is_admin:
+            return Response({'error': 'Admin access required'}, status=403)
+        
+        # Find the user by ID
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
+        
+        # Update allowed fields
+        if 'full_name' in request.data:
+            user.full_name = request.data['full_name']
+        
+        if 'phone_number' in request.data:
+            user.phone_number = request.data['phone_number']
+        
+        # Update role flags
+        if 'role' in request.data:
+            role = request.data['role']
+            # Reset all role flags
+            user.is_passenger = False
+            user.is_staff = False
+            user.is_admin = False
+            
+            # Set appropriate flag
+            if role == 'admin':
+                user.is_admin = True
+            elif role == 'staff':
+                user.is_staff = True
+            else:  # passenger
+                user.is_passenger = True
+        
+        # Update active status
+        if 'status' in request.data:
+            user.is_active = request.data['status'] == 'active'
+        
+        user.save()
+        
+        logger.info(f"Admin updated user: {user.email} (ID: {user_id})")
+        
+        return Response({
+            'message': 'User updated successfully',
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'full_name': user.full_name,
+                'phone_number': user.phone_number,
+                'role': user.user_type,
+                'status': 'active' if user.is_active else 'inactive',
+                'created_at': user.date_joined.isoformat()
+            }
+        }, status=200)
+        
+    except Exception as e:
+        logger.error(f"Error in admin_update_user: {str(e)}")
+        return Response({'error': str(e)}, status=500)
+
+
 @api_view(['GET'])
 def staff_list(request):
     """Get list of all staff members"""

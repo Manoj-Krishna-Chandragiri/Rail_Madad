@@ -1122,9 +1122,6 @@ const handleGoogleSignIn = async () => {
                       </button>
                     </label>
                   </div>
-                  {!acceptedTerms && errors.terms && (
-                    <p className="text-red-600 dark:text-red-400 text-xs mt-1">{errors.terms}</p>
-                  )}
                   <div className="flex gap-4">
                     <button
                       type="submit"

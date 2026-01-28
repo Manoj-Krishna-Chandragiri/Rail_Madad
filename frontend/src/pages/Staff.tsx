@@ -83,6 +83,7 @@ const Staff = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Pagination state
   const [displayCount, setDisplayCount] = useState<number>(6);
@@ -123,8 +124,17 @@ const Staff = () => {
   }, []);
 
   const processAvatarUrl = (avatarPath: string, staffName: string): string => {
+    // Use a safe name for fallback avatar generation
+    const safeName = staffName || 'Staff Member';
+    
     if (!avatarPath) {
-      return `https://ui-avatars.com/api/?name=${encodeURIComponent(staffName)}&background=random`;
+      return `https://ui-avatars.com/api/?name=${encodeURIComponent(safeName)}&background=random`;
+    }
+    
+    // Handle corrupted avatar paths (e.g., staff_None_xxx.jpg where user_id was null)
+    if (avatarPath.includes('staff_None') || avatarPath.includes('_None_')) {
+      console.warn('Corrupted avatar path detected, using fallback:', avatarPath);
+      return `https://ui-avatars.com/api/?name=${encodeURIComponent(safeName)}&background=random`;
     }
     
     // Handle external URLs (like randomuser.me)
@@ -146,25 +156,33 @@ const Staff = () => {
     } else if (avatarPath.startsWith('media/')) {
       // Has media/ without leading slash
       return `${apiBaseUrl}/${avatarPath}`;
-    } else {
-      // No media prefix, add it
+    } else if (avatarPath.startsWith('avatars/') || avatarPath.startsWith('staff_avatars/')) {
+      // Has avatars/ or staff_avatars/ but missing media/ prefix
       return `${apiBaseUrl}/media/${avatarPath}`;
+    } else {
+      // No media prefix, add staff_avatars by default
+      return `${apiBaseUrl}/media/staff_avatars/${avatarPath}`;
     }
   };
 
   const fetchStaffData = async () => {
     setLoading(true);
     try {
-      // Use public staff endpoint for viewing staff
-      const response = await axios.get(`${API_BASE_URL}/api/complaints/staff/`);
+      // Use admin staff endpoint for consistent data (accounts_staff table)
+      const token = localStorage.getItem('adminToken') || localStorage.getItem('authToken') || localStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/complaints/admin/staff/`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
       
       // Parse expertise and languages fields if they're strings
-      const processedData = response.data.map((staff: any) => {
-        // Map new API field names to frontend expected names
+      const processedData = response.data.map((staff: any, index: number) => {
+        // Map API field names to frontend expected names (accounts_staff uses user_id as PK)
+        const staffId = staff.user_id?.toString() || staff.id?.toString() || `temp-${index}`;
+        const staffName = staff.full_name || staff.name || 'Unknown Staff';
         const mappedStaff = {
           ...staff,
-          id: staff.user_id?.toString() || staff.id?.toString(),  // user_id is the primary key in accounts_staff
-          name: staff.full_name || staff.name,  // API returns full_name
+          id: staffId,  // user_id is the primary key in accounts_staff
+          name: staffName,  // API returns full_name
           phone: staff.phone_number || staff.phone  // API returns phone_number
         };
         
@@ -308,23 +326,36 @@ const Staff = () => {
       const responseData = await response.json();
       console.log('Staff creation response:', responseData);
 
-      // Convert the returned data to match our frontend model
+      // Process the new staff data the same way as fetchStaffData
+      const staffId = responseData.user_id?.toString() || responseData.id?.toString() || `temp-${Date.now()}`;
+      const staffName = responseData.full_name || responseData.name || 'Unknown Staff';
+      
       const createdStaff = {
         ...responseData,
-        // Parse JSON strings back to arrays
-        expertise: Array.isArray(responseData.expertise) 
-          ? responseData.expertise 
-          : JSON.parse(responseData.expertise || '[]'),
-        languages: Array.isArray(responseData.languages)
-          ? responseData.languages
-          : JSON.parse(responseData.languages || '[]'),
-        communication_preferences: Array.isArray(responseData.communication_preferences)
-          ? responseData.communication_preferences
-          : JSON.parse(responseData.communication_preferences || '["Chat"]')
+        id: staffId,
+        name: staffName,
+        phone: responseData.phone_number || responseData.phone,
+        avatar: processAvatarUrl(responseData.avatar, staffName),
+        expertise: typeof responseData.expertise === 'string' 
+          ? JSON.parse(responseData.expertise || '[]') 
+          : (Array.isArray(responseData.expertise) ? responseData.expertise : []),
+        languages: typeof responseData.languages === 'string'
+          ? JSON.parse(responseData.languages || '[]')
+          : (Array.isArray(responseData.languages) ? responseData.languages : []),
+        communication_preferences: typeof responseData.communication_preferences === 'string'
+          ? JSON.parse(responseData.communication_preferences || '["Chat"]')
+          : (Array.isArray(responseData.communication_preferences) ? responseData.communication_preferences : ['Chat'])
       };
 
       // Add to staff list
       setStaffMembers(prev => [...prev, createdStaff]);
+      
+      // Show success notification
+      setNotification({
+        type: 'success',
+        message: `Staff member "${staffName}" added successfully!`
+      });
+      setTimeout(() => setNotification(null), 5000);
       
       // Reset form and close modal
       setNewStaff({
@@ -348,6 +379,8 @@ const Staff = () => {
     } catch (err: any) {
       console.error('Error adding staff member:', err);
       
+      let errorMsg = 'Failed to add staff member. Please try again.';
+      
       // Handle API error messages
       if (err.response?.data) {
         const apiErrors = err.response.data;
@@ -363,9 +396,20 @@ const Staff = () => {
         });
         
         setFormErrors(formattedErrors);
-      } else {
-        alert('Failed to add staff member. Please try again.');
+        
+        // Create error message from form errors
+        const errorDetails = Object.entries(formattedErrors)
+          .map(([field, msg]) => `${field}: ${msg}`)
+          .join(', ');
+        errorMsg = errorDetails || 'Failed to add staff member';
       }
+      
+      // Show error notification
+      setNotification({
+        type: 'error',
+        message: errorMsg
+      });
+      setTimeout(() => setNotification(null), 5000);
     } finally {
       setLoading(false);
     }
@@ -585,23 +629,39 @@ const Staff = () => {
 
       console.log('Staff update response:', response.data);
 
+      // Process the updated staff data the same way as fetchStaffData
+      const updatedStaff = response.data;
+      const staffId = updatedStaff.user_id?.toString() || updatedStaff.id?.toString() || selectedStaff.id;
+      const staffName = updatedStaff.full_name || updatedStaff.name || 'Unknown Staff';
+      
+      const processedStaff = {
+        ...updatedStaff,
+        id: staffId,
+        name: staffName,
+        phone: updatedStaff.phone_number || updatedStaff.phone,
+        avatar: processAvatarUrl(updatedStaff.avatar, staffName),
+        expertise: typeof updatedStaff.expertise === 'string' 
+          ? JSON.parse(updatedStaff.expertise || '[]') 
+          : (Array.isArray(updatedStaff.expertise) ? updatedStaff.expertise : []),
+        languages: typeof updatedStaff.languages === 'string' 
+          ? JSON.parse(updatedStaff.languages || '[]') 
+          : (Array.isArray(updatedStaff.languages) ? updatedStaff.languages : []),
+        communication_preferences: typeof updatedStaff.communication_preferences === 'string' 
+          ? JSON.parse(updatedStaff.communication_preferences || '["Chat"]') 
+          : (Array.isArray(updatedStaff.communication_preferences) ? updatedStaff.communication_preferences : ['Chat'])
+      };
+
       // Update in staff list
       setStaffMembers(prev => prev.map(staff => 
-        staff.id === selectedStaff.id 
-          ? {
-              ...response.data,
-              expertise: Array.isArray(response.data.expertise) 
-                ? response.data.expertise 
-                : JSON.parse(response.data.expertise || '[]'),
-              languages: Array.isArray(response.data.languages)
-                ? response.data.languages
-                : JSON.parse(response.data.languages || '[]'),
-              communication_preferences: Array.isArray(response.data.communication_preferences)
-                ? response.data.communication_preferences
-                : JSON.parse(response.data.communication_preferences || '["Chat"]')
-            } 
-          : staff
+        staff.id === selectedStaff.id ? processedStaff : staff
       ));
+      
+      // Show success notification
+      setNotification({
+        type: 'success',
+        message: `Staff member "${staffName}" updated successfully!`
+      });
+      setTimeout(() => setNotification(null), 5000);
       
       // Reset form and close modal
       setNewStaff({
@@ -625,6 +685,8 @@ const Staff = () => {
       
       // Show detailed error information
       const error = err as any;
+      let errorMsg = 'Failed to update staff member. Please try again.';
+      
       if (error.response && error.response.data) {
         console.error('Backend error details:', error.response.data);
         console.error('Validation errors:', error.response.data.details);
@@ -634,13 +696,17 @@ const Staff = () => {
         const errorMessages = Object.entries(details).map(([field, msgs]) => {
           const message = Array.isArray(msgs) ? msgs.join(', ') : msgs;
           return `${field}: ${message}`;
-        }).join('\n');
+        }).join(', ');
         
-        const errorMsg = errorMessages || error.response.data.error || 'Unknown validation error';
-        alert(`Failed to update staff member:\n\n${errorMsg}`);
-      } else {
-        alert('Failed to update staff member. Please try again.');
+        errorMsg = errorMessages || error.response.data.error || 'Failed to update staff member';
       }
+      
+      // Show error notification
+      setNotification({
+        type: 'error',
+        message: errorMsg
+      });
+      setTimeout(() => setNotification(null), 5000);
     } finally {
       setLoading(false);
     }
@@ -677,11 +743,25 @@ const Staff = () => {
 
       // Remove from staff list
       setStaffMembers(prev => prev.filter(staff => staff.id !== selectedStaff.id));
+      
+      // Show success notification
+      setNotification({
+        type: 'success',
+        message: `Staff member "${selectedStaff.name || 'Unknown'}" removed successfully!`
+      });
+      setTimeout(() => setNotification(null), 5000);
+      
       setSelectedStaff(null);
       setShowDeleteConfirmation(false);
     } catch (err) {
       console.error('Error deleting staff member:', err);
-      alert('Failed to delete staff member. Please try again.');
+      
+      // Show error notification
+      setNotification({
+        type: 'error',
+        message: 'Failed to delete staff member. Please try again.'
+      });
+      setTimeout(() => setNotification(null), 5000);
     } finally {
       setLoading(false);
     }
@@ -703,34 +783,38 @@ const Staff = () => {
     );
   }
 
-  const renderStaffCard = (staff: StaffMember) => (
-    <div key={staff.id} className={`border ${
+  const renderStaffCard = (staff: StaffMember) => {
+    const staffName = staff.name || 'Unknown Staff';
+    const staffId = staff.id || `staff-${Math.random().toString(36).substr(2, 9)}`;
+    
+    return (
+    <div key={staffId} className={`border ${
       isDark ? 'border-gray-600 bg-gray-700' : 'border-gray-200'
     } rounded-lg p-6`}>
       <div className="flex gap-4">
         <div className="relative w-16 h-16 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
           <img 
             src={staff.avatar}
-            alt={staff.name}
+            alt={staffName}
             className="w-full h-full object-cover"
             onError={(e) => {
-              console.error(`Error loading image for ${staff.name}:`, staff.avatar);
+              console.error(`Error loading image for ${staffName}:`, staff.avatar);
               const target = e.target as HTMLImageElement;
               target.onerror = null; // Prevent infinite error loop
-              target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(staff.name)}&background=random`;
+              target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(staffName)}&background=random`;
             }}
           />
         </div>
         <div className="flex-1">
           <div className="flex justify-between">
             <div>
-              <h3 className="text-lg font-semibold">{staff.name}</h3>
+              <h3 className="text-lg font-semibold">{staffName}</h3>
               <p className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                {staff.role} • {staff.department}
+                {staff.role || 'No Role'} • {staff.department || 'No Department'}
               </p>
             </div>
-            <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(staff.status)}`}>
-              {staff.status.charAt(0).toUpperCase() + staff.status.slice(1)}
+            <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(staff.status || 'inactive')}`}>
+              {(staff.status || 'inactive').charAt(0).toUpperCase() + (staff.status || 'inactive').slice(1)}
             </span>
           </div>
           
@@ -799,6 +883,7 @@ const Staff = () => {
       </div>
     </div>
   );
+  };
 
   return (
     <div className="max-w-7xl mx-auto p-6">
@@ -1660,7 +1745,7 @@ const Staff = () => {
               <ExclamationTriangleIcon className="h-16 w-16 text-red-500 mx-auto mb-4" />
               <h2 className="text-xl font-semibold">Confirm Removal</h2>
               <p className={`mt-2 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                Are you sure you want to remove {selectedStaff.name} from staff? This action cannot be undone.
+                Are you sure you want to remove {selectedStaff.name || 'this staff member'} from staff? This action cannot be undone.
               </p>
             </div>
 
@@ -1680,6 +1765,45 @@ const Staff = () => {
                 className={`px-4 py-2 bg-red-600 text-white rounded-lg ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-red-700'}`}
               >
                 {loading ? 'Removing...' : 'Remove Staff'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notification Toast */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-50 animate-slide-in-right">
+          <div className={`rounded-lg shadow-lg p-4 min-w-[300px] max-w-md ${
+            notification.type === 'success' 
+              ? 'bg-green-600 text-white' 
+              : 'bg-red-600 text-white'
+          }`}>
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                {notification.type === 'success' ? (
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+              </div>
+              <div className="flex-1">
+                <p className="font-medium">
+                  {notification.type === 'success' ? 'Success!' : 'Error!'}
+                </p>
+                <p className="text-sm mt-1 opacity-90">
+                  {notification.message}
+                </p>
+              </div>
+              <button
+                onClick={() => setNotification(null)}
+                className="flex-shrink-0 hover:opacity-75"
+              >
+                <X className="h-5 w-5" />
               </button>
             </div>
           </div>
