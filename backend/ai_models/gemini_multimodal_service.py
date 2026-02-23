@@ -19,9 +19,14 @@ class GeminiMultimodalService:
     
     def __init__(self):
         """Initialize Gemini API with different model configurations"""
-        self.api_key = os.getenv('GEMINI_MULTIMODAL_API_KEY')
+        # Try multiple environment variable names for API key
+        self.api_key = (
+            os.getenv('GEMINI_MULTIMODAL_API_KEY') or
+            os.getenv('GEMINI_API_KEY') or
+            os.getenv('GEMINI_CHATBOT_API_KEY')
+        )
         if not self.api_key:
-            raise ValueError("GEMINI_MULTIMODAL_API_KEY not found in environment variables")
+            raise ValueError("No Gemini API key found. Set GEMINI_MULTIMODAL_API_KEY, GEMINI_API_KEY, or GEMINI_CHATBOT_API_KEY")
         
         genai.configure(api_key=self.api_key)
         

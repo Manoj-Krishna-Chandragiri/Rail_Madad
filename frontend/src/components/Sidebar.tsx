@@ -30,7 +30,6 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
     { path: '', icon: Home, label: 'Home' },
     { path: '/dashboard', icon: BarChart2, label: 'Dashboard' },
     { path: '/smart-classification', icon: MessageSquare, label: 'Smart Classification' },
-    { path: '/quick-resolution', icon: TrendingUp, label: 'Quick Resolution' },
     { path: '/staff-management', icon: UserCog, label: 'Staff Management' },
     { path: '/staff-performance', icon: ClipboardList, label: 'Staff Performance' },
     { path: '/analytics', icon: BarChart2, label: 'Analytics' },
@@ -44,6 +43,7 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
   const staffMenuItems = [
     { path: '', icon: Home, label: 'Home' },
     { path: '/assigned-complaints', icon: ClipboardList, label: 'My Complaints' },
+    { path: '/quick-resolution', icon: TrendingUp, label: 'Quick Resolution' },
     { path: '/analytics', icon: BarChart2, label: 'My Analytics' },
     { path: '/profile', icon: User, label: 'My Profile' },
     { path: '/notifications', icon: Bell, label: 'Notifications' },

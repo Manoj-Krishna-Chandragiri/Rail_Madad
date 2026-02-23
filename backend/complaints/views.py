@@ -9,7 +9,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
-from .models import Complaint, QuickSolution, Notification, NotificationPreference  # Import Notification models
+from .models import Complaint, QuickSolution, SolutionApplication, Notification, NotificationPreference  # Import Notification models
 from .serializers import ComplaintSerializer  # StaffSerializer not imported here
 import os
 from rest_framework import status
@@ -2259,6 +2259,48 @@ def quick_resolution_solutions(request):
                     'category': 'Coach - Maintenance/Facilities',
                     'resolution_time': '2 hours',
                     'success_rate': 82.0
+                },
+                {
+                    'problem': 'Luggage Damaged During Transit',
+                    'solution': '1. Immediately report to TTE/Guard at destination\n2. File FIR if damage is significant\n3. Take photos/videos of damage\n4. Claim refund with proof of damage within 30 days',
+                    'category': 'Baggage / Luggage Issues',
+                    'resolution_time': '1 day',
+                    'success_rate': 90.0
+                },
+                {
+                    'problem': 'Train Delayed - Schedule Change',
+                    'solution': '1. Check NTES app for live status\n2. Contact ticket counter for alternative options\n3. Rebook on next available train (no extra charge)\n4. Claim compensation if delay > 2 hours',
+                    'category': 'Schedule & Delays',
+                    'resolution_time': '15 mins',
+                    'success_rate': 94.0
+                },
+                {
+                    'problem': 'Platform Issue - Wrong Platform Assignment',
+                    'solution': '1. Check station announcement system\n2. Verify from ticket counter immediately\n3. Move to correct platform\n4. Alert ticket checkers to avoid missing train',
+                    'category': 'Station Services',
+                    'resolution_time': '5 mins',
+                    'success_rate': 96.0
+                },
+                {
+                    'problem': 'Concession/Student Pass Not Recognized',
+                    'solution': '1. Check validity of concession document\n2. Verify with TTE at ticket counter\n3. Carry original certificates\n4. If genuine, claim refund of difference amount',
+                    'category': 'Ticketing & Concessions',
+                    'resolution_time': '20 mins',
+                    'success_rate': 89.0
+                },
+                {
+                    'problem': 'Coach/Berth Number Mismatch',
+                    'solution': '1. Check the train manifest board\n2. Compare with your ticket carefully\n3. Inform TTE of discrepancy immediately\n4. TTE will assist with correct berth location',
+                    'category': 'Passenger Amenities',
+                    'resolution_time': '10 mins',
+                    'success_rate': 92.0
+                },
+                {
+                    'problem': 'Water/Sanitation Issues in Coach',
+                    'solution': '1. Immediately report to Guard/TTE\n2. Request coach change if severe\n3. Document with photos/videos\n4. File complaint for compensation',
+                    'category': 'Coach - Maintenance/Facilities',
+                    'resolution_time': '30 mins',
+                    'success_rate': 87.0
                 }
             ]
             
@@ -2279,6 +2321,129 @@ def quick_resolution_solutions(request):
         
     except Exception as e:
         logger.error(f"Error in quick_resolution_solutions: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+def apply_quick_solution(request):
+    """
+    Apply a quick solution to a complaint
+    """
+    if not hasattr(request, 'is_authenticated') or not request.is_authenticated:
+        return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+    
+    try:
+        solution_id = request.data.get('solution_id')
+        complaint_id = request.data.get('complaint_id')
+        feedback = request.data.get('feedback', '')
+        result = request.data.get('result', 'success')
+        
+        if not solution_id:
+            return Response({'error': 'Solution ID required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the solution
+        from complaints.models import QuickSolution, SolutionApplication
+        solution = QuickSolution.objects.get(id=solution_id)
+        
+        # Get complaint if provided
+        complaint = None
+        if complaint_id:
+            try:
+                complaint = Complaint.objects.get(id=complaint_id)
+            except Complaint.DoesNotExist:
+                pass
+        
+        # Create solution application record
+        application = SolutionApplication.objects.create(
+            complaint=complaint,
+            solution=solution,
+            applied_by=getattr(request, 'user_email', 'Unknown'),
+            result=result,
+            feedback=feedback
+        )
+        
+        # Update solution usage stats
+        solution.usage_count += 1
+        if result == 'success':
+            # Update success rate based on feedback
+            current_success = (solution.success_rate * (solution.usage_count - 1) + 100) / solution.usage_count
+            solution.success_rate = round(current_success, 1)
+        solution.save()
+        
+        # Update complaint status if provided
+        if complaint and result == 'success':
+            complaint.status = 'Closed'
+            complaint.resolved_at = timezone.now()
+            complaint.save()
+        
+        return Response({
+            'id': application.id,
+            'message': 'Solution applied successfully',
+            'result': result,
+            'solution_name': solution.problem
+        }, status=status.HTTP_201_CREATED)
+        
+    except QuickSolution.DoesNotExist:
+        return Response({'error': 'Solution not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error in apply_quick_solution: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+def create_support_ticket(request):
+    """
+    Create a support ticket for escalation
+    """
+    if not hasattr(request, 'is_authenticated') or not request.is_authenticated:
+        return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+    
+    try:
+        complaint_id = request.data.get('complaint_id')
+        subject = request.data.get('subject', 'Support Request')
+        description = request.data.get('description', '')
+        priority = request.data.get('priority', 'Medium')
+        solution_id = request.data.get('solution_id')
+        
+        complaint = None
+        if complaint_id:
+            try:
+                complaint = Complaint.objects.get(id=complaint_id)
+            except Complaint.DoesNotExist:
+                pass
+        
+        # Create escalation complaint
+        escalation = Complaint.objects.create(
+            type='Support Escalation',
+            description=f"Escalated from Quick Resolution\nOriginal Subject: {subject}\n\n{description}",
+            priority=priority,
+            status='Open',
+            date_of_incident=timezone.now().date(),
+            staff=getattr(request, 'user_email', 'Support Team')
+        )
+        
+        # Link the original solution if provided
+        if solution_id:
+            try:
+                solution = QuickSolution.objects.get(id=solution_id)
+                SolutionApplication.objects.create(
+                    complaint=escalation,
+                    solution=solution,
+                    applied_by=getattr(request, 'user_email', 'Unknown'),
+                    result='escalated'
+                )
+            except QuickSolution.DoesNotExist:
+                pass
+        
+        return Response({
+            'id': escalation.id,
+            'message': 'Support ticket created successfully',
+            'ticket_number': f"SUPPORT-{escalation.id}",
+            'status': escalation.status
+        }, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        logger.error(f"Error in create_support_ticket: {str(e)}")
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])

@@ -23,7 +23,6 @@ export const routes = {
     { path: '/dashboard', icon: BarChart2, label: 'Dashboard' },
     { path: '/smart-classification', icon: Brain, label: 'Smart Classification' },
     { path: '/real-time-support', icon: Headphones, label: 'Real-time Support' },
-    { path: '/quick-resolution', icon: Zap, label: 'Quick Resolution' },
     { path: '/multi-lingual', icon: Globe, label: 'Multi-lingual' },
     { path: '/staff', icon: Users, label: 'Staff Management' },
     { path: '/settings', icon: Settings, label: 'Settings' },

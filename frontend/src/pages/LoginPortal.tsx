@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import { ExternalLink } from 'lucide-react';
 
 const LoginPortal = () => {
   const { theme } = useTheme();
@@ -50,19 +51,30 @@ const LoginPortal = () => {
   ];
 
   return (
-    <div className={`min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
-      <div className="max-w-4xl w-full space-y-8">
+    <div 
+      className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative"
+      style={{
+        backgroundImage: 'url(https://res.cloudinary.com/dbnkhibzi/image/upload/v1769581146/1520665647_pamban_bridge_rameshwaram_fotor1_rxk3oh.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
+    >
+      {/* Dark overlay for better readability */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+      
+      <div className="max-w-4xl w-full space-y-8 relative z-10">
         {/* Header */}
         <div className="text-center">
-          <div className="mx-auto h-20 w-20 flex items-center justify-center rounded-full bg-indigo-600 mb-6">
+          <div className="mx-auto h-20 w-20 flex items-center justify-center rounded-full bg-indigo-600 mb-6 shadow-xl">
             <svg className="h-10 w-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m13 0H3" />
             </svg>
           </div>
-          <h1 className={`text-4xl font-extrabold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>
+          <h1 className="text-4xl font-extrabold text-white mb-4 drop-shadow-lg">
             Rail Madad Portal
           </h1>
-          <p className={`text-xl ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} mb-8`}>
+          <p className="text-xl text-gray-200 mb-8 drop-shadow-md">
             Choose your login portal to access the appropriate dashboard
           </p>
         </div>
@@ -97,26 +109,26 @@ const LoginPortal = () => {
         </div>
 
         {/* Additional Information */}
-        <div className={`mt-12 text-center p-6 ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md`}>
-          <h4 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>
+        <div className="mt-12 text-center p-6 bg-white/95 backdrop-blur-sm rounded-lg shadow-xl">
+          <h4 className="text-lg font-semibold text-gray-900 mb-4">
             Need Help Choosing?
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
             <div>
               <span className="font-semibold text-red-600">Admin:</span>
-              <span className={theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}>
+              <span className="text-gray-700">
                 {' '}System administrators and managers
               </span>
             </div>
             <div>
               <span className="font-semibold text-blue-600">Staff:</span>
-              <span className={theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}>
+              <span className="text-gray-700">
                 {' '}Railway employees and support staff
               </span>
             </div>
             <div>
               <span className="font-semibold text-green-600">Passenger:</span>
-              <span className={theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}>
+              <span className="text-gray-700">
                 {' '}Travelers and general users
               </span>
             </div>
@@ -125,22 +137,17 @@ const LoginPortal = () => {
 
         {/* Footer Links */}
         <div className="text-center space-y-4">
-          <div className="flex justify-center space-x-6">
-            <Link 
-              to="/track-status" 
-              className={`text-sm ${theme === 'dark' ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-500'} font-medium`}
-            >
-              Track Complaint Status
-            </Link>
+          <div className="flex justify-center">
             <Link 
               to="/landing" 
-              className={`text-sm ${theme === 'dark' ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-500'} font-medium`}
+              className="text-sm text-white hover:text-indigo-300 font-medium drop-shadow-md flex items-center gap-2"
             >
               Learn More
+              <ExternalLink className="h-4 w-4" />
             </Link>
           </div>
           
-          <p className={`text-xs ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
+          <p className="text-xs text-gray-300 drop-shadow-md">
             Secure portal access • Data protection compliant • Available 24/7
           </p>
         </div>

@@ -13,9 +13,6 @@ urlpatterns = [
     path('staff/list/', views.staff_list, name='staff_list'),
     path('staff/performance/', views.staff_performance, name='staff_performance'),
     path('users/', views.list_users, name='list_users'),
-    # Use RESTful conventions: PUT for updates, DELETE for deletes
-    path('users/<int:user_id>/update/', views.admin_update_user, name='admin_update_user'),  # Admin update user (PUT)
-    path('users/<int:user_id>/delete/', views.admin_delete_user, name='admin_delete_user'),  # Admin delete user (DELETE)
     path('admin/verify/', verify_admin, name='verify-admin'),
     path('admin/profile/', get_admin_profile, name='admin-profile'),
     path('notifications/', views.get_notifications, name='get_notifications'),

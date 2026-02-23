@@ -10,7 +10,6 @@ import {
   CheckCircle,
   Settings,
   Brain,
-  Zap,
   Headphones,
   TrendingUp,
   Shield,
@@ -390,19 +389,6 @@ const AdminHome = () => {
           </Link>
           
           <Link 
-            to="/admin-dashboard/quick-resolution" 
-            className={`flex flex-col items-center p-6 rounded-lg border transition-all duration-300 ${cardHoverClass} transform hover:translate-y-[-4px]`}
-          >
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${isDark ? 'bg-yellow-900/50' : 'bg-yellow-100'}`}>
-              <Zap className="h-8 w-8 text-yellow-500" />
-            </div>
-            <h3 className="font-semibold text-lg">Quick Resolution</h3>
-            <p className={`text-sm text-center mt-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-              Resolve complaints efficiently
-            </p>
-          </Link>
-          
-          <Link 
             to="/admin-dashboard/settings" 
             className={`flex flex-col items-center p-6 rounded-lg border transition-all duration-300 ${cardHoverClass} transform hover:translate-y-[-4px]`}
           >
@@ -478,20 +464,6 @@ const AdminHome = () => {
               Detailed analytics and reports to identify trends and improve service quality.
             </p>
             <Link to="/dashboard" className="flex items-center gap-2 text-purple-500 text-sm font-medium group">
-              <span>Learn more</span>
-              <span className="group-hover:translate-x-1 transition-transform">→</span>
-            </Link>
-          </div>
-          
-          <div className={featureCardClass}>
-            <div className={`w-14 h-14 rounded-lg flex items-center justify-center mb-6 ${isDark ? 'bg-amber-900/30' : 'bg-amber-100'}`}>
-              <Clock className="h-7 w-7 text-amber-500" />
-            </div>
-            <h3 className="font-semibold text-xl mb-3">Resolution Tracking</h3>
-            <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'} mb-4`}>
-              Monitor resolution times and staff performance for better accountability.
-            </p>
-            <Link to="/quick-resolution" className="flex items-center gap-2 text-amber-500 text-sm font-medium group">
               <span>Learn more</span>
               <span className="group-hover:translate-x-1 transition-transform">→</span>
             </Link>

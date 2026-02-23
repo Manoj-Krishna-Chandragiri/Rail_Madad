@@ -224,11 +224,27 @@ const FileComplaintMultimedia = () => {
           </div>
         </div>
 
-        {aiAnalysis && (
+        {isAnalyzing && (
+          <div className={`mb-6 p-4 rounded-lg ${theme === 'dark' ? 'bg-yellow-900/30 border border-yellow-700' : 'bg-yellow-50 border border-yellow-200'}`}>
+            <div className="flex items-center gap-2">
+              <Loader className="h-5 w-5 animate-spin" />
+              <span className="font-semibold">🤖 AI is analyzing your multimedia files...</span>
+            </div>
+            <p className="text-sm mt-2">Please wait while we extract complaint details from your photos/videos/audio.</p>
+          </div>
+        )}
+
+        {aiAnalysis && !isAnalyzing && (
           <div className={`mb-6 p-4 rounded-lg ${theme === 'dark' ? 'bg-indigo-900/30 border border-indigo-700' : 'bg-indigo-50 border border-indigo-200'}`}>
-            <h3 className="font-semibold mb-2 flex items-center gap-2">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
               🤖 AI Analysis Results
             </h3>
+            {aiDescription && (
+              <div className="mb-3 p-3 bg-white/50 dark:bg-gray-800/50 rounded border">
+                <strong className="block mb-1">AI-Generated Description:</strong>
+                <p className="text-sm">{aiDescription}</p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div><strong>Category:</strong> {aiAnalysis.category}</div>
               <div><strong>Severity:</strong> {aiAnalysis.severity}</div>

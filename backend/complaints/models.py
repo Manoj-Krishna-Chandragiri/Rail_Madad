@@ -145,6 +145,32 @@ class QuickSolution(models.Model):
         verbose_name_plural = "Quick Solutions"
 
 
+class SolutionApplication(models.Model):
+    """
+    Track when and how solutions are applied to complaints
+    """
+    RESULT_CHOICES = [
+        ('success', 'Successfully Resolved'),
+        ('partial', 'Partially Resolved'),
+        ('failed', 'Failed to Resolve'),
+        ('escalated', 'Escalated to Support'),
+    ]
+    
+    complaint = models.ForeignKey(Complaint, on_delete=models.CASCADE, null=True, blank=True)
+    solution = models.ForeignKey(QuickSolution, on_delete=models.CASCADE)
+    applied_by = models.CharField(max_length=255)  # Admin/Staff name
+    applied_at = models.DateTimeField(default=timezone.now)
+    result = models.CharField(max_length=20, choices=RESULT_CHOICES, default='pending')
+    feedback = models.TextField(blank=True, null=True)
+    resolution_time_actual = models.IntegerField(null=True, blank=True)  # in minutes
+    
+    def __str__(self):
+        return f"{self.solution.problem} - {self.result}"
+
+    class Meta:
+        verbose_name_plural = "Solution Applications"
+
+
 class Notification(models.Model):
     """
     Notification model for tracking user notifications

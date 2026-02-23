@@ -38,7 +38,8 @@ import SignUpStaff from './pages/SignUpStaff';
 // User routes components
 import AIAssistance from './pages/AIAssistance';
 import FileComplaint from './pages/FileComplaint';
-import FileComplaintWithAI from './pages/FileComplaintWithAI';  
+// import FileComplaintWithAI from './pages/FileComplaintWithAI';
+import FileComplaintMultimedia from './pages/FileComplaintMultimedia';  
 import MultiLingual from './pages/MultiLingual';
 import TrackStatus from './pages/TrackStatus';
 import Help from './pages/Help';
@@ -50,7 +51,7 @@ import { initializeErrorHandling } from './utils/errorHandling';
 import './styles/translate.css';
 import './index.css';
 
-const getUserType = (): 'admin' | 'user' | null => {
+const getUserType = (): 'admin' | 'user' | 'staff' | null => {
   // Check localStorage for user role
   const userRole = localStorage.getItem('userRole');
   const adminToken = localStorage.getItem('adminToken');
@@ -77,6 +78,10 @@ const getUserType = (): 'admin' | 'user' | null => {
     return 'admin';
   }
   
+  if (userRole === 'staff') {
+    return 'staff';
+  }
+
   // If authenticated but not admin, return user
   if (userRole === 'passenger' || userRole === 'user' || isAuthenticated) {
     return 'user';
@@ -128,7 +133,7 @@ const ThemeInitializer = ({ children }: { children: React.ReactNode }) => {
 };
 
 const App = () => {
-  const [userType, setUserType] = useState<'admin' | 'user' | null>(null);
+  const [userType, setUserType] = useState<'admin' | 'user' | 'staff' | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -219,7 +224,6 @@ const App = () => {
               <Route index element={<AdminHome />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="smart-classification" element={<SmartClassification />} />
-              <Route path="quick-resolution" element={<QuickResolution />} />
               <Route path="multi-lingual" element={<MultiLingual />} />
               <Route path="staff" element={<Staff />} />
               <Route path="staff-management" element={<Staff />} />
@@ -243,7 +247,8 @@ const App = () => {
               }
             >
               <Route index element={<Home />} />
-              <Route path="file-complaint" element={<FileComplaintWithAI />} />
+              {/* <Route path="file-complaint" element={<FileComplaintWithAI />} /> */}
+              <Route path="file-complaint" element={<FileComplaintMultimedia/>}></Route>
               <Route path="file-complaint-basic" element={<FileComplaint />} />
               <Route path="track-status" element={<TrackStatus />} />
               <Route path="ai-assistance" element={<AIAssistance />} />
@@ -266,6 +271,7 @@ const App = () => {
             >
               <Route index element={<StaffHome />} />
               <Route path="assigned-complaints" element={<StaffDashboard />} />
+              <Route path="quick-resolution" element={<QuickResolution />} />
               <Route path="analytics" element={<StaffAnalytics />} />
               <Route path="profile" element={<StaffProfile />} />
               <Route path="notifications" element={<Notifications />} />
@@ -280,7 +286,13 @@ const App = () => {
             <Route path="/track-status" element={<Navigate to="/user-dashboard/track-status" />} />
             <Route path="/ai-assistance" element={<Navigate to="/user-dashboard/ai-assistance" />} />
             <Route path="/real-time-support" element={<Navigate to="/user-dashboard/real-time-support" />} />
-            <Route path="/quick-resolution" element={<Navigate to={userType === 'admin' ? '/admin-dashboard/quick-resolution' : '/user-dashboard/quick-resolution'} />} />
+            <Route path="/quick-resolution" element={<Navigate to={
+              userType === 'staff'
+                ? '/staff-dashboard/quick-resolution'
+                : userType === 'admin'
+                ? '/admin-dashboard/dashboard'
+                : '/user-dashboard/quick-resolution'
+            } />} />
             <Route path="/multi-lingual" element={<Navigate to={userType === 'admin' ? '/admin-dashboard/multi-lingual' : '/user-dashboard/multi-lingual'} />} />
             <Route path="/help" element={<Navigate to="/user-dashboard/help" />} />
             <Route path="/feedback-form" element={<Navigate to="/user-dashboard/feedback-form" />} />

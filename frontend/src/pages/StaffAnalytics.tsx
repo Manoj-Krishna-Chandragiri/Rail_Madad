@@ -91,22 +91,10 @@ const StaffAnalytics = () => {
     // Get staff ID from profile or localStorage
     const userEmail = localStorage.getItem('userEmail');
     if (userEmail) {
-      // Fetch staff profile to get ID
-      fetchStaffId(userEmail);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (staffId) {
-      fetchStaffAnalytics();
-    }
-  }, [staffId]);
-  
-  useEffect(() => {
-    if (staffAnalytics) {
+      // Just fetch analytics directly, don't need staff ID
       fetchAnalytics();
     }
-  }, [staffAnalytics]);
+  }, []);
 
   const fetchStaffId = async (email: string) => {
     try {
@@ -125,7 +113,8 @@ const StaffAnalytics = () => {
     if (!staffId) return;
     
     try {
-      const response = await apiClient.get(`/api/complaints/staff/${staffId}/analytics/`);
+      // Use the staff dashboard endpoint which provides analytics data
+      const response = await apiClient.get(`/api/complaints/staff/dashboard/`);
       setStaffAnalytics(response.data);
     } catch (err) {
       console.error('Failed to fetch staff analytics:', err);
@@ -136,45 +125,75 @@ const StaffAnalytics = () => {
     try {
       setLoading(true);
       
-      // Use staffAnalytics data that we already have
-      if (staffAnalytics) {
-        const complaintStats = staffAnalytics.complaint_stats;
-        const feedbackStats = staffAnalytics.feedback_stats;
-        const now = new Date();
-        const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        
-        // Create mock monthly data from current stats
-        const currentMonthData = {
-          month: now.getMonth() + 1,
-          year: now.getFullYear(),
-          tickets_resolved: complaintStats.total_resolved || 0,
-          avg_resolution_time: staffAnalytics.avg_resolution_time_hours || 0,
-          customer_satisfaction: complaintStats.customer_satisfaction || 0,
-          complaints_received: complaintStats.total_assigned || 0
-        };
-        const lastMonthData = {
-          month: lastMonthDate.getMonth() + 1,
-          year: lastMonthDate.getFullYear(),
-          tickets_resolved: complaintStats.total_resolved || 0,
-          avg_resolution_time: staffAnalytics.avg_resolution_time_hours || 0,
-          customer_satisfaction: complaintStats.customer_satisfaction || 0,
-          complaints_received: complaintStats.total_assigned || 0
-        };
-        
-        setAnalytics({
-          current_month: currentMonthData,
-          last_month: lastMonthData,
-          yearly_stats: {
-            total_resolved: complaintStats.total_resolved || 0,
-            avg_rating: feedbackStats.average_rating || 0,
-            avg_satisfaction: complaintStats.customer_satisfaction || 0,
-            total_complaints: complaintStats.total_assigned || 0
-          },
-          monthly_trend: [currentMonthData]
-        });
-      }
+      // Use the same endpoint as Staff Dashboard home page
+      const response = await apiClient.get('/api/complaints/staff/dashboard/');
+      const data = response.data;
+      
+      console.log('Staff Dashboard API Response:', data);
+      console.log('Stats object:', data.stats);
+      console.log('Root level rating:', data.rating);
+      console.log('Root level customer_satisfaction:', data.customer_satisfaction);
+      
+      // Extract stats from the response
+      const totalAssigned = data.stats?.total_assigned || 0;
+      const pending = data.stats?.pending || 0;
+      const inProgress = data.stats?.in_progress || 0;
+      const resolved = data.stats?.resolved || 0; // Use resolved from stats
+      
+      // Parse avg resolution time (it's a string like "944.2 hours")
+      const avgTimeString = data.stats?.avg_resolution_time || '0 hours';
+      const avgResolutionTime = parseFloat(avgTimeString.split(' ')[0]) || 0;
+      
+      // Get rating and satisfaction from root level (not from stats)
+      const rating = data.rating || 0;
+      const satisfaction = data.customer_satisfaction || 0;
+      
+      console.log('Extracted rating:', rating);
+      console.log('Extracted satisfaction:', satisfaction);
+      
+      const now = new Date();
+      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      
+      // Create monthly data
+      const currentMonthData = {
+        month: now.getMonth() + 1,
+        year: now.getFullYear(),
+        tickets_resolved: resolved,
+        avg_resolution_time: avgResolutionTime,
+        customer_satisfaction: satisfaction,
+        complaints_received: totalAssigned
+      };
+      
+      const lastMonthData = {
+        month: lastMonthStart.getMonth() + 1,
+        year: lastMonthStart.getFullYear(),
+        tickets_resolved: resolved,
+        avg_resolution_time: avgResolutionTime,
+        customer_satisfaction: satisfaction,
+        complaints_received: totalAssigned
+      };
+      
+      setAnalytics({
+        current_month: currentMonthData,
+        last_month: lastMonthData,
+        yearly_stats: {
+          total_resolved: resolved,
+          avg_rating: rating,
+          avg_satisfaction: satisfaction,
+          total_complaints: totalAssigned
+        },
+        monthly_trend: [currentMonthData]
+      });
     } catch (err: any) {
       console.error('Failed to fetch analytics:', err);
+      // Set default empty analytics on error
+      setAnalytics({
+        current_month: { month: 1, year: 2026, tickets_resolved: 0, avg_resolution_time: 0, customer_satisfaction: 0, complaints_received: 0 },
+        last_month: { month: 12, year: 2025, tickets_resolved: 0, avg_resolution_time: 0, customer_satisfaction: 0, complaints_received: 0 },
+        yearly_stats: { total_resolved: 0, avg_rating: 0, avg_satisfaction: 0, total_complaints: 0 },
+        monthly_trend: []
+      });
     } finally {
       setLoading(false);
     }

@@ -61,3 +61,31 @@ ai_venv/
 # Database file (contains sensitive data)
 *.sqlite3
 db.sqlite3
+
+# Sensitive files - AWS keys, certificates, and credentials
+*.pem
+*.key
+*.crt
+
+# Documentation files (large/not needed in repo)
+*.pdf
+*.doc
+*.docx
+*.pptx
+*.ppt
+
+# Design files
+*.fig
+
+# Large datasets
+*.csv
+*.ipynb
+
+# Project-specific files to ignore
+Major_final_abstract.pdf
+major_final_ppt.pptx
+railmadad.doc
+railmadad.pdf
+Railway_Complaints_Final_Validated.csv
+Train_Enhanced_Models_Colab.ipynb
+Train_Enhanced_Models_Colab_Dataset.csv

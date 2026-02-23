@@ -12,6 +12,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 dotenv_path = BASE_DIR / '.env'
 load_dotenv(dotenv_path=dotenv_path)
 
+# Load secrets from .env.secrets (API keys, credentials, etc.)
+secrets_path = BASE_DIR / '.env.secrets'
+if secrets_path.exists():
+    load_dotenv(dotenv_path=secrets_path, override=True)
+    print(f"✅ Loaded secrets from {secrets_path}")
+
 # SECURITY WARNING: keep the secret key used in production secret!
 if not os.getenv('DJANGO_SECRET_KEY'):
     raise ValueError('DJANGO_SECRET_KEY environment variable is not set. This is required for production.')

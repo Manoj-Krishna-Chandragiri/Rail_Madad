@@ -1,4 +1,4 @@
-import { FileUp, Camera, Brain, Sparkles, CheckCircle, Mic, MicOff } from 'lucide-react';
+import { FileUp, Camera, Brain, Sparkles, CheckCircle, Mic, MicOff, Video, Music } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import axios from "axios";
@@ -37,7 +37,11 @@ const FileComplaintWithAI = () => {
   });
 
   const [photos, setPhotos] = useState<File[]>([]);
+  const [videos, setVideos] = useState<File[]>([]);
+  const [audioFiles, setAudioFiles] = useState<File[]>([]);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
   const [aiSuggestion, setAISuggestion] = useState<AISuggestion | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showAISuggestion, setShowAISuggestion] = useState(false);
@@ -192,6 +196,24 @@ const FileComplaintWithAI = () => {
           formDataToSend.append('photos', photo, fileName);
           console.log("Added photo:", fileName);
         }
+        
+        // Add videos
+        videos.forEach((video, index) => {
+          const extension = video.name.split('.').pop() || 'mp4';
+          const uniqueId = generateRandomString(32);
+          const fileName = `${uniqueId}_${index}.${extension}`;
+          formDataToSend.append('videos', video, fileName);
+          console.log("Added video:", fileName);
+        });
+        
+        // Add audio files
+        audioFiles.forEach((audio, index) => {
+          const extension = audio.name.split('.').pop() || 'mp3';
+          const uniqueId = generateRandomString(32);
+          const fileName = `${uniqueId}_${index}.${extension}`;
+          formDataToSend.append('audio_files', audio, fileName);
+          console.log("Added audio:", fileName);
+        });
 
         await axios.post(
           `${import.meta.env.VITE_API_BASE_URL}/api/complaints/file/`,
@@ -218,6 +240,8 @@ const FileComplaintWithAI = () => {
         date_of_incident: ''
       });
       setPhotos([]);
+      setVideos([]);
+      setAudioFiles([]);
       setAISuggestion(null);
       setShowAISuggestion(false);
       setUseAISuggestion(false);
@@ -260,12 +284,39 @@ const FileComplaintWithAI = () => {
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setPhotos(prev => [...prev, ...files]);
+    if (e.target.files) {
+      const newPhotos = Array.from(e.target.files);
+      setPhotos(prev => [...prev, ...newPhotos]);
+      console.log(`📷 ${newPhotos.length} photo(s) added`);
+    }
   };
 
   const removePhoto = (index: number) => {
     setPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+  
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newVideos = Array.from(e.target.files);
+      setVideos(prev => [...prev, ...newVideos]);
+      console.log(`🎥 ${newVideos.length} video(s) added`);
+    }
+  };
+  
+  const removeVideo = (index: number) => {
+    setVideos(prev => prev.filter((_, i) => i !== index));
+  };
+  
+  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newAudioFiles = Array.from(e.target.files);
+      setAudioFiles(prev => [...prev, ...newAudioFiles]);
+      console.log(`🎵 ${newAudioFiles.length} audio file(s) added`);
+    }
+  };
+  
+  const removeAudio = (index: number) => {
+    setAudioFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleVoiceInput = () => {
@@ -551,6 +602,98 @@ const FileComplaintWithAI = () => {
             )}
           </div>
 
+          {/* Video Upload */}
+          <div className={`p-6 rounded-lg shadow-sm ${isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'}`}>
+            <label className="block text-sm font-medium mb-2">Upload Videos (Optional)</label>
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => videoInputRef.current?.click()}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                <Video className="h-4 w-4" />
+                Add Videos
+              </button>
+              <input
+                type="file"
+                ref={videoInputRef}
+                onChange={handleVideoUpload}
+                accept="video/*"
+                multiple
+                className="hidden"
+              />
+            </div>
+            
+            {videos.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {videos.map((video, index) => (
+                  <div key={index} className={`flex items-center justify-between p-3 rounded-lg ${
+                    isDark ? 'bg-gray-700' : 'bg-gray-100'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <Video className="h-5 w-5 text-purple-500" />
+                      <span className="text-sm">{video.name}</span>
+                      <span className="text-xs text-gray-500">({(video.size / (1024 * 1024)).toFixed(2)} MB)</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeVideo(index)}
+                      className="text-red-600 hover:text-red-700 font-bold"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Audio Upload */}
+          <div className={`p-6 rounded-lg shadow-sm ${isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'}`}>
+            <label className="block text-sm font-medium mb-2">Upload Audio (Optional)</label>
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => audioInputRef.current?.click()}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <Music className="h-4 w-4" />
+                Add Audio
+              </button>
+              <input
+                type="file"
+                ref={audioInputRef}
+                onChange={handleAudioUpload}
+                accept="audio/*"
+                multiple
+                className="hidden"
+              />
+            </div>
+            
+            {audioFiles.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {audioFiles.map((audio, index) => (
+                  <div key={index} className={`flex items-center justify-between p-3 rounded-lg ${
+                    isDark ? 'bg-gray-700' : 'bg-gray-100'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <Music className="h-5 w-5 text-green-500" />
+                      <span className="text-sm">{audio.name}</span>
+                      <span className="text-xs text-gray-500">({(audio.size / (1024 * 1024)).toFixed(2)} MB)</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeAudio(index)}
+                      className="text-red-600 hover:text-red-700 font-bold"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Submit Button */}
           <div className="flex justify-end gap-4">
             <button
@@ -567,6 +710,8 @@ const FileComplaintWithAI = () => {
                   date_of_incident: ''
                 });
                 setPhotos([]);
+                setVideos([]);
+                setAudioFiles([]);
                 setAISuggestion(null);
                 setShowAISuggestion(false);
                 setUseAISuggestion(false);

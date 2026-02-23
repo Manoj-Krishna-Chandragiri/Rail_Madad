@@ -53,6 +53,8 @@ urlpatterns = [
     # Quick Resolution endpoints
     path('admin/quick-resolution/stats/', views.quick_resolution_stats, name='quick-resolution-stats'),
     path('admin/quick-resolution/solutions/', views.quick_resolution_solutions, name='quick-resolution-solutions'),
+    path('admin/quick-resolution/apply/', views.apply_quick_solution, name='apply-quick-solution'),
+    path('admin/quick-resolution/support/', views.create_support_ticket, name='create-support-ticket'),
 
     # Search endpoint
     path('search/', views.search_user_complaints, name='search_user_complaints'),

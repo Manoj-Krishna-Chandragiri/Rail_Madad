@@ -1261,32 +1261,6 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Creator Credits Section */}
-      <section className={`py-12 md:py-16 ${isDark ? 'bg-gray-900/60' : 'bg-white/60'} border-t ${isDark ? 'border-gray-700/50' : 'border-gray-200/50'} backdrop-blur-sm`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <div className="mb-6 md:mb-8">
-              <Award className="h-12 w-12 md:h-16 md:w-16 text-indigo-500 mx-auto mb-4 animate-bounce" />
-              <h3 className="text-xl md:text-2xl font-bold mb-4" style={{ textShadow: isDark ? '0 2px 4px rgba(0,0,0,0.5)' : '0 1px 2px rgba(0,0,0,0.2)' }}>Created with 💖 by</h3>
-              <div className={`p-4 md:p-6 rounded-xl ${isDark ? 'bg-gray-800/70' : 'bg-gray-50/70'} shadow-lg max-w-md mx-auto backdrop-blur-sm border border-gray-200/20`}>
-                <div className="flex items-center justify-center space-x-3 mb-4">
-                  <Code className="h-6 w-6 md:h-8 md:w-8 text-indigo-600" />
-                  <span className="text-lg md:text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                    Manoj Krishna Chandragiri
-                  </span>
-                </div>
-                <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>
-                  Full-Stack Developer & AI Enthusiast
-                </p>
-                <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-xs mt-2`}>
-                  Passionate about creating innovative solutions for India's railway system
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Enhanced Footer */}
       <footer id="contact" className={`py-12 md:py-16 ${isDark ? 'bg-gray-900/70' : 'bg-gray-900/70'} text-white relative overflow-hidden z-10`}>
         {/* Animated Background */}

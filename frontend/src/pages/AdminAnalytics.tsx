@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { 
-  BarChart2,
   TrendingUp,
   TrendingDown,
-  Users,
   MessageSquare,
   Clock,
+  AlertTriangle,
   Target,
   Award,
   Activity,
@@ -14,6 +13,7 @@ import {
   Filter
 } from 'lucide-react';
 import axios from 'axios';
+import { getAuth } from 'firebase/auth';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -24,7 +24,7 @@ interface AnalyticsData {
     pendingComplaints: number;
     avgResolutionTime: string;
     resolutionRate: number;
-    customerSatisfaction: number;
+    slaBreaches: number;
   };
   categoryStats: {
     category: string;
@@ -35,6 +35,16 @@ interface AnalyticsData {
     priority: string;
     count: number;
     percentage: number;
+  }[];
+  backlogAging: {
+    label: string;
+    count: number;
+    percentage: number;
+  }[];
+  avgResolutionByCategory: {
+    category: string;
+    avgHours: number;
+    resolvedCount: number;
   }[];
   monthlyTrend: {
     month: string;
@@ -57,42 +67,108 @@ const AdminAnalytics = () => {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('month');
+  const [authReady, setAuthReady] = useState(false);
 
+  // Wait for Firebase auth to initialize
   useEffect(() => {
-    fetchAnalytics();
-  }, [timeRange]);
+    const auth = getAuth();
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      console.log('AdminAnalytics: Auth state changed, user:', user?.email);
+      setAuthReady(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch analytics when auth is ready or timeRange changes
+  useEffect(() => {
+    if (authReady) {
+      fetchAnalytics();
+    }
+  }, [timeRange, authReady]);
+
+  const getStartDate = (range: string) => {
+    const now = new Date();
+    const start = new Date(now);
+    switch (range) {
+      case 'week':
+        start.setDate(now.getDate() - 7);
+        break;
+      case 'quarter':
+        start.setDate(now.getDate() - 90);
+        break;
+      case 'year':
+        start.setDate(now.getDate() - 365);
+        break;
+      case 'month':
+      default:
+        start.setDate(now.getDate() - 30);
+        break;
+    }
+    return start;
+  };
+
+  const normalizeStatus = (status?: string) => (status || '').toLowerCase();
 
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
       
-      // Get auth token
-      const token = localStorage.getItem('authToken');
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      // Get fresh Firebase ID token
+      const auth = getAuth();
+      const currentUser = auth.currentUser;
+      
+      if (!currentUser) {
+        console.error('AdminAnalytics: No user logged in');
+        setLoading(false);
+        return;
+      }
+
+      console.log('AdminAnalytics: Getting ID token for user:', currentUser.email);
+      const token = await currentUser.getIdToken(true); // Force refresh
+      console.log('AdminAnalytics: Got token, length:', token.length);
+      const headers = { Authorization: `Bearer ${token}` };
       
       // Fetch real data from backend API
+      console.log('AdminAnalytics: Fetching data from:', `${API_BASE_URL}/api/complaints/admin/complaints/`);
       const [dashboardRes, complaintsRes, staffRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/api/complaints/admin/dashboard-stats/`, { headers }).catch(() => null),
-        axios.get(`${API_BASE_URL}/api/complaints/admin/complaints/`, { headers }).catch(() => null),
-        axios.get(`${API_BASE_URL}/api/complaints/admin/staff/`, { headers }).catch(() => null)
+        axios.get(`${API_BASE_URL}/api/complaints/admin/dashboard-stats/`, { headers }).catch((err) => {
+          console.error('Dashboard stats error:', err.response?.status, err.response?.data);
+          return null;
+        }),
+        axios.get(`${API_BASE_URL}/api/complaints/admin/complaints/`, { headers }).catch((err) => {
+          console.error('Complaints error:', err.response?.status, err.response?.data);
+          return null;
+        }),
+        axios.get(`${API_BASE_URL}/api/complaints/admin/staff/`, { headers }).catch((err) => {
+          console.error('Staff error:', err.response?.status, err.response?.data);
+          return null;
+        })
       ]);
       
       const dashboardData = dashboardRes?.data || {};
       const complaints = complaintsRes?.data || [];
       const staffList = staffRes?.data || [];
+
+      const now = new Date();
+      const startDate = getStartDate(timeRange);
+      const filteredComplaints = complaints.filter((complaint: { created_at?: string }) => {
+        if (!complaint.created_at) return true;
+        const createdAt = new Date(complaint.created_at);
+        return createdAt >= startDate && createdAt <= now;
+      });
       
       // Calculate category stats from complaints
       const categoryMap: { [key: string]: number } = {};
       const priorityMap: { [key: string]: number } = {};
       
-      complaints.forEach((complaint: { category?: string; priority?: string }) => {
-        const category = complaint.category || 'Other';
+      filteredComplaints.forEach((complaint: { category?: string; type?: string; priority?: string }) => {
+        const category = complaint.category || complaint.type || 'Other';
         const priority = complaint.priority || 'Medium';
         categoryMap[category] = (categoryMap[category] || 0) + 1;
         priorityMap[priority] = (priorityMap[priority] || 0) + 1;
       });
-      
-      const totalComplaints = dashboardData.totalComplaints || complaints.length || 0;
+
+      const totalComplaints = dashboardData.totalComplaints || filteredComplaints.length || 0;
       
       const categoryStats = Object.entries(categoryMap).map(([category, count]) => ({
         category,
@@ -106,9 +182,23 @@ const AdminAnalytics = () => {
         percentage: totalComplaints > 0 ? Math.round((count / totalComplaints) * 100) : 0
       }));
       
-      // Process monthly trends from dashboard data
+      // Process monthly trends from dashboard data (fallback to computed)
       const trends = dashboardData.complaintTrends || [];
-      const monthlyTrend = processMonthlyTrend(trends);
+      const monthlyTrend = trends.length > 0 ? processMonthlyTrend(trends) : buildMonthlyTrend(complaints);
+
+      // Resolution calculations
+      const resolvedComplaints = filteredComplaints.filter((c: { status?: string }) => normalizeStatus(c.status) === 'closed');
+      const pendingComplaints = filteredComplaints.filter((c: { status?: string }) => {
+        const s = normalizeStatus(c.status);
+        return s === 'open' || s === 'in progress';
+      });
+
+      const avgResolutionTime = calculateAverageResolutionTime(resolvedComplaints);
+      const resolutionRate = totalComplaints > 0 ? Math.round((resolvedComplaints.length / totalComplaints) * 100) : 0;
+
+      const backlogAging = buildBacklogAging(pendingComplaints, pendingComplaints.length);
+      const avgResolutionByCategory = buildAvgResolutionByCategory(resolvedComplaints);
+      const slaBreaches = calculateSlaBreaches(filteredComplaints);
       
       // Get staff performance - use full_name field from the API
       const topPerformers = staffList
@@ -123,11 +213,11 @@ const AdminAnalytics = () => {
       const analyticsData: AnalyticsData = {
         overview: {
           totalComplaints: totalComplaints,
-          resolvedComplaints: dashboardData.closedComplaints || 0,
-          pendingComplaints: (dashboardData.openComplaints || 0) + (dashboardData.inProgressComplaints || 0),
-          avgResolutionTime: dashboardData.averageResolutionTime || '0h',
-          resolutionRate: dashboardData.resolutionRate || 0,
-          customerSatisfaction: 85 // This would come from feedback endpoint if available
+          resolvedComplaints: dashboardData.closedComplaints || resolvedComplaints.length,
+          pendingComplaints: (dashboardData.openComplaints || 0) + (dashboardData.inProgressComplaints || 0) || pendingComplaints.length,
+          avgResolutionTime: dashboardData.averageResolutionTime || avgResolutionTime,
+          resolutionRate: dashboardData.resolutionRate || resolutionRate,
+          slaBreaches
         },
         categoryStats: categoryStats.length > 0 ? categoryStats : [
           { category: 'No Data', count: 0, percentage: 0 }
@@ -135,6 +225,8 @@ const AdminAnalytics = () => {
         priorityStats: priorityStats.length > 0 ? priorityStats : [
           { priority: 'No Data', count: 0, percentage: 0 }
         ],
+        backlogAging,
+        avgResolutionByCategory,
         monthlyTrend,
         staffPerformance: {
           topPerformers: topPerformers.length > 0 ? topPerformers : [
@@ -154,10 +246,12 @@ const AdminAnalytics = () => {
           pendingComplaints: 0,
           avgResolutionTime: '0h',
           resolutionRate: 0,
-          customerSatisfaction: 0
+          slaBreaches: 0
         },
         categoryStats: [{ category: 'Error loading', count: 0, percentage: 0 }],
         priorityStats: [{ priority: 'Error loading', count: 0, percentage: 0 }],
+        backlogAging: [],
+        avgResolutionByCategory: [],
         monthlyTrend: [],
         staffPerformance: { topPerformers: [] }
       });
@@ -196,6 +290,143 @@ const AdminAnalytics = () => {
     }));
   };
 
+  const calculateAverageResolutionTime = (resolvedComplaints: { created_at?: string; resolved_at?: string; updated_at?: string }[]) => {
+    if (!resolvedComplaints.length) return '0h';
+    let totalHours = 0;
+    let count = 0;
+
+    resolvedComplaints.forEach((c) => {
+      if (!c.created_at) return;
+      const createdAt = new Date(c.created_at);
+      const resolvedAt = c.resolved_at ? new Date(c.resolved_at) : c.updated_at ? new Date(c.updated_at) : null;
+      if (!resolvedAt) return;
+      const diffHours = (resolvedAt.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
+      if (!Number.isNaN(diffHours) && diffHours >= 0) {
+        totalHours += diffHours;
+        count += 1;
+      }
+    });
+
+    const avgHours = count > 0 ? totalHours / count : 0;
+    return `${avgHours.toFixed(1)}h`;
+  };
+
+  const buildMonthlyTrend = (allComplaints: { created_at?: string; resolved_at?: string; updated_at?: string; status?: string }[]) => {
+    const months: { key: string; label: string; received: number; resolved: number }[] = [];
+    const now = new Date();
+
+    for (let i = 5; i >= 0; i -= 1) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
+      const label = date.toLocaleString('default', { month: 'short' });
+      months.push({ key, label, received: 0, resolved: 0 });
+    }
+
+    const monthMap = new Map(months.map((m) => [m.key, m]));
+
+    allComplaints.forEach((c) => {
+      if (c.created_at) {
+        const createdAt = new Date(c.created_at);
+        const key = `${createdAt.getFullYear()}-${createdAt.getMonth() + 1}`;
+        const bucket = monthMap.get(key);
+        if (bucket) bucket.received += 1;
+      }
+
+      const status = normalizeStatus(c.status);
+      const resolvedAt = c.resolved_at ? new Date(c.resolved_at) : c.updated_at ? new Date(c.updated_at) : null;
+      if (status === 'closed' && resolvedAt) {
+        const key = `${resolvedAt.getFullYear()}-${resolvedAt.getMonth() + 1}`;
+        const bucket = monthMap.get(key);
+        if (bucket) bucket.resolved += 1;
+      }
+    });
+
+    return months.map((m) => ({ month: m.label, resolved: m.resolved, received: m.received }));
+  };
+
+  const buildBacklogAging = (pendingComplaints: { created_at?: string }[], totalPending: number) => {
+    const buckets = [
+      { label: '0-1 day', min: 0, max: 1, count: 0 },
+      { label: '1-3 days', min: 1, max: 3, count: 0 },
+      { label: '3-7 days', min: 3, max: 7, count: 0 },
+      { label: '7-14 days', min: 7, max: 14, count: 0 },
+      { label: '14+ days', min: 14, max: Infinity, count: 0 }
+    ];
+
+    const now = new Date();
+    pendingComplaints.forEach((c) => {
+      if (!c.created_at) return;
+      const createdAt = new Date(c.created_at);
+      const ageDays = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
+      const bucket = buckets.find((b) => ageDays >= b.min && ageDays < b.max);
+      if (bucket) bucket.count += 1;
+    });
+
+    return buckets.map((b) => ({
+      label: b.label,
+      count: b.count,
+      percentage: totalPending > 0 ? Math.round((b.count / totalPending) * 100) : 0
+    }));
+  };
+
+  const buildAvgResolutionByCategory = (resolvedComplaints: { category?: string; type?: string; created_at?: string; resolved_at?: string; updated_at?: string }[]) => {
+    const categoryMap: { [key: string]: { totalHours: number; count: number } } = {};
+
+    resolvedComplaints.forEach((c) => {
+      if (!c.created_at) return;
+      const createdAt = new Date(c.created_at);
+      const resolvedAt = c.resolved_at ? new Date(c.resolved_at) : c.updated_at ? new Date(c.updated_at) : null;
+      if (!resolvedAt) return;
+      const diffHours = (resolvedAt.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
+      if (Number.isNaN(diffHours) || diffHours < 0) return;
+      const category = c.category || c.type || 'Other';
+
+      if (!categoryMap[category]) {
+        categoryMap[category] = { totalHours: 0, count: 0 };
+      }
+      categoryMap[category].totalHours += diffHours;
+      categoryMap[category].count += 1;
+    });
+
+    return Object.entries(categoryMap)
+      .map(([category, data]) => ({
+        category,
+        avgHours: data.count > 0 ? Number((data.totalHours / data.count).toFixed(1)) : 0,
+        resolvedCount: data.count
+      }))
+      .sort((a, b) => b.avgHours - a.avgHours)
+      .slice(0, 6);
+  };
+
+  const calculateSlaBreaches = (allComplaints: { priority?: string; created_at?: string; resolved_at?: string; updated_at?: string; status?: string }[]) => {
+    const slaHoursMap: { [key: string]: number } = {
+      Critical: 24,
+      High: 48,
+      Medium: 72,
+      Low: 120
+    };
+
+    const now = new Date();
+    let breaches = 0;
+
+    allComplaints.forEach((c) => {
+      if (!c.created_at) return;
+      const createdAt = new Date(c.created_at);
+      const status = normalizeStatus(c.status);
+      const resolvedAt = status === 'closed'
+        ? c.resolved_at ? new Date(c.resolved_at) : c.updated_at ? new Date(c.updated_at) : now
+        : now;
+      const diffHours = (resolvedAt.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
+      const priority = c.priority || 'Medium';
+      const sla = slaHoursMap[priority] || slaHoursMap.Medium;
+      if (!Number.isNaN(diffHours) && diffHours > sla) {
+        breaches += 1;
+      }
+    });
+
+    return breaches;
+  };
+
   const bgGradient = isDark 
     ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900' 
     : 'bg-gradient-to-br from-indigo-50 via-white to-purple-50';
@@ -207,6 +438,11 @@ const AdminAnalytics = () => {
       </div>
     );
   }
+
+  const maxMonthlyValue = Math.max(
+    1,
+    ...analytics.monthlyTrend.map((m) => Math.max(m.received, m.resolved))
+  );
 
   return (
     <div className={`min-h-screen ${bgGradient} p-6`}>
@@ -243,7 +479,7 @@ const AdminAnalytics = () => {
         </div>
 
         {/* Overview Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className={`p-6 rounded-xl shadow-lg ${isDark ? 'bg-gradient-to-br from-blue-900/50 to-blue-800/30' : 'bg-gradient-to-br from-blue-50 to-blue-100'} border ${isDark ? 'border-blue-800' : 'border-blue-200'}`}>
             <div className="flex items-center justify-between mb-4">
               <div className={`p-3 rounded-lg ${isDark ? 'bg-blue-800/50' : 'bg-blue-200'}`}>
@@ -257,8 +493,26 @@ const AdminAnalytics = () => {
             <p className="text-3xl font-bold text-blue-500">
               {analytics.overview.totalComplaints}
             </p>
-            <p className="text-xs text-green-500 mt-1">
-              +12% from last period
+            <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'} mt-1`}>
+              Based on selected time range
+            </p>
+          </div>
+
+          <div className={`p-6 rounded-xl shadow-lg ${isDark ? 'bg-gradient-to-br from-amber-900/50 to-amber-800/30' : 'bg-gradient-to-br from-amber-50 to-amber-100'} border ${isDark ? 'border-amber-800' : 'border-amber-200'}`}>
+            <div className="flex items-center justify-between mb-4">
+              <div className={`p-3 rounded-lg ${isDark ? 'bg-amber-800/50' : 'bg-amber-200'}`}>
+                <AlertTriangle className="h-6 w-6 text-amber-500" />
+              </div>
+              <TrendingDown className="h-5 w-5 text-amber-500" />
+            </div>
+            <h3 className={`text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-600'} mb-1`}>
+              Pending Complaints
+            </h3>
+            <p className="text-3xl font-bold text-amber-500">
+              {analytics.overview.pendingComplaints}
+            </p>
+            <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'} mt-1`}>
+              Open + In Progress
             </p>
           </div>
 
@@ -293,8 +547,8 @@ const AdminAnalytics = () => {
             <p className="text-3xl font-bold text-yellow-500">
               {analytics.overview.avgResolutionTime}
             </p>
-            <p className="text-xs text-green-500 mt-1">
-              -8% improvement
+            <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'} mt-1`}>
+              Avg across resolved complaints
             </p>
           </div>
         </div>
@@ -364,6 +618,75 @@ const AdminAnalytics = () => {
           </div>
         </div>
 
+        {/* Operational Insights */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-8`}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-600">
+                Backlog Aging
+              </h2>
+              <Calendar className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+            </div>
+            <div className="space-y-4">
+              {analytics.backlogAging.length > 0 ? (
+                analytics.backlogAging.map((bucket, index) => (
+                  <div key={index}>
+                    <div className="flex justify-between mb-2">
+                      <span className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        {bucket.label}
+                      </span>
+                      <span className={`text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-900'}`}>
+                        {bucket.count} ({bucket.percentage}%)
+                      </span>
+                    </div>
+                    <div className={`w-full rounded-full h-3 ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                      <div
+                        className="h-3 rounded-full bg-gradient-to-r from-amber-500 to-red-500"
+                        style={{ width: `${bucket.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>No backlog data available.</p>
+              )}
+            </div>
+          </div>
+
+          <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-8`}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-600">
+                Resolution Risk
+              </h2>
+              <Award className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+            </div>
+            <div className={`p-4 rounded-lg mb-6 ${isDark ? 'bg-red-900/30' : 'bg-red-50'} border ${isDark ? 'border-red-800' : 'border-red-200'}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>SLA Breaches</p>
+                  <p className="text-2xl font-bold text-red-500">{analytics.overview.slaBreaches}</p>
+                </div>
+                <AlertTriangle className="h-6 w-6 text-red-500" />
+              </div>
+            </div>
+            <h3 className={`text-sm font-semibold mb-3 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+              Slowest Categories (Avg Resolution Time)
+            </h3>
+            <div className="space-y-3">
+              {analytics.avgResolutionByCategory.length > 0 ? (
+                analytics.avgResolutionByCategory.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{item.category}</span>
+                    <span className={`text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-900'}`}>{item.avgHours}h</span>
+                  </div>
+                ))
+              ) : (
+                <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>No resolution data available.</p>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Monthly Trend */}
         <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-8 mb-8`}>
           <h2 className="text-2xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-600">
@@ -376,12 +699,12 @@ const AdminAnalytics = () => {
                   <div className="flex items-end gap-1 h-32">
                     <div
                       className="w-8 bg-gradient-to-t from-blue-500 to-blue-400 rounded-t"
-                      style={{ height: `${(month.received / 120) * 100}%` }}
+                      style={{ height: `${(month.received / maxMonthlyValue) * 100}%` }}
                       title={`Received: ${month.received}`}
                     />
                     <div
                       className="w-8 bg-gradient-to-t from-green-500 to-green-400 rounded-t"
-                      style={{ height: `${(month.resolved / 120) * 100}%` }}
+                      style={{ height: `${(month.resolved / maxMonthlyValue) * 100}%` }}
                       title={`Resolved: ${month.resolved}`}
                     />
                   </div>
