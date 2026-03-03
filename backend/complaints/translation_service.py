@@ -10,7 +10,7 @@ class TranslationService:
     """Service class for handling text translations"""
     
     def __init__(self):
-        self.translator = Translator()
+        self.translator = None  # Lazy init to avoid blocking on startup
         # Supported language codes for Indian languages
         self.supported_languages = {
             'en': 'English',
@@ -30,6 +30,12 @@ class TranslationService:
             'ne': 'Nepali'
         }
     
+    def _get_translator(self):
+        """Lazily initialize translator to avoid blocking on startup"""
+        if self.translator is None:
+            self.translator = Translator()
+        return self.translator
+
     def translate_text(self, text, target_language='en', source_language='auto'):
         """
         Translate text to target language
@@ -73,7 +79,7 @@ class TranslationService:
                 }
             
             # Perform translation
-            result = self.translator.translate(
+            result = self._get_translator().translate(
                 text, 
                 dest=target_language, 
                 src=source_language
@@ -115,7 +121,7 @@ class TranslationService:
                     'error': 'Empty text provided'
                 }
             
-            detected = self.translator.detect(text)
+            detected = self._get_translator().detect(text)
             
             return {
                 'language': detected.lang,
