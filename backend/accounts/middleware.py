@@ -3,6 +3,7 @@ from django.http import JsonResponse
 from django.conf import settings
 from django.apps import apps
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.urls import resolve, Resolver404
 import logging
 import firebase_admin
@@ -56,7 +57,7 @@ class FirebaseAuthMiddleware:
             request.firebase_user = None
             request.firebase_uid = 'dev-uid-12345'
             request.is_authenticated = True  # Enable authentication in development
-            request.user = None
+            request.user = AnonymousUser()
             
             # Try to get a development user from database
             try:
@@ -124,7 +125,7 @@ class FirebaseAuthMiddleware:
             request.is_authenticated = False
             request.is_admin = False
             request.is_staff = False
-            request.user = None
+            request.user = AnonymousUser()
             request.user_id = None
             
             # In development, try to decode the Firebase token without verification
@@ -210,7 +211,7 @@ class FirebaseAuthMiddleware:
         request.is_authenticated = False
         request.is_admin = False
         request.is_staff = False
-        request.user = None
+        request.user = AnonymousUser()
         request.user_id = None
 
         if auth_header and auth_header.startswith('Bearer '):
