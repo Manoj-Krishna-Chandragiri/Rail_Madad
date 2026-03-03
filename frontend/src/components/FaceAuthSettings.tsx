@@ -3,6 +3,17 @@ import FaceAuthModal from './FaceAuthModal';
 import { useTheme } from '../context/ThemeContext';
 import apiClient from '../utils/api';
 
+const MEDIA_BASE = import.meta.env.VITE_API_BASE_URL || '';
+
+const mediaUrl = (path?: string | null) => {
+  if (!path) return null;
+  // If already absolute, return as-is; otherwise prefix with backend base
+  if (path.startsWith('http')) return path;
+  // Ensure leading slash
+  const p = path.startsWith('/') ? path : `/${path}`;
+  return `${MEDIA_BASE}${p}`;
+};
+
 interface FaceAuthLog {
   id: number;
   status: string;
@@ -10,6 +21,7 @@ interface FaceAuthLog {
   timestamp: string;
   ip_address: string;
   is_successful: boolean;
+  captured_image?: string | null;
 }
 
 const FaceAuthSettings: React.FC = () => {
@@ -176,12 +188,19 @@ const FaceAuthSettings: React.FC = () => {
               theme === 'dark' ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'
             }`}>
               <div className="flex items-start gap-4">
-                {faceProfile?.face_image && (
+                {faceProfile?.face_image && mediaUrl(faceProfile.face_image) ? (
                   <img 
-                    src={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${faceProfile.face_image}`}
+                    src={mediaUrl(faceProfile.face_image)!}
                     alt="Face Profile"
-                    className="w-24 h-24 rounded-lg object-cover"
+                    className="w-24 h-24 rounded-lg object-cover border-2 border-indigo-300"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
+                ) : (
+                  <div className="w-24 h-24 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                    <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
                 )}
                 <div className="flex-1">
                   <h4 className={`font-semibold mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
@@ -247,10 +266,63 @@ const FaceAuthSettings: React.FC = () => {
                         theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
                       }`}
                     >
+                      {/* Image comparison row */}
+                      {(faceProfile?.face_image || log.captured_image) && (
+                        <div className="flex gap-3 mb-3">
+                          {/* Stored enrolled face */}
+                          <div className="flex flex-col items-center gap-1">
+                            {faceProfile?.face_image && mediaUrl(faceProfile.face_image) ? (
+                              <img
+                                src={mediaUrl(faceProfile.face_image)!}
+                                alt="Enrolled face"
+                                className="w-16 h-16 rounded-lg object-cover border-2 border-indigo-400"
+                                onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
+                              />
+                            ) : (
+                              <div className="w-16 h-16 rounded-lg bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center">
+                                <svg className="w-7 h-7 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                              </div>
+                            )}
+                            <span className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Enrolled</span>
+                          </div>
+
+                          {/* VS divider */}
+                          <div className="flex items-center">
+                            <span className={`text-xs font-bold px-1 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>VS</span>
+                          </div>
+
+                          {/* Captured image during this auth attempt */}
+                          <div className="flex flex-col items-center gap-1">
+                            {log.captured_image && mediaUrl(log.captured_image) ? (
+                              <img
+                                src={mediaUrl(log.captured_image)!}
+                                alt="Captured face"
+                                className={`w-16 h-16 rounded-lg object-cover border-2 ${
+                                  log.is_successful ? 'border-green-400' : 'border-red-400'
+                                }`}
+                                onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
+                              />
+                            ) : (
+                              <div className={`w-16 h-16 rounded-lg flex items-center justify-center ${
+                                log.is_successful ? 'bg-green-100 dark:bg-green-900' : 'bg-red-100 dark:bg-red-900'
+                              }`}>
+                                <svg className={`w-7 h-7 ${log.is_successful ? 'text-green-400' : 'text-red-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                              </div>
+                            )}
+                            <span className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Captured</span>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="flex justify-between items-start">
                         <div>
                           <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${getStatusBadgeColor(log.status)}`}>
-                            {log.status}
+                            {log.status.replace(/_/g, ' ')}
                           </span>
                           {log.confidence_score > 0 && (
                             <span className={`ml-2 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>

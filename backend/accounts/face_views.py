@@ -224,7 +224,7 @@ def face_profile_status(request):
         if face_profile:
             return Response({
                 'enrolled': True,
-                'profile': FaceProfileSerializer(face_profile).data
+                'profile': FaceProfileSerializer(face_profile, context={'request': request}).data
             })
         else:
             return Response({

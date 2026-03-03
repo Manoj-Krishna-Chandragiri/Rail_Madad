@@ -7,12 +7,15 @@ console.log('MODE:', import.meta.env.MODE);
 console.log('VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
 console.log('All env vars:', import.meta.env);
 
+// In development, use empty string so requests use relative paths
+// and are handled by Vite's proxy (vite.config.ts → /api → http://127.0.0.1:8000)
+// This avoids Chrome HSTS issues caused by direct requests to localhost:8000
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   import.meta.env.VITE_API_URL ||
-  'http://localhost:8000';
+  ''; // Empty = relative paths → Vite proxy handles routing to backend
 
-console.log('🚀 Final API_BASE_URL:', API_BASE_URL);
+console.log('🚀 Final API_BASE_URL:', API_BASE_URL || '(relative - using Vite proxy)');
 
 // Create axios instance with base URL
 const apiClient = axios.create({
@@ -37,6 +40,13 @@ apiClient.interceptors.request.use(
       console.log('✅ Authorization header set');
     } else {
       console.warn('⚠️ No authToken in localStorage!');
+    }
+
+    // In dev mode the backend uses X-Dev-User-Email to pick the right user
+    // (avoids always falling back to the first passenger in the DB)
+    const userEmail = localStorage.getItem('userEmail');
+    if (userEmail && import.meta.env.DEV) {
+      config.headers['X-Dev-User-Email'] = userEmail;
     }
     
     return config;

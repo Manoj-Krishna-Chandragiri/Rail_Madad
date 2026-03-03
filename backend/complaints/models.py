@@ -63,10 +63,17 @@ class Complaint(models.Model):
     has_feedback = models.BooleanField(default=False)
  
     def save(self, *args, **kwargs):
-        # If status is changing to closed, record resolution time
+        # If status is changing to Closed, record resolution time
         if self.pk:
             old_instance = Complaint.objects.get(pk=self.pk)
-            if old_instance.status != 'closed' and self.status == 'closed':
+            old_closed = old_instance.status.lower() == 'closed'
+            new_closed = self.status.lower() == 'closed'
+            if not old_closed and new_closed and not self.resolved_at:
+                from django.utils import timezone
+                self.resolved_at = timezone.now()
+        else:
+            # New record already in Closed state
+            if self.status.lower() == 'closed' and not self.resolved_at:
                 from django.utils import timezone
                 self.resolved_at = timezone.now()
         

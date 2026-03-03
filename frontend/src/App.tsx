@@ -257,6 +257,7 @@ const App = () => {
               <Route path="multi-lingual" element={<MultiLingual />} />
               <Route path="help" element={<Help />} />
               <Route path="feedback-form" element={<FeedbackForm />} />
+              <Route path="feedback-form/:complaintId" element={<FeedbackForm />} />
               <Route path="notifications" element={<Notifications />} />
               <Route path="settings" element={<Settings />} />
               <Route path="profile" element={<Profile />} />

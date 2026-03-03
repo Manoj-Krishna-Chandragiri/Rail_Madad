@@ -9,12 +9,12 @@ import {
   MessageSquare,
   Search,
   ChevronDown,
-  Badge,
-  Bell
+  Bell,
+  UserCheck,
+  Cpu,
+  Train
 } from 'lucide-react';
 import apiClient from '../utils/api';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
 
 interface AssignedComplaint {
   id: string | number;
@@ -63,8 +63,7 @@ const StaffDashboard: React.FC = () => {
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [priorityFilter, setPriorityFilter] = useState<string>('all');
-
+  const [priorityFilter, setPriorityFilter] = useState<string>('all');  const [typeFilter, setTypeFilter] = useState<string>('all');
   useEffect(() => {
     fetchStaffDashboard();
   }, []);
@@ -180,26 +179,34 @@ const StaffDashboard: React.FC = () => {
     }
   };
 
+  // Unique complaint types for the type filter
+  const uniqueTypes = Array.from(
+    new Set(complaints.map(c => (c.category || c.type || 'other').toLowerCase()))
+  ).sort();
+
   // Filter complaints based on search and filters
   const filteredComplaints = complaints.filter(complaint => {
     const searchLower = searchTerm.toLowerCase();
     const complaintId = complaint.complaint_id || complaint.id.toString();
-    const category = complaint.category || complaint.type || '';
+    const category = (complaint.category || complaint.type || '').toLowerCase();
     const passengerName = complaint.passenger_name || complaint.user?.name || complaint.user?.email || 'Unknown';
-    
-    const matchesSearch = 
+
+    const matchesSearch =
       complaint.description.toLowerCase().includes(searchLower) ||
       complaintId.toLowerCase().includes(searchLower) ||
       passengerName.toLowerCase().includes(searchLower) ||
-      category.toLowerCase().includes(searchLower);
-    
-    const complaintStatus = complaint.status.toLowerCase().replace(' ', '-');
-    const matchesStatus = statusFilter === 'all' || complaintStatus === statusFilter.toLowerCase();
-    
+      category.includes(searchLower);
+
+    // Model statuses: 'Open', 'In Progress', 'Closed'
+    const statusLower = complaint.status.toLowerCase().replace(/ /g, '-');
+    const matchesStatus = statusFilter === 'all' || statusLower === statusFilter;
+
     const priority = complaint.priority_level || complaint.priority || complaint.severity || 'Medium';
     const matchesPriority = priorityFilter === 'all' || priority === priorityFilter;
-    
-    return matchesSearch && matchesStatus && matchesPriority;
+
+    const matchesType = typeFilter === 'all' || category === typeFilter;
+
+    return matchesSearch && matchesStatus && matchesPriority && matchesType;
   });
 
   const getPriorityColor = (priority: string) => {
@@ -356,16 +363,14 @@ const StaffDashboard: React.FC = () => {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className={`appearance-none pl-4 pr-8 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                isDark 
-                  ? 'bg-gray-700 border-gray-600 text-white' 
+                isDark
+                  ? 'bg-gray-700 border-gray-600 text-white'
                   : 'bg-white border-gray-300 text-gray-900'
               }`}
             >
               <option value="all">All Status</option>
               <option value="open">Open</option>
-              <option value="pending">Pending</option>
               <option value="in-progress">In Progress</option>
-              <option value="resolved">Resolved</option>
               <option value="closed">Closed</option>
             </select>
             <ChevronDown className="h-4 w-4 absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -377,8 +382,8 @@ const StaffDashboard: React.FC = () => {
               value={priorityFilter}
               onChange={(e) => setPriorityFilter(e.target.value)}
               className={`appearance-none pl-4 pr-8 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                isDark 
-                  ? 'bg-gray-700 border-gray-600 text-white' 
+                isDark
+                  ? 'bg-gray-700 border-gray-600 text-white'
                   : 'bg-white border-gray-300 text-gray-900'
               }`}
             >
@@ -390,6 +395,37 @@ const StaffDashboard: React.FC = () => {
             </select>
             <ChevronDown className="h-4 w-4 absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
+
+          {/* Type / Category Filter */}
+          <div className="relative">
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className={`appearance-none pl-4 pr-8 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                isDark
+                  ? 'bg-gray-700 border-gray-600 text-white'
+                  : 'bg-white border-gray-300 text-gray-900'
+              }`}
+            >
+              <option value="all">All Types</option>
+              {uniqueTypes.map(t => (
+                <option key={t} value={t}>
+                  {t.replace(/-/g, ' ').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="h-4 w-4 absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+
+          {/* Active filter count + clear */}
+          {(statusFilter !== 'all' || priorityFilter !== 'all' || typeFilter !== 'all' || searchTerm) && (
+            <button
+              onClick={() => { setStatusFilter('all'); setPriorityFilter('all'); setTypeFilter('all'); setSearchTerm(''); }}
+              className="px-3 py-2 text-sm text-red-500 hover:text-red-700 border border-red-300 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 whitespace-nowrap"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
       </div>
 
@@ -454,17 +490,19 @@ const StaffDashboard: React.FC = () => {
                     </span>
                     {complaint.date_of_incident && (
                       <span className="flex items-center gap-1">
-                        📅 Incident: {new Date(complaint.date_of_incident).toLocaleDateString()}
+                        <Train className="h-4 w-4" />
+                        Incident: {new Date(complaint.date_of_incident).toLocaleDateString('en-GB')}
                       </span>
                     )}
                     {complaint.ai_confidence && (
                       <span className="flex items-center gap-1">
-                        <Badge className="h-4 w-4" />
+                        <Cpu className="h-4 w-4" />
                         AI: {(complaint.ai_confidence * 100).toFixed(1)}%
                       </span>
                     )}
                     <span className={`flex items-center gap-1 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>
-                      👤 Assigned: {staffAssigned}
+                      <UserCheck className="h-4 w-4" />
+                      Assigned: {staffAssigned}
                     </span>
                   </div>
                 </div>
@@ -487,8 +525,9 @@ const StaffDashboard: React.FC = () => {
                     </button>
                   )}
                   {(status === 'resolved' || status === 'closed') && (
-                    <span className={`px-4 py-2 rounded-lg ${isDark ? 'bg-green-900/20 text-green-400' : 'bg-green-100 text-green-800'}`}>
-                      ✓ Resolved
+                    <span className={`flex items-center gap-1 px-4 py-2 rounded-lg ${isDark ? 'bg-green-900/20 text-green-400' : 'bg-green-100 text-green-800'}`}>
+                      <CheckCircle2 className="h-4 w-4" />
+                      Resolved
                     </span>
                   )}
                 </div>

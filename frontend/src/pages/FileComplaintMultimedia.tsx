@@ -33,6 +33,8 @@ const FileComplaintMultimedia = () => {
   const [audioFiles, setAudioFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<any>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiDescription, setAiDescription] = useState<string>('');
   
   const photoInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -84,11 +86,12 @@ const FileComplaintMultimedia = () => {
         formDataToSend.append('audio_files', audio, audio.name);
       });
 
+      setIsAnalyzing(true);
       console.log("📤 Submitting multimedia complaint...");
       console.log(`   Photos: ${photos.length}, Videos: ${videos.length}, Audio: ${audioFiles.length}`);
 
       const response = await axios.post(
-        `${import.meta.env.VITE_API_BASE_URL}/api/complaints/file/multimedia/`,
+        `${import.meta.env.VITE_API_BASE_URL || ''}/api/complaints/file/multimedia/`,
         formDataToSend,
         {
           headers: {
@@ -100,9 +103,14 @@ const FileComplaintMultimedia = () => {
       
       console.log("✅ Complaint submitted:", response.data);
       
+      setIsAnalyzing(false);
+
       // Show AI analysis if available
       if (response.data.ai_analysis) {
         setAiAnalysis(response.data.ai_analysis);
+        if (response.data.ai_analysis.description) {
+          setAiDescription(response.data.ai_analysis.description);
+        }
         alert(`Complaint submitted successfully!\n\nAI Analysis:\nCategory: ${response.data.ai_analysis.category}\nSeverity: ${response.data.ai_analysis.severity}\nConfidence: ${(response.data.ai_analysis.confidence * 100).toFixed(1)}%`);
       } else {
         alert("Complaint submitted successfully!");
@@ -123,6 +131,7 @@ const FileComplaintMultimedia = () => {
       setVideos([]);
       setAudioFiles([]);
       setAiAnalysis(null);
+      setAiDescription('');
       
     } catch (error: any) {
       console.error("❌ Error submitting:", error.response?.data || error);
@@ -134,6 +143,7 @@ const FileComplaintMultimedia = () => {
       }
     } finally {
       setIsSubmitting(false);
+      setIsAnalyzing(false);
     }
   };
 

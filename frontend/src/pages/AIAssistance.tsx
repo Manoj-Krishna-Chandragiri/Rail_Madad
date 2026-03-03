@@ -1,7 +1,130 @@
 import { Bot, MessageCircle, Loader, Mic, MicOff } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import AudioTranscription from '../components/AudioTranscription';
+
+// ─── Markdown-like message formatter ──────────────────────────────────────────
+function inlineFormat(text: string): ReactNode[] {
+  // Handle **bold**, [link](url) inside a text fragment
+  const parts: ReactNode[] = [];
+  const regex = /(\*\*(.+?)\*\*|\[([^\]]+)\]\((https?:\/\/[^\)]+)\))/g;
+  let last = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > last) parts.push(text.slice(last, match.index));
+    if (match[2]) {
+      // **bold**
+      parts.push(<strong key={key++} className="font-semibold">{match[2]}</strong>);
+    } else if (match[3] && match[4]) {
+      // [label](url)
+      parts.push(
+        <a key={key++} href={match[4]} target="_blank" rel="noopener noreferrer"
+          className="text-indigo-500 underline underline-offset-2 break-all hover:text-indigo-700">
+          {match[3]}
+        </a>
+      );
+    }
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
+function FormattedMessage({ content, isDark }: { content: string; isDark: boolean }) {
+  const lines = content.split('\n');
+  const nodes: ReactNode[] = [];
+  let bulletItems: ReactNode[] = [];
+  let numberedItems: ReactNode[] = [];
+  let key = 0;
+
+  const flushBullets = () => {
+    if (bulletItems.length) {
+      nodes.push(
+        <ul key={key++} className="list-disc list-outside pl-5 space-y-1 my-2">
+          {bulletItems}
+        </ul>
+      );
+      bulletItems = [];
+    }
+  };
+  const flushNumbered = () => {
+    if (numberedItems.length) {
+      nodes.push(
+        <ol key={key++} className="list-decimal list-outside pl-5 space-y-1 my-2">
+          {numberedItems}
+        </ol>
+      );
+      numberedItems = [];
+    }
+  };
+
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+
+    // Heading: ### or ##
+    if (/^#{2,3}\s+/.test(line)) {
+      flushBullets(); flushNumbered();
+      const text = line.replace(/^#{2,3}\s+/, '');
+      nodes.push(
+        <p key={key++} className="font-bold text-base mt-3 mb-1">
+          {inlineFormat(text)}
+        </p>
+      );
+      continue;
+    }
+
+    // Bullet: * item  or  - item
+    const bulletMatch = line.match(/^[\*\-]\s+(.*)/);
+    if (bulletMatch) {
+      flushNumbered();
+      bulletItems.push(
+        <li key={key++} className="leading-relaxed">
+          {inlineFormat(bulletMatch[1])}
+        </li>
+      );
+      continue;
+    }
+
+    // Numbered list: 1. item
+    const numMatch = line.match(/^\d+\.\s+(.*)/);
+    if (numMatch) {
+      flushBullets();
+      numberedItems.push(
+        <li key={key++} className="leading-relaxed">
+          {inlineFormat(numMatch[1])}
+        </li>
+      );
+      continue;
+    }
+
+    // Empty line — flush lists, add spacing
+    if (line.trim() === '') {
+      flushBullets(); flushNumbered();
+      nodes.push(<div key={key++} className="h-2" />);
+      continue;
+    }
+
+    // Plain paragraph
+    flushBullets(); flushNumbered();
+    nodes.push(
+      <p key={key++} className="leading-relaxed">
+        {inlineFormat(line)}
+      </p>
+    );
+  }
+
+  flushBullets();
+  flushNumbered();
+
+  return (
+    <div className={`text-sm sm:text-base space-y-0.5 ${isDark ? 'text-gray-100' : 'text-gray-800'}`}>
+      {nodes}
+    </div>
+  );
+}
+// ──────────────────────────────────────────────────────────────────────────────
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -209,7 +332,7 @@ You are a helpful AI assistant for Rail Madad, an integrated helpline system for
 * Emergency Contacts: Quick access to Railway Helpline (139), Security (182), Medical Emergency (+91 11 2338 4787)
 
 ### Important Links:
-* Website: https://rail-madad.manojkrishna.me
+* Website: https://rail-madad.manojkrishna.tech
 * File Complaint: Dashboard > File Complaint button
 * Track Status: Navigation menu > Track Status
 * Notifications: Click bell icon in navbar (shows unread count)
@@ -390,15 +513,19 @@ const AIAssistance = () => {
               className={`mb-3 sm:mb-4 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-[85%] sm:max-w-[80%] rounded-lg p-3 sm:p-4 text-sm sm:text-base ${
+                className={`max-w-[85%] sm:max-w-[80%] rounded-lg p-3 sm:p-4 ${
                   msg.role === 'user'
-                    ? 'bg-indigo-600 text-white'
+                    ? 'bg-indigo-600 text-white text-sm sm:text-base'
                     : theme === 'dark'
-                    ? 'bg-gray-800 border-gray-700'
-                    : 'bg-white border border-gray-200'
+                    ? 'bg-gray-800 border border-gray-700'
+                    : 'bg-white border border-gray-200 shadow-sm'
                 }`}
               >
-                {msg.content}
+                {msg.role === 'user' ? (
+                  msg.content
+                ) : (
+                  <FormattedMessage content={msg.content} isDark={theme === 'dark'} />
+                )}
               </div>
             </div>
           ))}

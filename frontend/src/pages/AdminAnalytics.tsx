@@ -15,7 +15,7 @@ import {
 import axios from 'axios';
 import { getAuth } from 'firebase/auth';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''; // Empty = Vite proxy in dev
 
 interface AnalyticsData {
   overview: {
@@ -86,27 +86,6 @@ const AdminAnalytics = () => {
     }
   }, [timeRange, authReady]);
 
-  const getStartDate = (range: string) => {
-    const now = new Date();
-    const start = new Date(now);
-    switch (range) {
-      case 'week':
-        start.setDate(now.getDate() - 7);
-        break;
-      case 'quarter':
-        start.setDate(now.getDate() - 90);
-        break;
-      case 'year':
-        start.setDate(now.getDate() - 365);
-        break;
-      case 'month':
-      default:
-        start.setDate(now.getDate() - 30);
-        break;
-    }
-    return start;
-  };
-
   const normalizeStatus = (status?: string) => (status || '').toLowerCase();
 
   const fetchAnalytics = async () => {
@@ -149,46 +128,48 @@ const AdminAnalytics = () => {
       const complaints = complaintsRes?.data || [];
       const staffList = staffRes?.data || [];
 
-      const now = new Date();
-      const startDate = getStartDate(timeRange);
-      const filteredComplaints = complaints.filter((complaint: { created_at?: string }) => {
-        if (!complaint.created_at) return true;
-        const createdAt = new Date(complaint.created_at);
-        return createdAt >= startDate && createdAt <= now;
-      });
+      // Use ALL complaints for every chart so the full distribution is always visible.
+      // (Bulk-imported data shares a single created_at timestamp, so a date filter
+      // would leave most charts empty.)
+      const allComplaints = complaints;
       
-      // Calculate category stats from complaints
+      // Calculate category stats from ALL complaints
       const categoryMap: { [key: string]: number } = {};
       const priorityMap: { [key: string]: number } = {};
       
-      filteredComplaints.forEach((complaint: { category?: string; type?: string; priority?: string }) => {
+      allComplaints.forEach((complaint: { category?: string; type?: string; priority?: string }) => {
         const category = complaint.category || complaint.type || 'Other';
         const priority = complaint.priority || 'Medium';
         categoryMap[category] = (categoryMap[category] || 0) + 1;
         priorityMap[priority] = (priorityMap[priority] || 0) + 1;
       });
 
-      const totalComplaints = dashboardData.totalComplaints || filteredComplaints.length || 0;
+      const totalComplaints = allComplaints.length || dashboardData.totalComplaints || 0;
       
-      const categoryStats = Object.entries(categoryMap).map(([category, count]) => ({
-        category,
-        count,
-        percentage: totalComplaints > 0 ? Math.round((count / totalComplaints) * 100) : 0
-      }));
+      const categoryStats = Object.entries(categoryMap)
+        .map(([category, count]) => ({
+          category,
+          count,
+          percentage: totalComplaints > 0 ? Math.round((count / totalComplaints) * 100) : 0
+        }))
+        .sort((a, b) => b.count - a.count);
       
-      const priorityStats = Object.entries(priorityMap).map(([priority, count]) => ({
-        priority,
-        count,
-        percentage: totalComplaints > 0 ? Math.round((count / totalComplaints) * 100) : 0
-      }));
+      const priorityStats = Object.entries(priorityMap)
+        .map(([priority, count]) => ({
+          priority,
+          count,
+          percentage: totalComplaints > 0 ? Math.round((count / totalComplaints) * 100) : 0
+        }))
+        .sort((a, b) => b.count - a.count);
       
-      // Process monthly trends from dashboard data (fallback to computed)
-      const trends = dashboardData.complaintTrends || [];
-      const monthlyTrend = trends.length > 0 ? processMonthlyTrend(trends) : buildMonthlyTrend(complaints);
+      // Always build the 6-month trend from the full complaints list.
+      // The backend complaintTrends only covers last 30 days, so it misses
+      // Oct/Nov/Dec/Jan data — buildMonthlyTrend uses created_at/resolved_at correctly.
+      const monthlyTrend = buildMonthlyTrend(allComplaints);
 
-      // Resolution calculations
-      const resolvedComplaints = filteredComplaints.filter((c: { status?: string }) => normalizeStatus(c.status) === 'closed');
-      const pendingComplaints = filteredComplaints.filter((c: { status?: string }) => {
+      // Resolution / backlog calculations from ALL complaints
+      const resolvedComplaints = allComplaints.filter((c: { status?: string }) => normalizeStatus(c.status) === 'closed');
+      const pendingComplaints = allComplaints.filter((c: { status?: string }) => {
         const s = normalizeStatus(c.status);
         return s === 'open' || s === 'in progress';
       });
@@ -198,11 +179,14 @@ const AdminAnalytics = () => {
 
       const backlogAging = buildBacklogAging(pendingComplaints, pendingComplaints.length);
       const avgResolutionByCategory = buildAvgResolutionByCategory(resolvedComplaints);
-      const slaBreaches = calculateSlaBreaches(filteredComplaints);
+      const slaBreaches = calculateSlaBreaches(allComplaints);
       
-      // Get staff performance - use full_name field from the API
-      const topPerformers = staffList
+      // Top performers: sort by resolved_complaints desc, take top 3
+      const topPerformers = [...staffList]
         .filter((staff: { status?: string }) => staff.status === 'active')
+        .sort((a: { resolved_complaints?: number }, b: { resolved_complaints?: number }) =>
+          (b.resolved_complaints || 0) - (a.resolved_complaints || 0)
+        )
         .slice(0, 3)
         .map((staff: { full_name?: string; name?: string; resolved_complaints?: number; rating?: number }) => ({
           name: staff.full_name || staff.name || 'Staff Member',
@@ -213,10 +197,12 @@ const AdminAnalytics = () => {
       const analyticsData: AnalyticsData = {
         overview: {
           totalComplaints: totalComplaints,
-          resolvedComplaints: dashboardData.closedComplaints || resolvedComplaints.length,
-          pendingComplaints: (dashboardData.openComplaints || 0) + (dashboardData.inProgressComplaints || 0) || pendingComplaints.length,
+          resolvedComplaints: dashboardData.closedComplaints ?? resolvedComplaints.length,
+          pendingComplaints: dashboardData.openComplaints != null
+            ? (dashboardData.openComplaints + (dashboardData.inProgressComplaints || 0))
+            : pendingComplaints.length,
           avgResolutionTime: dashboardData.averageResolutionTime || avgResolutionTime,
-          resolutionRate: dashboardData.resolutionRate || resolutionRate,
+          resolutionRate: resolutionRate || dashboardData.resolutionRate || 0,
           slaBreaches
         },
         categoryStats: categoryStats.length > 0 ? categoryStats : [
@@ -258,36 +244,6 @@ const AdminAnalytics = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Helper function to process monthly trends
-  const processMonthlyTrend = (trends: { date: string; closed: number; open: number; in_progress: number }[]) => {
-    if (!trends || trends.length === 0) {
-      // Return last 6 months with 0 data
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-      return months.map(month => ({ month, resolved: 0, received: 0 }));
-    }
-    
-    // Group by month
-    const monthMap: { [key: string]: { resolved: number; received: number } } = {};
-    
-    trends.forEach(day => {
-      const date = new Date(day.date);
-      const monthKey = date.toLocaleString('default', { month: 'short' });
-      
-      if (!monthMap[monthKey]) {
-        monthMap[monthKey] = { resolved: 0, received: 0 };
-      }
-      
-      monthMap[monthKey].resolved += day.closed || 0;
-      monthMap[monthKey].received += (day.open || 0) + (day.in_progress || 0) + (day.closed || 0);
-    });
-    
-    return Object.entries(monthMap).map(([month, data]) => ({
-      month,
-      resolved: data.resolved,
-      received: data.received
-    }));
   };
 
   const calculateAverageResolutionTime = (resolvedComplaints: { created_at?: string; resolved_at?: string; updated_at?: string }[]) => {

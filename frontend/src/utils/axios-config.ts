@@ -6,10 +6,11 @@ const isDevelopment = import.meta.env.DEV || import.meta.env.MODE === 'developme
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
 // Determine API base URL
-let API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+// Empty string = relative paths → Vite proxy forwards to http://127.0.0.1:8000
+let API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 // Override for local development if needed
-if (isDevelopment && isLocalhost && !API_BASE_URL.includes('localhost')) {
+if (isDevelopment && isLocalhost && API_BASE_URL && !API_BASE_URL.includes('localhost')) {
   // If we're in development but API_BASE_URL is pointing to production, 
   // and we want to use local backend, we can override it
   const useLocalBackend = import.meta.env.VITE_USE_LOCAL_BACKEND === 'true';

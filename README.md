@@ -10,7 +10,7 @@
 
 ### 🎯 A modern, intelligent solution for Indian Railways passenger grievance redressal with AI-powered assistance, real-time support, and facial authentication
 
-[Live Demo](https://rail-madad.manojkrishna.me) • [API Documentation](#-api-documentation) • [Features](#-key-features) • [Installation](#-installation)
+[Live Demo](https://rail-madad.manojkrishna.tech) • [API Documentation](#-api-documentation) • [Features](#-key-features) • [Installation](#-installation)
 
 </div>
 

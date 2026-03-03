@@ -896,7 +896,8 @@ def staff_analytics(request, staff_id):
 
 # Admin Complaints Management API Views
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@authentication_classes([])
+@permission_classes([])
 def admin_get_all_complaints(request):
     """
     Admin endpoint to get all complaints
@@ -939,15 +940,17 @@ def admin_get_all_complaints(request):
     return Response(serializer.data)
 
 @api_view(['PUT'])
-@permission_classes([IsAuthenticated])
+@authentication_classes([])
+@permission_classes([])
 def admin_update_complaint_status(request, complaint_id):
     """
     Admin endpoint to update a complaint's status
     """
-    user = request.user
+    if not getattr(request, 'is_authenticated', False):
+        return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
     
-    # Ensure the user is an admin
-    if not user.is_staff and not user.is_superuser:
+    # Ensure the user is an admin or staff
+    if not getattr(request, 'is_admin', False) and not getattr(request, 'is_staff', False):
         return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
     
     complaint = get_object_or_404(Complaint, id=complaint_id)
@@ -973,7 +976,7 @@ def admin_update_complaint_status(request, complaint_id):
             complaint.resolution_notes = resolution_notes
         
         # Record admin who closed the complaint
-        complaint.resolved_by = user.username
+        complaint.resolved_by = getattr(request, 'firebase_email', None) or 'admin'
     
     complaint.save()
     
@@ -1014,9 +1017,24 @@ def admin_staff_list(request):
         return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
     
     if request.method == 'GET':
-        staff = Staff.objects.select_related('user').all()
-        serializer = StaffSerializer(staff, many=True, context={'request': request})
-        return Response(serializer.data)
+        staff_qs = Staff.objects.select_related('user').all()
+        staff_data = []
+        for s in staff_qs:
+            data = StaffSerializer(s, context={'request': request}).data
+            # Dynamically compute resolved/assigned counts from the Complaint table
+            # (the model field resolved_complaints is never auto-updated)
+            resolved_count = Complaint.objects.filter(
+                staff=s.full_name, status='Closed'
+            ).count()
+            assigned_count = Complaint.objects.filter(staff=s.full_name).count()
+            data['resolved_complaints'] = resolved_count
+            data['assigned_complaints'] = assigned_count
+            data['resolution_rate'] = (
+                round((resolved_count / assigned_count) * 100, 1)
+                if assigned_count > 0 else 0
+            )
+            staff_data.append(data)
+        return Response(staff_data)
     
     elif request.method == 'POST':
         print("Admin staff creation - received data:", request.data)
@@ -1383,28 +1401,30 @@ def admin_dashboard_stats(request):
 
 # Additional admin utility endpoints
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@authentication_classes([])
+@permission_classes([])
 def admin_complaint_types(request):
     """
     Get all unique complaint types for filtering
     """
-    user = request.user
-    
-    if not user.is_staff and not user.is_superuser:
+    if not getattr(request, 'is_authenticated', False):
+        return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+    if not getattr(request, 'is_admin', False) and not getattr(request, 'is_staff', False):
         return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
     
     complaint_types = Complaint.objects.values_list('type', flat=True).distinct().order_by('type')
     return Response(list(complaint_types))
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@authentication_classes([])
+@permission_classes([])
 def admin_recent_activity(request):
     """
     Get recent complaint activity for admin dashboard
     """
-    user = request.user
-    
-    if not user.is_staff and not user.is_superuser:
+    if not getattr(request, 'is_authenticated', False):
+        return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+    if not getattr(request, 'is_admin', False) and not getattr(request, 'is_staff', False):
         return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
     
     # Get recent complaints (last 24 hours)
@@ -1452,16 +1472,17 @@ def admin_recent_activity(request):
     return Response(activity_data[:15])  # Return top 15 activities
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@authentication_classes([])
+@permission_classes([])
 def admin_performance_metrics(request):
     """
     Get detailed performance metrics for admin
     """
     from accounts.models import Staff
     
-    user = request.user
-    
-    if not user.is_staff and not user.is_superuser:
+    if not getattr(request, 'is_authenticated', False):
+        return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+    if not getattr(request, 'is_admin', False) and not getattr(request, 'is_staff', False):
         return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
     
     # Time periods
@@ -1545,14 +1566,15 @@ def admin_performance_metrics(request):
 
 # Add a simple admin settings endpoint
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@authentication_classes([])
+@permission_classes([])
 def admin_settings(request):
     """
     Get or update admin settings
     """
-    user = request.user
-    
-    if not user.is_staff and not user.is_superuser:
+    if not getattr(request, 'is_authenticated', False):
+        return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+    if not getattr(request, 'is_admin', False) and not getattr(request, 'is_staff', False):
         return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
     
     if request.method == 'GET':
@@ -2807,66 +2829,73 @@ def staff_dashboard(request):
         if not (getattr(request, 'is_staff', False) or getattr(request, 'is_admin', False)):
             return Response({'error': 'Staff access required'}, status=status.HTTP_403_FORBIDDEN)
         
-        # For development mode, we'll show all complaints for now
-        # In production, you would filter by the specific staff member
-        staff_email = getattr(request, 'firebase_email', 'unknown')
-        
-        # Try to find staff member by email or show all if admin
-        try:
-            from .assignment_service import ComplaintAssignmentService
-            
+        staff_email = getattr(request, 'firebase_email', None)
+        logger.info(f"[STAFF_DASHBOARD] Request from email: {staff_email}")
+
+        PRIORITY_ORDER = Case(
+            When(status='Open', then=Value(0)),
+            When(status='In Progress', then=Value(1)),
+            When(status='Closed', then=Value(2)),
+            output_field=IntegerField()
+        )
+        SEVERITY_ORDER = Case(
+            When(severity='High', then=Value(0)),
+            When(severity='Medium', then=Value(1)),
+            When(severity='Low', then=Value(2)),
+            output_field=IntegerField()
+        )
+        PRIORITY_LEVEL_ORDER = Case(
+            When(priority='Critical', then=Value(0)),
+            When(priority='High', then=Value(1)),
+            When(priority='Medium', then=Value(2)),
+            When(priority='Low', then=Value(3)),
+            output_field=IntegerField()
+        )
+
+        staff_member = None   # complaints.Staff instance
+        workload = None
+        staff_name = None
+
+        # 1. Look up in complaints.Staff by login email (primary lookup)
+        if staff_email:
             staff_member = Staff.objects.filter(email=staff_email).first()
             if staff_member:
-                # Filter complaints assigned to this specific staff member OR all complaints if no specific assignment yet
-                # (Since we're transitioning from department-based to person-based assignment)
-                # Sort by: Status (Open > In Progress), then Severity (High > Medium > Low), then Priority
-                assigned_complaints = Complaint.objects.filter(
-                    staff=staff_member.name
-                )
-                
-                # If no complaints specifically assigned to this staff member, show all unassigned or department-assigned complaints
-                # This helps during transition period
-                if assigned_complaints.count() == 0:
-                    # Show all complaints (staff can work on any complaint during transition)
-                    assigned_complaints = Complaint.objects.all()
-                
-                assigned_complaints = assigned_complaints.order_by(
-                    # Status ordering: Open=0, In Progress=1, Closed=2 (so negate for descending)
-                    Case(
-                        When(status='Open', then=Value(0)),
-                        When(status='In Progress', then=Value(1)),
-                        When(status='Closed', then=Value(2)),
-                        output_field=IntegerField()
-                    ),
-                    # Severity ordering: High=0, Medium=1, Low=2
-                    Case(
-                        When(severity='High', then=Value(0)),
-                        When(severity='Medium', then=Value(1)),
-                        When(severity='Low', then=Value(2)),
-                        output_field=IntegerField()
-                    ),
-                    # Priority ordering: Critical=0, High=1, Medium=2, Low=3
-                    Case(
-                        When(priority='Critical', then=Value(0)),
-                        When(priority='High', then=Value(1)),
-                        When(priority='Medium', then=Value(2)),
-                        When(priority='Low', then=Value(3)),
-                        output_field=IntegerField()
-                    ),
-                    '-created_at'  # Newest first for same priority
-                )
-                
-                # Get staff workload
-                workload = ComplaintAssignmentService.get_staff_workload(staff_member.name)
-            else:
-                # If no specific staff found (e.g., admin), show all complaints
-                assigned_complaints = Complaint.objects.all().order_by('-created_at')
-                workload = None
-        except Exception as e:
-            logger.warning(f"Error in staff dashboard: {e}")
-            # Fallback to showing all complaints sorted by date
-            assigned_complaints = Complaint.objects.all().order_by('-created_at')
-            workload = None
+                staff_name = staff_member.name
+                logger.info(f"[STAFF_DASHBOARD] Resolved via complaints.Staff email: {staff_name}")
+
+        # 2. Fall back: check accounts.Staff full_name and then match in complaints.Staff
+        if staff_name is None and staff_email:
+            try:
+                from accounts.models import Staff as AccountsStaff
+                acct = AccountsStaff.objects.filter(email=staff_email).first()
+                if acct:
+                    compl_staff = Staff.objects.filter(name=acct.full_name).first()
+                    if compl_staff:
+                        staff_member = compl_staff
+                        staff_name = compl_staff.name
+                        logger.info(f"[STAFF_DASHBOARD] Resolved via accounts.Staff→complaints.Staff name: {staff_name}")
+                    else:
+                        # Use the accounts.Staff full_name directly (in case staff field stores it)
+                        staff_name = acct.full_name
+                        logger.info(f"[STAFF_DASHBOARD] Resolved via accounts.Staff full_name: {staff_name}")
+            except Exception as e:
+                logger.warning(f"[STAFF_DASHBOARD] accounts.Staff lookup failed: {e}")
+
+        if staff_name:
+            try:
+                from .assignment_service import ComplaintAssignmentService
+                workload = ComplaintAssignmentService.get_staff_workload(staff_name)
+            except Exception as e:
+                logger.warning(f"[STAFF_DASHBOARD] Could not get workload: {e}")
+
+            assigned_complaints = Complaint.objects.filter(
+                staff=staff_name
+            ).order_by(PRIORITY_ORDER, SEVERITY_ORDER, PRIORITY_LEVEL_ORDER, '-created_at')
+
+            logger.info(f"[STAFF_DASHBOARD] Complaints for '{staff_name}': {assigned_complaints.count()}")
+        else:
+            logger.warning(f"[STAFF_DASHBOARD] No staff name resolved for '{staff_email}' — returning empty set")
+            assigned_complaints = Complaint.objects.none()
         
         # Get statistics for the staff dashboard
         total_assigned = assigned_complaints.count()
@@ -2940,7 +2969,7 @@ def staff_dashboard(request):
                 'today_assigned': today_assigned,
                 'today_resolved': today_resolved,
                 'staff_email': staff_email,
-                'staff_name': staff_member.name if staff_member else 'Admin User'
+                'staff_name': staff_name if staff_name else 'Admin User'
             }
         }
         
