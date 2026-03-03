@@ -16,6 +16,8 @@ service-account-key.json
 .env
 .env.local
 .env.production
+.env.secrets
+.env.ec2
 
 # Media files
 media/
