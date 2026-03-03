@@ -26,7 +26,7 @@ jobs:
 
             echo "=== Installing/updating dependencies ==="
             cd /home/ubuntu/Rail_Madad/backend
-            pip install -r requirements.txt --quiet
+            pip install -r requirements-ec2.txt --quiet
 
             echo "=== Running database migrations ==="
             python manage.py migrate --noinput

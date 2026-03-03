@@ -42,7 +42,8 @@ cd backend
 python3.12 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
-pip install -r requirements.txt
+# Use EC2-specific requirements (excludes tensorflow/deepface — too heavy for t2.micro)
+pip install -r requirements-ec2.txt
 
 # ── 5. .env file ───────────────────────────────────────────────────────────
 echo "=== Creating .env file ==="
