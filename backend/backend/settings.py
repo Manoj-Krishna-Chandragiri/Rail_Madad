@@ -353,8 +353,8 @@ SECURE_SSL_REDIRECT = False
 
 # Production Security Settings
 if IS_PRODUCTION:
-    # HTTPS & SSL Configuration — allow explicit override via env var
-    SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True').lower() not in ('false', '0', 'no')
+    # HTTPS & SSL Configuration — disabled until SSL cert is configured on EC2
+    SECURE_SSL_REDIRECT = False
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # For Nginx/Gunicorn
     
     # HSTS (HTTP Strict Transport Security)
