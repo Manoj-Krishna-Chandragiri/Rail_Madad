@@ -35,10 +35,10 @@ mysqlclient==2.2.4
 # Production Server
 gunicorn==23.0.0
 
-# Lightweight ML (no tensorflow/torch)
+# Lightweight ML (no tensorflow/torch) — Python 3.12 compatible versions
 scikit-learn==1.5.1
-pandas==2.1.4
-numpy==1.24.3
+pandas==2.2.3
+numpy==2.2.3
 joblib==1.3.2
 
 # Gemini AI for Multimodal Analysis (cloud API, no local model)
