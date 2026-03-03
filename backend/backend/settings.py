@@ -33,13 +33,18 @@ IS_PRODUCTION = not DEBUG and os.getenv('ENVIRONMENT') == 'production'
 DEFAULT_ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 if IS_PRODUCTION or os.getenv('ENVIRONMENT') in ['staging', 'production']:
     DEFAULT_ALLOWED_HOSTS.extend([
-        'api.rail-madad.manojkrishna.me',
-        'rail-madad.manojkrishna.me',
+        'api.rail-madad.manojkrishna.tech',
+        'rail-madad.manojkrishna.tech',
     ])
-    # Add EC2 instance IP if provided (for fallback access)
+    # Add EC2 instance IP/DNS if provided (for fallback access)
     ec2_ip = os.getenv('EC2_PUBLIC_IP')
     if ec2_ip:
         DEFAULT_ALLOWED_HOSTS.append(ec2_ip)
+    ec2_dns = os.getenv('EC2_PUBLIC_DNS')
+    if ec2_dns:
+        DEFAULT_ALLOWED_HOSTS.append(ec2_dns)
+    # Allow all EC2 ap-south-1 hostnames as fallback (IP changes on restart)
+    DEFAULT_ALLOWED_HOSTS.append('.ap-south-1.compute.amazonaws.com')
 
 ALLOWED_HOSTS = [host.strip() for host in os.getenv('DJANGO_ALLOWED_HOSTS', ','.join(DEFAULT_ALLOWED_HOSTS)).split(',') if host.strip()]
 # Application definition
@@ -112,22 +117,24 @@ if os.getenv('USE_SQLITE', 'False') == 'True':
     }
 else:
     # Use MySQL for production
+    _db_options = {
+        'sql_mode': 'traditional',
+        'charset': 'utf8mb4',
+        'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+    }
+    # Use SSL for cloud DBs (Aiven), disable for local EC2 MySQL
+    if os.getenv('MYSQL_SSL', 'true').lower() == 'true':
+        _db_options['ssl'] = {'ssl_mode': 'REQUIRED'}
+
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
             'NAME': os.getenv('MYSQL_DATABASE'),
             'USER': os.getenv('MYSQL_USER'),
             'PASSWORD': os.getenv('MYSQL_PASSWORD'),
-            'HOST': os.getenv('MYSQL_HOST'),
-            'PORT': os.getenv('MYSQL_PORT'),
-            'OPTIONS': {
-                'sql_mode': 'traditional',
-                'charset': 'utf8mb4',
-                'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-                'ssl': {
-                    'ssl_mode': 'REQUIRED',
-                }
-            }
+            'HOST': os.getenv('MYSQL_HOST', '127.0.0.1'),
+            'PORT': os.getenv('MYSQL_PORT', '3306'),
+            'OPTIONS': _db_options,
         }
     }
 
@@ -175,7 +182,7 @@ DEFAULT_CORS_ORIGINS = [
 
 if IS_PRODUCTION or os.getenv('ENVIRONMENT') in ['staging', 'production']:
     DEFAULT_CORS_ORIGINS.extend([
-        "https://rail-madad.manojkrishna.me",      # Custom frontend domain
+        "https://rail-madad.manojkrishna.tech",      # Custom frontend domain
         "https://main.dhpx91sx6cx3f.amplifyapp.com",  # AWS Amplify frontend
     ])
 
@@ -221,7 +228,7 @@ DEFAULT_CSRF_ORIGINS = [
 
 if IS_PRODUCTION or os.getenv('ENVIRONMENT') in ['staging', 'production']:
     DEFAULT_CSRF_ORIGINS.extend([
-        "https://rail-madad.manojkrishna.me",       # Custom frontend domain
+        "https://rail-madad.manojkrishna.tech",       # Custom frontend domain
         "https://main.dhpx91sx6cx3f.amplifyapp.com",  # AWS Amplify frontend
     ])
 
@@ -340,6 +347,9 @@ STORAGES = {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
+
+# Always disable SSL redirect — override per-environment below
+SECURE_SSL_REDIRECT = False
 
 # Production Security Settings
 if IS_PRODUCTION:
