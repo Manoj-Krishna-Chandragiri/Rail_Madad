@@ -4,7 +4,7 @@ import GoogleIcon from '../components/icons/GoogleIcon';
 import { useTheme } from '../context/ThemeContext';
 import FaceAuthModal from '../components/FaceAuthModal';
 import TermsModal from '../components/TermsModal';
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import { signInWithEmailAndPassword, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { auth, db } from '../config/firebase';
 import { fetchAndStoreUserProfile } from '../utils/auth-helpers';
 import { setDoc, doc } from 'firebase/firestore';
@@ -208,9 +208,6 @@ const AdminLogin = () => {
   const handleFaceAuthSuccess = async (userData: any, firebaseToken: string) => {
     try {
       console.log('🎯 Face auth success handler called:', { userData, firebaseToken });
-      
-      const isDevToken = firebaseToken && firebaseToken.startsWith('dev-face-token-');
-      const effectiveToken = firebaseToken || (isDevToken ? firebaseToken : `dev-face-token-${userData?.id || 'user'}`);
 
       // Validate that the user is an admin
       if (userData.user_type !== 'admin') {
@@ -219,8 +216,21 @@ const AdminLogin = () => {
         return;
       }
 
+      // Exchange the custom token for a real Firebase ID token
+      let effectiveToken = firebaseToken;
+      const isDevToken = firebaseToken && firebaseToken.startsWith('dev-face-token-');
+      if (!isDevToken && firebaseToken) {
+        try {
+          const userCredential = await signInWithCustomToken(auth, firebaseToken);
+          effectiveToken = await userCredential.user.getIdToken();
+          console.log('✅ Exchanged custom token for ID token');
+        } catch (tokenErr) {
+          console.warn('⚠️ Could not exchange custom token, using as-is:', tokenErr);
+        }
+      }
+
       console.log('✅ Storing auth data:', {
-        token: effectiveToken,
+        token: effectiveToken?.substring(0, 20) + '...',
         userType: userData.user_type,
         userId: userData.id
       });
