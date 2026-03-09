@@ -396,9 +396,10 @@ Response Guidelines:
 - Mention emergency helpline numbers when safety/security issues arise"""
 
 CHATBOT_MODELS = [
-    'gemini-2.5-flash',
-    'gemini-2.5-flash-lite',
-    'gemini-flash-latest',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-8b',
+    'gemini-1.5-flash-latest',
 ]
 
 
@@ -424,8 +425,8 @@ def chatbot_proxy(request):
         return Response({'error': 'Message too long (max 4000 characters)'}, status=status.HTTP_400_BAD_REQUEST)
 
     api_key = (
+        os.getenv('GOOGLE_GEMINI_API_KEY') or  # prefer — was never in VITE_ prefix
         os.getenv('GEMINI_CHATBOT_API_KEY') or
-        os.getenv('GOOGLE_GEMINI_API_KEY') or
         os.getenv('GEMINI_API_KEY')
     )
     if not api_key:
@@ -448,18 +449,25 @@ def chatbot_proxy(request):
         except Exception as e:
             err_str = str(e).lower()
             last_error = str(e)
-            if 'quota' in err_str or 'rate' in err_str or '429' in err_str:
-                logger.warning(f"Rate limit on {model_name}, trying next model")
-                continue
-            logger.error(f"Chatbot error with model {model_name}: {e}")
-            break
+            # Stop immediately if the API key itself is invalid/revoked — no point retrying other models
+            if '403' in err_str and 'api key' in err_str:
+                logger.error(f"API key error (not retrying other models): {e}")
+                break
+            logger.warning(f"Model {model_name} failed, trying next: {e}")
+            continue  # try next model for all other errors
 
-    # All models exhausted or non-rate-limit error
-    if last_error and ('quota' in last_error.lower() or 'rate' in last_error.lower()):
-        return Response(
-            {'error': 'All AI models are rate-limited. Please try again in a few minutes.', 'type': 'rate_limit'},
-            status=status.HTTP_429_TOO_MANY_REQUESTS
-        )
+    # All models exhausted
+    if last_error:
+        if 'quota' in last_error.lower() or 'rate' in last_error.lower() or '429' in last_error:
+            return Response(
+                {'error': 'All AI models are rate-limited. Please try again in a few minutes.', 'type': 'rate_limit'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        if '403' in last_error and 'leaked' in last_error.lower():
+            return Response(
+                {'error': 'The AI service API key needs to be renewed. Please contact the administrator.', 'type': 'api_key_error'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
 
     return Response(
         {'error': 'AI service temporarily unavailable', 'type': 'api_error'},

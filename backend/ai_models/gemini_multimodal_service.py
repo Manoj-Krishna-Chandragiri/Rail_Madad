@@ -20,20 +20,22 @@ class GeminiMultimodalService:
     def __init__(self):
         """Initialize Gemini API with different model configurations"""
         # Try multiple environment variable names for API key
+        # Prefer GOOGLE_GEMINI_API_KEY — it was never exposed in a VITE_ frontend variable
         self.api_key = (
+            os.getenv('GOOGLE_GEMINI_API_KEY') or
             os.getenv('GEMINI_MULTIMODAL_API_KEY') or
             os.getenv('GEMINI_API_KEY') or
             os.getenv('GEMINI_CHATBOT_API_KEY')
         )
         if not self.api_key:
-            raise ValueError("No Gemini API key found. Set GEMINI_MULTIMODAL_API_KEY, GEMINI_API_KEY, or GEMINI_CHATBOT_API_KEY")
+            raise ValueError("No Gemini API key found. Set GOOGLE_GEMINI_API_KEY in the environment.")
         
         genai.configure(api_key=self.api_key)
         
-        # Model selection based on task - use full model names
-        self.image_model = os.getenv('GEMINI_IMAGE_MODEL', 'gemini-flash-latest')
-        self.video_model = os.getenv('GEMINI_VIDEO_MODEL', 'gemini-flash-latest')
-        self.audio_model = os.getenv('GEMINI_AUDIO_MODEL', 'gemini-flash-latest')
+        # Model selection based on task - use stable model names
+        self.image_model = os.getenv('GEMINI_IMAGE_MODEL', 'gemini-1.5-flash')
+        self.video_model = os.getenv('GEMINI_VIDEO_MODEL', 'gemini-1.5-flash')
+        self.audio_model = os.getenv('GEMINI_AUDIO_MODEL', 'gemini-1.5-flash')
         
         # Generation config for consistent JSON output
         self.generation_config = {
