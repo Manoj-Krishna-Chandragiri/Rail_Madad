@@ -19,6 +19,7 @@ jobs:
 
             echo "=== Pulling latest code ==="
             cd /home/ubuntu/Rail_Madad
+            git clean -fd
             git pull origin main
 
             echo "=== Activating Python venv ==="
