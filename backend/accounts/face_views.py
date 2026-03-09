@@ -387,8 +387,9 @@ def face_auth_login(request):
             # Generate Firebase custom token for frontend
             firebase_token = None
             try:
+                import firebase_admin
                 from firebase_admin import auth as firebase_auth
-                if firebase_auth._apps and getattr(matched_user, 'firebase_uid', None):
+                if firebase_admin._apps and getattr(matched_user, 'firebase_uid', None):
                     custom_token = firebase_auth.create_custom_token(matched_user.firebase_uid)
                     firebase_token = custom_token.decode('utf-8') if isinstance(custom_token, bytes) else custom_token
                 else:
