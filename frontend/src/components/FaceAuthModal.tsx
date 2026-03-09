@@ -31,7 +31,8 @@ const FaceAuthModal: React.FC<FaceAuthModalProps> = ({
         ? '/api/accounts/face-auth/login/'
         : '/api/accounts/face-profile/enroll/';
 
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}${endpoint}`, {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${baseUrl}${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
