@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import GoogleIcon from '../components/icons/GoogleIcon';
 import { useTheme } from '../context/ThemeContext';
-import FaceAuthModal from '../components/FaceAuthModal';
 import TermsModal from '../components/TermsModal';
 import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { auth, db } from '../config/firebase';
@@ -99,7 +98,6 @@ const PassengerLogin = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showSignUp, setShowSignUp] = useState(false);
-  const [showFaceAuthModal, setShowFaceAuthModal] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [modalType, setModalType] = useState<'terms' | 'privacy'>('terms');
@@ -203,56 +201,6 @@ const PassengerLogin = () => {
       setErrors({ general: 'Google sign-in failed. Please try again.' });
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleFaceAuthSuccess = async (userData: any, firebaseToken: string) => {
-    try {
-      console.log('🎯 Face auth success handler called:', { userData, firebaseToken });
-      
-      const isDevToken = firebaseToken && firebaseToken.startsWith('dev-face-token-');
-      const effectiveToken = firebaseToken || (isDevToken ? firebaseToken : `dev-face-token-${userData?.id || 'user'}`);
-
-      // Validate that the user is a passenger
-      if (userData.user_type !== 'passenger') {
-        setErrors({ general: 'This account is not authorized for passenger access.' });
-        setShowFaceAuthModal(false);
-        return;
-      }
-
-      console.log('✅ Storing auth data:', {
-        token: effectiveToken,
-        userType: userData.user_type,
-        userId: userData.id
-      });
-
-      // Store authentication data
-      localStorage.setItem('authToken', effectiveToken || '');
-      localStorage.setItem('firebaseToken', effectiveToken || '');
-      localStorage.setItem('loginType', 'passenger');
-      localStorage.setItem('userRole', 'passenger');
-      localStorage.setItem('isPassenger', 'true');
-      localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('userId', String(userData.id || ''));
-      localStorage.setItem('userName', userData.full_name || userData.name || userData.email);
-      localStorage.setItem('userEmail', userData.email);
-
-      if (userData.profile_image) {
-        localStorage.setItem('userAvatar', userData.profile_image);
-      }
-
-      console.log('✅ Auth data stored, triggering userTypeChanged event');
-      window.dispatchEvent(new Event('userTypeChanged'));
-      
-      setShowFaceAuthModal(false);
-      
-      console.log('✅ Navigating to user dashboard...');
-      setTimeout(() => {
-        navigate('/user-dashboard');
-      }, 100);
-    } catch (error) {
-      console.error('❌ Face auth success handler error:', error);
-      setErrors({ general: 'Authentication succeeded but navigation failed.' });
     }
   };
 
@@ -530,20 +478,6 @@ const PassengerLogin = () => {
                 Sign in with Google
               </button>
 
-              <button
-                type="button"
-                onClick={() => setShowFaceAuthModal(true)}
-                disabled={isLoading}
-                className={`w-full flex items-center justify-center gap-2 border py-2 rounded-lg ${
-                  theme === 'dark' ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                Sign in with Face
-              </button>
-
               <div className="text-center">
                 <button
                   type="button"
@@ -768,14 +702,6 @@ const PassengerLogin = () => {
       </div>
     </div>
   </div>
-
-  {/* Face Authentication Modal */}
-  <FaceAuthModal
-    isOpen={showFaceAuthModal}
-    onClose={() => setShowFaceAuthModal(false)}
-    onSuccess={handleFaceAuthSuccess}
-    mode="login"
-  />
 
   {/* Terms Modal */}
   <TermsModal

@@ -88,6 +88,19 @@ Major_final_abstract.pdf
 major_final_ppt.pptx
 railmadad.doc
 railmadad.pdf
+
+# Database dumps (may contain sensitive data)
+*.sql
+aiven_dump.sql
+
+# Debug/test output files
+backend/check_output.txt
+check_output.txt
+
+# Research/paper markdown docs (not part of codebase)
+PAPER_*.md
+RESEARCH_*.md
+TECHNICAL_*.md
 Railway_Complaints_Final_Validated.csv
 Train_Enhanced_Models_Colab.ipynb
 Train_Enhanced_Models_Colab_Dataset.csv

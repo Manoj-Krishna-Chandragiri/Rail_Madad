@@ -40,7 +40,7 @@ google-generativeai==0.8.3
 cloudinary==1.41.0
 
 # Facial Recognition (using DeepFace - more lightweight alternative)
-deepface==0.0.79
+deepface>=0.0.93  # 0.0.79 dropped: LocallyConnected2D removed in TF 2.13+
 tf-keras>=2.16.0
 
 # Additional utilities (if needed for development/production)
