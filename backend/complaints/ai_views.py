@@ -13,6 +13,7 @@ from .models import Complaint, Staff
 from ai_models.complaint_categorizer import complaint_categorizer
 import logging
 import json
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -369,3 +370,98 @@ def get_available_staff(request):
         return Response({
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ─── Chatbot Proxy ────────────────────────────────────────────────────────────
+
+CHATBOT_SYSTEM_PROMPT = """You are a helpful AI assistant for Rail Madad, an integrated helpline system for Indian Railways passengers and staff. Your role is to assist both passengers and railway staff with their queries and guide them through the platform features.
+
+For Passengers, help with: filing complaints (type, severity, train/PNR, location, date, description), tracking complaint status, understanding notifications, the feedback system, real-time support options, and profile/settings features.
+
+For Railway Staff, help with: the staff dashboard, complaint management workflow (Submitted to Assigned to In Progress to Resolved to Closed), adding internal notes, and communication features.
+
+Platform key info:
+- Emergency contacts: Railway Helpline 139, Security 182, Medical +91 11 2338 4787
+- Website: https://rail-madad.manojkrishna.tech
+- Notification updates every 60 seconds
+- Supports 10+ Indian languages
+
+Response Guidelines:
+- Always provide responses in point-wise format with each point on a new line
+- Be polite, professional, and concise
+- Use emojis sparingly to keep responses friendly
+- Avoid formatting symbols like *, **, or quotation marks
+- Focus on clarity and ease of understanding
+- Guide users step-by-step for complex processes
+- Mention emergency helpline numbers when safety/security issues arise"""
+
+CHATBOT_MODELS = [
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-flash-latest',
+]
+
+
+@api_view(['POST'])
+def chatbot_proxy(request):
+    """
+    Proxy endpoint for the AI assistant chatbot.
+    Calls Gemini API server-side using GEMINI_CHATBOT_API_KEY so no API key
+    is needed in the frontend environment.
+
+    Request body: { "message": "<user message>" }
+    Response:     { "response": "<assistant reply>" }
+                  { "error": "<message>", "type": "rate_limit|api_error|server_error" }
+    """
+    import google.generativeai as genai
+
+    user_message = request.data.get('message', '').strip()
+    if not user_message:
+        return Response({'error': 'message is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Validate message length to prevent abuse
+    if len(user_message) > 4000:
+        return Response({'error': 'Message too long (max 4000 characters)'}, status=status.HTTP_400_BAD_REQUEST)
+
+    api_key = (
+        os.getenv('GEMINI_CHATBOT_API_KEY') or
+        os.getenv('GOOGLE_GEMINI_API_KEY') or
+        os.getenv('GEMINI_API_KEY')
+    )
+    if not api_key:
+        logger.error('No Gemini API key configured for chatbot proxy')
+        return Response({'error': 'AI service not configured', 'type': 'server_error'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    genai.configure(api_key=api_key)
+    generation_config = {'temperature': 0.7, 'max_output_tokens': 1024}
+
+    prompt = f"{CHATBOT_SYSTEM_PROMPT}\n\nUser: {user_message}"
+
+    last_error = None
+    for model_name in CHATBOT_MODELS:
+        try:
+            model = genai.GenerativeModel(model_name=model_name, generation_config=generation_config)
+            response = model.generate_content(prompt)
+            reply = response.text.strip()
+            logger.info(f"Chatbot responded using model {model_name}")
+            return Response({'response': reply}, status=status.HTTP_200_OK)
+        except Exception as e:
+            err_str = str(e).lower()
+            last_error = str(e)
+            if 'quota' in err_str or 'rate' in err_str or '429' in err_str:
+                logger.warning(f"Rate limit on {model_name}, trying next model")
+                continue
+            logger.error(f"Chatbot error with model {model_name}: {e}")
+            break
+
+    # All models exhausted or non-rate-limit error
+    if last_error and ('quota' in last_error.lower() or 'rate' in last_error.lower()):
+        return Response(
+            {'error': 'All AI models are rate-limited. Please try again in a few minutes.', 'type': 'rate_limit'},
+            status=status.HTTP_429_TOO_MANY_REQUESTS
+        )
+
+    return Response(
+        {'error': 'AI service temporarily unavailable', 'type': 'api_error'},
+        status=status.HTTP_503_SERVICE_UNAVAILABLE
+    )

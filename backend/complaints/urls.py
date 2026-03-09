@@ -21,6 +21,7 @@ from .ai_classification_views import (
     auto_assign_complaint,
     health_check
 )
+from .ai_views import chatbot_proxy
 
 urlpatterns = [
     # Multimedia complaint filing (NEW - with Gemini AI)
@@ -77,6 +78,7 @@ urlpatterns = [
     path('ai/classification-info/', get_classification_info, name='classification_info'),
     path('ai/<int:complaint_id>/auto-assign/', auto_assign_complaint, name='auto_assign_complaint'),
     path('ai/health/', health_check, name='ai_health_check'),
+    path('ai/chat/', chatbot_proxy, name='chatbot_proxy'),
     
     # Staff management endpoints
     path('staff/dashboard/', views.staff_dashboard, name='staff_dashboard'),

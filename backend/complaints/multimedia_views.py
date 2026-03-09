@@ -5,6 +5,8 @@ Handles images, videos, and audio files
 import os
 import json
 import logging
+import tempfile
+from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from django.conf import settings
 from django.http import JsonResponse
@@ -73,14 +75,16 @@ def upload_file_to_cloudinary(file, resource_type='auto') -> Optional[str]:
         return None
 
 
-def process_multimedia_files(request) -> Tuple[Dict[str, List[str]], List[Tuple[str, str]]]:
+def process_multimedia_files(request) -> Tuple[Dict[str, List[str]], List[Tuple[str, str]], List[str]]:
     """
-    Process uploaded files and upload to Cloudinary
-    
+    Process uploaded files: upload to Cloudinary (if configured) and prepare for Gemini analysis.
+    Files are always saved to temp disk so Gemini can analyse them even when Cloudinary is absent.
+
     Returns:
-        Tuple of (urls_dict, files_for_analysis)
+        Tuple of (urls_dict, files_for_analysis, temp_files_to_cleanup)
         urls_dict: {'photos': [...], 'videos': [...], 'audio_files': [...]}
-        files_for_analysis: [(url, type), ...]
+        files_for_analysis: [(path_or_url, type), ...]
+        temp_files_to_cleanup: list of temp file paths to delete after analysis
     """
     urls = {
         'photos': [],
@@ -88,35 +92,79 @@ def process_multimedia_files(request) -> Tuple[Dict[str, List[str]], List[Tuple[
         'audio_files': []
     }
     files_for_analysis = []
-    
+    temp_files = []
+
+    cloudinary_ready = configure_cloudinary()
+
+    def _save_temp(uploaded_file, suffix: str) -> str:
+        """Save an uploaded file to a named temp file and return its path."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            for chunk in uploaded_file.chunks():
+                tmp.write(chunk)
+            return tmp.name
+
     # Process photos
     photos = request.FILES.getlist('photos')
     for photo in photos:
-        url = upload_file_to_cloudinary(photo, 'image')
+        suffix = Path(photo.name).suffix or '.jpg'
+        tmp_path = _save_temp(photo, suffix)
+        temp_files.append(tmp_path)
+
+        url = None
+        if cloudinary_ready:
+            photo.seek(0)
+            url = upload_file_to_cloudinary(photo, 'image')
+
         if url:
             urls['photos'].append(url)
             files_for_analysis.append((url, 'image'))
-            logger.info(f"✅ Photo uploaded: {url}")
-    
+            logger.info(f"✅ Photo uploaded to Cloudinary: {url}")
+        else:
+            # Fall back to local temp file for Gemini analysis
+            files_for_analysis.append((tmp_path, 'image'))
+            logger.info(f"📁 Photo saved locally for Gemini analysis: {tmp_path}")
+
     # Process videos
     videos = request.FILES.getlist('videos')
     for video in videos:
-        url = upload_file_to_cloudinary(video, 'video')
+        suffix = Path(video.name).suffix or '.mp4'
+        tmp_path = _save_temp(video, suffix)
+        temp_files.append(tmp_path)
+
+        url = None
+        if cloudinary_ready:
+            video.seek(0)
+            url = upload_file_to_cloudinary(video, 'video')
+
         if url:
             urls['videos'].append(url)
             files_for_analysis.append((url, 'video'))
-            logger.info(f"✅ Video uploaded: {url}")
-    
+            logger.info(f"✅ Video uploaded to Cloudinary: {url}")
+        else:
+            files_for_analysis.append((tmp_path, 'video'))
+            logger.info(f"📁 Video saved locally for Gemini analysis: {tmp_path}")
+
     # Process audio files
     audio_files = request.FILES.getlist('audio_files')
     for audio in audio_files:
-        url = upload_file_to_cloudinary(audio, 'video')  # Audio as video resource type
+        suffix = Path(audio.name).suffix or '.mp3'
+        tmp_path = _save_temp(audio, suffix)
+        temp_files.append(tmp_path)
+
+        url = None
+        if cloudinary_ready:
+            audio.seek(0)
+            url = upload_file_to_cloudinary(audio, 'video')  # Cloudinary treats audio as video resource
+
         if url:
             urls['audio_files'].append(url)
             files_for_analysis.append((url, 'audio'))
-            logger.info(f"✅ Audio uploaded: {url}")
-    
-    return urls, files_for_analysis
+            logger.info(f"✅ Audio uploaded to Cloudinary: {url}")
+        else:
+            files_for_analysis.append((tmp_path, 'audio'))
+            logger.info(f"📁 Audio saved locally for Gemini analysis: {tmp_path}")
+
+    return urls, files_for_analysis, temp_files
 
 
 @api_view(["POST"])
@@ -170,8 +218,11 @@ def file_complaint_with_multimedia(request):
             logger.warning("⚠️ No authenticated user")
         
         # Process and upload multimedia files
-        logger.info("📤 Uploading files to Cloudinary...")
-        urls_dict, files_for_analysis = process_multimedia_files(request)
+        logger.info("📤 Processing multimedia files...")
+        urls_dict, files_for_analysis, temp_files = process_multimedia_files(request)
+        
+        if not files_for_analysis:
+            logger.warning("⚠️ No multimedia files received in request")
         
         # Store URLs as JSON in database
         if urls_dict['photos']:
@@ -270,6 +321,13 @@ def file_complaint_with_multimedia(request):
                 logger.error(f"❌ Gemini AI analysis failed: {e}")
                 # Continue without AI analysis
         
+        # Clean up temp files now that Gemini analysis is done
+        for tmp_path in temp_files:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
         # Ensure description is set (either from user or AI or default)
         if not data.get('description'):
             data['description'] = 'Complaint filed with multimedia attachments'

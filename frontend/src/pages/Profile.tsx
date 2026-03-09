@@ -707,10 +707,12 @@ const Profile: React.FC = () => {
           </div>
         </div>
 
-        {/* Face Authentication Section */}
-        <div className="mt-8">
-          <FaceAuthSettings />
-        </div>
+        {/* Face Authentication Section - Admin only */}
+        {localStorage.getItem('loginType') === 'admin' && (
+          <div className="mt-8">
+            <FaceAuthSettings />
+          </div>
+        )}
       </div>
     </div>
   );
